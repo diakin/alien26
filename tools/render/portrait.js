@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildStockySoldier } from './soldier2.js';
 import { buildRifle } from './actors.js';
 import { setEnvIntensity } from './lib.js';
-import { buildStockyAlien, setAlienFacing } from './alien2.js';
+import { buildReptileAlien, setAlienFacing } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -34,14 +34,14 @@ window.renderPortrait = (camo) => {
     camera.position.set(2.6, 3.9, 9.0);
     camera.lookAt(0.15, 2.5, 0);
   } else if (camo === 'alien') {
-    model = buildStockyAlien('idle');
+    model = buildReptileAlien('idle');
     model.rotation.y = 1.0;
     studio.add(model);
     setAlienFacing(model);
     model.updateMatrixWorld(true);
     const head = model.localToWorld(model.userData.head.clone());
     camera.position.set(head.x + 0.3, head.y - 0.05, head.z + 2.4);
-    camera.lookAt(head.x - 0.02, head.y - 0.22, head.z);
+    camera.lookAt(head.x - 0.02, head.y - 0.19, head.z);
   } else {
     model = buildStockySoldier({ ...LOADOUTS[camo], pose: 'idle' });
     model.rotation.y = 0.35;
@@ -53,9 +53,17 @@ window.renderPortrait = (camo) => {
   }
   setEnvIntensity(model, 0.5);
   renderer.setClearColor(0x000000, 1);
-  renderer.setSize(300, 360);
+  // пришельца рендерим вдвое крупнее и уменьшаем: мелкая чешуя без ряби
+  const supersample = camo === 'alien' ? 2 : 1;
+  renderer.setSize(300 * supersample, 360 * supersample);
   renderer.render(studio, camera);
-  return renderer.domElement.toDataURL('image/png');
+  if (supersample === 1) return renderer.domElement.toDataURL('image/png');
+  const reduced = document.createElement('canvas');
+  reduced.width = 300; reduced.height = 360;
+  const context = reduced.getContext('2d');
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(renderer.domElement, 0, 0, 300, 360);
+  return reduced.toDataURL('image/png');
 };
 
 window.renderWeapon = (camo) => {

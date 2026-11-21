@@ -8,7 +8,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { toXZ } from './world.js';
 import { buildStockySoldier, walkCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
-import { buildStockyAlien, alienWalkCycle, setAlienFacing } from './alien2.js';
+import { buildReptileAlien, alienWalkCycle, setAlienFacing } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
@@ -66,14 +66,17 @@ const camera = new THREE.OrthographicCamera(-FRAME_W_M / 2, FRAME_W_M / 2, FRAME
 let composer = null;
 let currentFrame = '';
 // кадр [ширина м, высота м, высота центра м]; камера, буфер и проход затенения подстраиваются
-function setFrame(frame) {
-  const key = frame.join(',');
+// supersample: во сколько раз крупнее рендерить буфер (потом уменьшается) — сглаживает мелкий рельеф
+let SUPERSAMPLE = 1;
+function setFrame(frame, supersample = 1) {
+  const key = frame.join(',') + 'x' + supersample;
   if (key === currentFrame) return;
   currentFrame = key;
   [FRAME_W_M, FRAME_H_M] = frame;
   WIDTH = Math.round(FRAME_W_M * PIXELS_PER_METER);
   HEIGHT = Math.round(FRAME_H_M * PIXELS_PER_METER);
-  renderer.setSize(WIDTH, HEIGHT);
+  SUPERSAMPLE = supersample;
+  renderer.setSize(WIDTH * supersample, HEIGHT * supersample);
   Object.assign(camera, { left: -FRAME_W_M / 2, right: FRAME_W_M / 2, top: FRAME_H_M / 2, bottom: -FRAME_H_M / 2 });
   lookAt.set(0, frame[2], 0);
   const down = toXZ(0, 1);
@@ -86,9 +89,9 @@ function setFrame(frame) {
   sun.shadow.camera.updateProjectionMatrix();
   try {
     composer = new EffectComposer(renderer);
-    composer.setSize(WIDTH, HEIGHT);
+    composer.setSize(WIDTH * supersample, HEIGHT * supersample);
     composer.addPass(new RenderPass(scene, camera));
-    const gtao = new GTAOPass(scene, camera, WIDTH, HEIGHT);
+    const gtao = new GTAOPass(scene, camera, WIDTH * supersample, HEIGHT * supersample);
     gtao.updateGtaoMaterial({ radius: 0.18 * Math.max(1, frame[1] / 2.8), distanceExponent: 1.5, thickness: 1.5, scale: 1.4, samples: 16 });
     gtao.blendIntensity = 1.0;
     composer.addPass(gtao);
@@ -108,6 +111,20 @@ export function facingYaw(direction) {
   const angle = direction * Math.PI / 4;
   const xz = toXZ(-Math.sin(angle), Math.cos(angle));
   return Math.atan2(xz.x, xz.y);
+}
+
+// снимок буфера в размере WIDTH x HEIGHT (с уменьшением при суперсэмплинге)
+const reduceCanvas = document.createElement('canvas');
+function capture() {
+  if (SUPERSAMPLE === 1) return renderer.domElement.toDataURL('image/png');
+  reduceCanvas.width = WIDTH;
+  reduceCanvas.height = HEIGHT;
+  const context = reduceCanvas.getContext('2d');
+  context.clearRect(0, 0, WIDTH, HEIGHT);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(renderer.domElement, 0, 0, WIDTH, HEIGHT);
+  return reduceCanvas.toDataURL('image/png');
 }
 
 function anchor() {
@@ -135,9 +152,9 @@ function buildRockObject(seed, radius) {
 
 window.renderSprite = (options, direction) => {
   let soldier;
-  setFrame(options.frame || DEFAULT_FRAME);
+  setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
-  else if (options.alien) soldier = buildStockyAlien(options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
+  else if (options.alien) soldier = buildReptileAlien(options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {
     const spriteOptions = { ...options };
@@ -154,14 +171,14 @@ window.renderSprite = (options, direction) => {
   camera.layers.set(0);
   scene.background = new THREE.Color(0x7f7f7f);
   if (composer) composer.render(); else renderer.render(scene, camera);
-  const color = renderer.domElement.toDataURL('image/png');
+  const color = capture();
 
   // 2. маска силуэта
   scene.background = new THREE.Color(0x000000);
   scene.overrideMaterial = white;
   renderer.render(scene, camera);
   scene.overrideMaterial = null;
-  const mask = renderer.domElement.toDataURL('image/png');
+  const mask = capture();
 
   // 3. тень на земле (боец невидим для камеры, но отбрасывает тень)
   scene.background = null;
@@ -170,7 +187,7 @@ window.renderSprite = (options, direction) => {
   camera.layers.enableAll();
   renderer.render(scene, camera);
   camera.layers.set(0);
-  const shadow = renderer.domElement.toDataURL('image/png');
+  const shadow = capture();
 
   scene.remove(soldier);
   return { color, mask, shadow, anchor: anchor(), width: WIDTH, height: HEIGHT, scale: PIXELS_PER_METER };
