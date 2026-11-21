@@ -8,7 +8,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { toXZ } from './world.js';
 import { buildStockySoldier, walkCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
-import { buildStockyAlien, alienWalkCycle } from './alien2.js';
+import { buildStockyAlien, alienWalkCycle, setAlienFacing } from './alien2.js';
 import { buildMechPosed } from './mechpose.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
@@ -145,6 +145,7 @@ window.renderSprite = (options, direction) => {
     soldier = buildStockySoldier(spriteOptions);
   }
   soldier.rotation.y = facingYaw(direction);
+  if (options.alien) setAlienFacing(soldier);
   setEnvIntensity(soldier, 0.28);
   scene.add(soldier);
   soldier.updateMatrixWorld(true);

@@ -511,3 +511,63 @@ export function setEnvIntensity(root, value) {
     }
   });
 }
+
+// чешуя: ряды перекрывающихся скруглённых чешуек (нижний ряд поверх верхнего), бесшовно
+export function scaleTextures({ columns = 10, rows = 14, seed = 51, size = 512 } = {}) {
+  const rng = mulberry32(seed);
+  const heights = new Float32Array(size * size);
+  const shade = new Float32Array(size * size);
+  const cellW = size / columns, cellH = size / rows;
+  // каждая чешуйка — полуэллипс, «висящий» вниз от своей точки крепления
+  const scales = [];
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      scales.push({ x: (column + (row % 2) * 0.5) * cellW, y: row * cellH, tone: 0.86 + rng() * 0.22, row });
+    }
+  }
+  const radiusX = cellW * 0.62, radiusY = cellH * 1.45;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      // ищем самую нижнюю (последнюю нарисованную) чешуйку, накрывающую пиксель
+      let best = null, bestDepth = 0, bestRow = -1;
+      const rowGuess = Math.floor(y / cellH);
+      for (let dr = -2; dr <= 0; dr++) {
+        const row = rowGuess + dr;
+        const wrappedRow = ((row % rows) + rows) % rows;
+        const offsetY = Math.floor(row / rows) * size;
+        for (let dc = -1; dc <= 1; dc++) {
+          const column = Math.floor((x - (wrappedRow % 2) * 0.5 * cellW) / cellW) + dc;
+          const wrappedColumn = ((column % columns) + columns) % columns;
+          const scale = scales[wrappedRow * columns + wrappedColumn];
+          const centerX = scale.x + Math.floor(column / columns) * size;
+          const centerY = scale.y + offsetY;
+          const dx = (x - centerX) / radiusX, dy = (y - centerY) / radiusY;
+          if (dy < 0 || dy > 1) continue;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance >= 1) continue;
+          if (row > bestRow) { bestRow = row; best = scale; bestDepth = distance; }
+        }
+      }
+      const index = y * size + x;
+      if (best) {
+        // купол: выше в середине, низ чешуйки приподнят над следующей
+        heights[index] = Math.sqrt(1 - bestDepth * bestDepth) * 0.8 + (1 - bestDepth) * 0.2;
+        const rim = Math.max(0, bestDepth - 0.82) / 0.18;            // светлый край
+        shade[index] = best.tone * (0.78 + 0.32 * (1 - bestDepth)) + rim * 0.12;
+      } else {
+        heights[index] = 0; shade[index] = 0.55;
+      }
+    }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(size, size);
+  for (let index = 0; index < size * size; index++) {
+    const value = Math.max(0, Math.min(255, shade[index] * 210 + (rng() - 0.5) * 8));
+    image.data[index * 4] = image.data[index * 4 + 1] = image.data[index * 4 + 2] = value;
+    image.data[index * 4 + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+  return { map: canvasTexture(canvas), normalMap: normalFromHeight(heights, size, 6) };
+}

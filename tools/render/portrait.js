@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildStockySoldier } from './soldier2.js';
 import { buildRifle } from './actors.js';
 import { setEnvIntensity } from './lib.js';
-import { buildStockyAlien } from './alien2.js';
+import { buildStockyAlien, setAlienFacing } from './alien2.js';
 import { buildMechPosed } from './mechpose.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -37,6 +37,7 @@ window.renderPortrait = (camo) => {
     model = buildStockyAlien('idle');
     model.rotation.y = 1.0;
     studio.add(model);
+    setAlienFacing(model);
     model.updateMatrixWorld(true);
     const head = model.localToWorld(model.userData.head.clone());
     camera.position.set(head.x + 0.3, head.y - 0.05, head.z + 2.4);
