@@ -340,13 +340,13 @@ export function buildParts(spec) {
   const tailQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, spec.twist, 0));
   const tailBase = torso.point(0, 0.0, -0.12);
   const tail = new Bone(tailBase, tailQuat, V(0.53, 0.17, 0.29));
-  const tailPoints = [[0, 0, 0], [0, -0.22, -0.24], [0.03, -0.56, -0.42], [0.08, -0.86, -0.58], [0.17, -1.02, -0.74], [0.28, -1.06, -0.84]]
+  const tailPoints = [[0, 0, 0], [0, -0.2, -0.17], [0.02, -0.45, -0.3], [0.05, -0.66, -0.42], [0.1, -0.8, -0.52], [0.16, -0.87, -0.6]]
     .map(([x, y, z], index) => {
       const sway = -spec.twist * 0.7 * (index / 5) ** 2;
       const point = tail.point(x + sway, y, z);
       return point;
     });
-  const tailRadii = [0.1, 0.085, 0.062, 0.042, 0.027, 0.014];
+  const tailRadii = [0.075, 0.058, 0.042, 0.029, 0.018, 0.009];
   tailPoints.forEach((point, index) => { point.y = Math.max(point.y, tailRadii[index] + 0.004); });
   for (let index = 0; index < tailPoints.length - 1; index++) {
     field.cone(tail, tailPoints[index], tailPoints[index + 1], tailRadii[index], tailRadii[index + 1], { k: 0.04, cell: 0.036 - index * 0.003 });
@@ -492,7 +492,7 @@ export function buildParts(spec) {
       const direction = tailPoints[index + 1].clone().sub(tailPoints[index]).normalize();
       const outward = up.clone().addScaledVector(direction, 0.5).normalize();
       const size = 1 - (index + part) / tailPoints.length;
-      horns.push(hornGeometry(surface.addScaledVector(up, -0.006), outward, direction, 0.012 + 0.03 * size, 0.004 + 0.009 * size, BONE_DARK, BONE_TIP, 0.3));
+      horns.push(hornGeometry(surface.addScaledVector(up, -0.006), outward, direction, 0.01 + 0.022 * size, 0.0035 + 0.007 * size, BONE_DARK, BONE_TIP, 0.3));
     }
   }
   for (const { fore, foreLength, side, upper } of hands) {
