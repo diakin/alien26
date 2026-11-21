@@ -174,6 +174,7 @@ game_map = {
     'indoor': flat(layout['indoor'], TILES),
     'blocked': blocked,
     'doors': DOORS,
+    'stairs': [[stair['level'], stair['col'], stair['row'], stair['dirCol'], stair['dirRow'], stair['count']] for stair in layout['stairs']],
     'links': [{'from': link['from'], 'to': link['to'], 'cost': link['cost'], 'kind': link['kind']} for link in layout['links']],
     'spawns': layout['spawns'],
     'variants': variants,

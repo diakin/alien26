@@ -99,7 +99,7 @@ export function buildLayout() {
   object('console', 0, 3, 3); object('console', 0, 4, 3); object('locker', 0, 6, 3);
   object('bunk', 0, 9, 3, 2, 1); object('locker', 0, 10, 5);
   object('labTable', 0, 9, 8, 2, 1); object('cabinet', 0, 10, 9);
-  object('crate', 0, 3, 9); object('crate', 0, 3, 7);
+  object('crate', 0, 7, 9); object('crate', 0, 3, 7);          // у подножия лестницы (3,8) свободно
   object('rack', 1, 10, 7); object('rack', 1, 10, 8); object('rack', 1, 10, 9);
   object('desk', 1, 4, 3, 2, 1); object('console', 1, 9, 3); object('crate', 1, 3, 5); object('crate', 1, 3, 6);
   // крыша: вентиляция, мачта; приставная лестница с земли на крышу по восточной стене

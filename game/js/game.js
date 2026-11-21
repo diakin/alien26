@@ -65,6 +65,21 @@
     if (nextRow === row - 1) return !wallBlocks(MAP.wallN, level, col, row);
     return true;
   }
+  // лестничные марши: на ступени и со ступеней ходят только вдоль марша
+  var stairRuns = (MAP.stairs || []).map(function (stair) {
+    var run = { level: stair[0], dirCol: stair[3], dirRow: stair[4], tiles: [] };
+    for (var step = 0; step < stair[5]; step++) run.tiles.push({ col: stair[1] + stair[3] * step, row: stair[2] + stair[4] * step });
+    var last = run.tiles[run.tiles.length - 1];
+    run.lastCol = last.col; run.lastRow = last.row;
+    return run;
+  });
+  var stairAt = {};
+  stairRuns.forEach(function (run) { run.tiles.forEach(function (tile) { stairAt[run.level + ':' + tile.col + ':' + tile.row] = run; }); });
+  function stairRun(col, row, level) { return stairAt[level + ':' + col + ':' + row] || null; }
+  function alongRun(run, deltaCol, deltaRow) {
+    return (deltaCol === run.dirCol && deltaRow === run.dirRow) || (deltaCol === -run.dirCol && deltaRow === -run.dirRow);
+  }
+
   function nodeKey(col, row, level) { return (level * GRID + row) * GRID + col; }
   function keyNode(key) { return { col: key % GRID, row: Math.floor(key / GRID) % GRID, level: Math.floor(key / (GRID * GRID)) }; }
 
@@ -163,6 +178,9 @@
     }
     var from = elevationOf(col, row, level), to = elevationOf(nextCol, nextRow, nextLevel);
     if (Math.abs(to - from) > MAX_STEP) return false;
+    var runFrom = stairRun(col, row, level), runTo = stairRun(nextCol, nextRow, nextLevel);
+    if (runFrom && !alongRun(runFrom, deltaCol, deltaRow)) return false;
+    if (runTo && !alongRun(runTo, deltaCol, deltaRow)) return false;
     if (deltaCol && deltaRow) {
       if (nextLevel !== level) return false;
       if (stairOffset(col, row, level) || stairOffset(nextCol, nextRow, level) || stairOffset(col + deltaCol, row, level) || stairOffset(col, row + deltaRow, level)) return false;
@@ -447,8 +465,25 @@
   var mouse = { x: 0, y: 0, overView: false, dragging: false, dragStartX: 0, dragStartY: 0, cameraStartX: 0, cameraStartY: 0, moved: false };
 
   // клетка под курсором: сначала на текущем уровне, ниже — если там нет пола
+  function insideQuad(x, y, corners) {
+    var inside = false;
+    for (var index = 0, previous = 3; index < 4; previous = index++) {
+      var first = corners[index], second = corners[previous];
+      if ((first.y > y) !== (second.y > y) && x < (second.x - first.x) * (y - first.y) / (second.y - first.y) + first.x) inside = !inside;
+    }
+    return inside;
+  }
   function tileUnderMouse() {
     if (!mouse.overView) return null;
+    var pointX = mouse.x + camera.x, pointY = mouse.y + camera.y, best = null;
+    stairRuns.forEach(function (run) {
+      if (run.level > view.level) return;
+      run.tiles.forEach(function (tile) {
+        var elevation = elevationOf(tile.col, tile.row, run.level);
+        if (insideQuad(pointX, pointY, Iso.tileCorners(tile.col, tile.row, elevation)) && (!best || elevation > best.elevation)) best = { col: tile.col, row: tile.row, level: run.level, elevation: elevation };
+      });
+    });
+    if (best) return { col: best.col, row: best.row, level: best.level };
     for (var level = view.level; level >= 0; level--) {
       var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y + level * LEVEL_H * Iso.pixelsPerMeterUp);
       var col = Math.floor(grid.col), row = Math.floor(grid.row);
@@ -637,7 +672,13 @@
   // на лестнице юнит стоит перед стеной: рисуется после всех кусков своей клетки (парапет, перекрытия)
   function unitDepth(unit) {
     var climbing = unit.path.length && unit.path[0].climb;
-    return depthKey(unit.col, unit.row, climbing ? LEVELS - 1 : unit.level, 3.5) + (unit.size - 1) * 100;
+    if (climbing) return depthKey(unit.col, unit.row, LEVELS - 1, 3.5);
+    var run = stairRun(unit.col, unit.row, unit.level);
+    if (run) {
+      var last = depthKey(run.lastCol, run.lastRow, run.level, 1.5), first = depthKey(run.tiles[0].col, run.tiles[0].row, run.level, 1.5);
+      return Math.max(last, first, depthKey(unit.col, unit.row, unit.level, 3.5));
+    }
+    return depthKey(unit.col, unit.row, unit.level, 3.5) + (unit.size - 1) * 100;
   }
 
   // ---------------- отрисовка ----------------
@@ -645,23 +686,109 @@
     context.moveTo(first.x - camera.x, first.y - camera.y);
     context.lineTo(second.x - camera.x, second.y - camera.y);
   }
-  // сетка: ромбы клеток текущего уровня, где есть пол
-  function drawGrid() {
-    context.save();
-    context.beginPath();
-    var level = view.level;
+  // граница пола уровня: стороны клетки, за которыми на этом уровне пола нет
+  var boundaryCache = {};
+  function boundaryEdges(level) {
+    if (boundaryCache[level]) return boundaryCache[level];
+    var edges = {};
     for (var row = 0; row < GRID; row++) {
       for (var col = 0; col < GRID; col++) {
         if (!floorAt(col, row, level)) continue;
-        var corners = Iso.tileCorners(col, row, elevationOf(col, row, level));
-        line(corners[0], corners[1]); line(corners[1], corners[2]); line(corners[2], corners[3]); line(corners[3], corners[0]);
+        // стороны: 0 — к row-1, 1 — к col+1, 2 — к row+1, 3 — к col-1 (по углам ромба 0-1, 1-2, 2-3, 3-0)
+        var sides = [!floorAt(col, row - 1, level), !floorAt(col + 1, row, level), !floorAt(col, row + 1, level), !floorAt(col - 1, row, level)];
+        if (sides[0] || sides[1] || sides[2] || sides[3]) edges[row * GRID + col] = sides;
       }
     }
-    context.strokeStyle = 'rgba(10, 20, 6, 0.3)';
-    context.lineWidth = 2.2;
+    boundaryCache[level] = edges;
+    return edges;
+  }
+  function quadPath(corners) {
+    context.beginPath();
+    context.moveTo(corners[0].x - camera.x, corners[0].y - camera.y);
+    for (var index = 1; index < 4; index++) context.lineTo(corners[index].x - camera.x, corners[index].y - camera.y);
+    context.closePath();
+  }
+  function quadRect(corners, pad) {
+    var xs = corners.map(function (point) { return point.x; }), ys = corners.map(function (point) { return point.y; });
+    var left = Math.min.apply(null, xs) - pad, top = Math.min.apply(null, ys) - pad;
+    return { x: left, y: top, width: Math.max.apply(null, xs) + pad - left, height: Math.max.apply(null, ys) + pad - top };
+  }
+  // элементы подсветки на полу: рисуются в общем порядке глубины, стены и предметы впереди их закрывают
+  function floorOverlays() {
+    var items = [];
+    var level = view.level;
+    var tint = level > 0, edges = boundaryEdges(level);
+    if (tint || showGrid) {
+      for (var row = 0; row < GRID; row++) {
+        for (var col = 0; col < GRID; col++) {
+          if (!floorAt(col, row, level)) continue;
+          var sides = edges[row * GRID + col];
+          if (!tint && !showGrid) continue;
+          (function (col, row, sides) {
+            var corners = Iso.tileCorners(col, row, elevationOf(col, row, level));
+            items.push({ depth: depthKey(col, row, level, 1.2), rect: quadRect(corners, 3), draw: function () {
+              if (tint) { quadPath(corners); context.fillStyle = 'rgba(120, 205, 255, 0.15)'; context.fill(); }
+              if (showGrid) {
+                quadPath(corners);
+                context.strokeStyle = 'rgba(10, 20, 6, 0.28)'; context.lineWidth = 2; context.stroke();
+                context.strokeStyle = 'rgba(235, 245, 215, 0.3)'; context.lineWidth = 1; context.stroke();
+              }
+              if (tint && sides) {
+                context.strokeStyle = 'rgba(140, 220, 255, 0.95)';
+                context.lineWidth = 2.5;
+                for (var side = 0; side < 4; side++) {
+                  if (!sides[side]) continue;
+                  var first = corners[side], second = corners[(side + 1) % 4];
+                  context.beginPath();
+                  context.moveTo(first.x - camera.x, first.y - camera.y);
+                  context.lineTo(second.x - camera.x, second.y - camera.y);
+                  context.stroke();
+                }
+              }
+            } });
+          })(col, row, sides);
+        }
+      }
+    }
+    // клетка выбранного юнита
+    if (selected && selected.level <= view.level && !selected.path.length) {
+      var unitCorners = Iso.tileCorners(selected.col, selected.row, elevationOf(selected.col, selected.row, selected.level), selected.size);
+      items.push({ depth: depthKey(selected.col, selected.row, selected.level, 1.3), rect: quadRect(unitCorners, 3), draw: function () {
+        quadPath(unitCorners);
+        context.fillStyle = 'rgba(255, 210, 60, 0.16)'; context.fill();
+        context.strokeStyle = 'rgba(255, 210, 60, 0.85)'; context.lineWidth = 1.6; context.stroke();
+      } });
+    }
+    // клетка под курсором
+    if (hoverTile) {
+      var size = selected ? selected.size : 1;
+      var hoverCorners = Iso.tileCorners(hoverTile.col, hoverTile.row, elevationOf(hoverTile.col, hoverTile.row, hoverTile.level), size);
+      var reachable = busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level);
+      items.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.4), rect: quadRect(hoverCorners, 3), draw: function () {
+        quadPath(hoverCorners);
+        context.fillStyle = reachable ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 90, 70, 0.25)'; context.fill();
+        context.strokeStyle = reachable ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 110, 90, 0.95)'; context.lineWidth = 2; context.stroke();
+      } });
+    }
+    return items;
+  }
+
+  // отвес от клетки на верхнем уровне до земли: видно, над какой клеткой земли курсор
+  function drawDropLine(tile) {
+    var elevation = elevationOf(tile.col, tile.row, tile.level);
+    if (elevation < 0.3) return;
+    var top = Iso.toScreen(tile.col + 0.5, tile.row + 0.5, elevation), bottom = Iso.toScreen(tile.col + 0.5, tile.row + 0.5, 0);
+    context.save();
+    context.setLineDash([4, 4]);
+    context.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    context.lineWidth = 1.2;
+    context.beginPath();
+    context.moveTo(top.x - camera.x, top.y - camera.y);
+    context.lineTo(bottom.x - camera.x, bottom.y - camera.y);
     context.stroke();
-    context.strokeStyle = 'rgba(235, 245, 215, 0.32)';
-    context.lineWidth = 1;
+    context.setLineDash([]);
+    context.beginPath();
+    context.ellipse(bottom.x - camera.x, bottom.y - camera.y, 7, 4, 0, 0, Math.PI * 2);
     context.stroke();
     context.restore();
   }
@@ -787,19 +914,18 @@
     var wanted = variants[variantKey(view.level, view.cut)];
     if (wanted && wanted.ready) shownVariant = wanted;
     if (shownVariant && shownVariant.background.complete) context.drawImage(shownVariant.background, -Math.round(camera.x), -Math.round(camera.y));
-    if (showGrid) drawGrid();
 
     var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level));
     var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
     // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка.
     // Для робота рамка охватывает всю его площадку 2x2.
     var boxSize = selected ? selected.size : 1;
-    if (hoverTile) drawBox(hoverTile, hoverColor, 'back', boxSize);
-    drawPath();
-
     // объекты по глубине: диагональ клетки (col + row), затем уровень, затем часть клетки
     var drawList = [];
     var rects = [];
+    floorOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
+    if (hoverTile) drawList.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
+    drawList.push({ depth: -1, draw: drawPath });
     units.forEach(function (unit) {
       if (unit.level > view.level) return;          // выше уровня обзора — не видно
       var position = drawPosition(unit);
@@ -829,7 +955,7 @@
 
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
-    if (hoverTile) drawBox(hoverTile, hoverColor, 'front', boxSize);
+    if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
   }
 
   // ---------------- связь с панелью ----------------
