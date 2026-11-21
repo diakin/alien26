@@ -1,21 +1,28 @@
-// Прототип: поле, бойцы, выбор мышью, ходьба по клеткам, очки действия.
-// Панель интерфейса (panel.js) читает состояние и вызывает действия через window.Game.
+// Прототип: карта с уровнями, бойцы, выбор мышью, ходьба по клеткам, лестницы, очки действия.
+// Карта (MAP, FIELD) приходит из js/maps/*.js. Панель (panel.js) читает состояние через window.Game.
+//
+// Отрисовка как в UFO: виден выбранный уровень и все нижние. Фон варианта — готовая картинка
+// (уровни 0..V, стены верхнего уровня целые или срезанные). Поверх юнитов перерисовываются
+// только те куски картинки (стены, предметы, перекрытия), которые стоят ближе к зрителю.
 (function () {
   'use strict';
 
-  var GRID = FIELD.tiles;
+  var GRID = MAP.tiles, LEVELS = MAP.levels, LEVEL_H = MAP.levelHeight, WALL_STRIDE = GRID + 1;
   var WALK_FRAMES = 16;
   var BOX_HEIGHT = 1.9;                       // высота рамки-курсора, м
+  var MAX_STEP = 0.9;                         // наибольший перепад высоты за шаг (ступени), м
+  var CLIMB_SPEED = 1.1;                      // по приставной лестнице, м/с
+  var WALL_BLOCKS = [false, true, true, false, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник
 
   // типы юнитов: шаг анимации (stride, м за 16 кадров) совпадает с рендером спрайтов
   var KINDS = {
     soldier: { size: 1, speed: 1.5, stride: 1.32, height: 1.85, pickWidth: 26, canKneel: true },
     alien: { size: 1, speed: 1.5, stride: 1.2, height: 2.0, pickWidth: 26, canKneel: false },
-    mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false }
+    mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false, groundOnly: true }
   };
 
   // стоимость действий в очках действия (ОД)
-  var COST = { kneel: 4, stand: 8, turnStep: 1, reload: 15 };
+  var COST = { kneel: 4, stand: 8, turnStep: 1, reload: 15, step: 4, diagonal: 6, stairs: 2 };
   var MAGAZINE = 30;
   var FIRE_MODES = [
     { name: 'Прицельный', cost: 18 },
@@ -35,70 +42,296 @@
     images[name] = image;
     return image;
   }
-  var background = load('field', 'assets/maps/field01.jpg');
   Object.keys(SPRITE_ANCHORS).forEach(function (name) {
     load(name, (name.indexOf('rock') === 0 ? 'assets/objects/' : 'assets/units/') + name + '.png');
   });
 
-  // ---------------- состояние ----------------
-  var obstacles = [
-    { sprite: 'rock0', col: 5, row: 6 }, { sprite: 'rock2', col: 9, row: 9 }, { sprite: 'rock1', col: 10, row: 9 },
-    { sprite: 'rock3', col: 10, row: 10 }, { sprite: 'rock0', col: 13, row: 4 }, { sprite: 'rock1', col: 4, row: 13 },
-    { sprite: 'rock2', col: 15, row: 14 }, { sprite: 'rock3', col: 7, row: 16 }
-  ];
-  var blocked = new Uint8Array(GRID * GRID);
-  obstacles.forEach(function (rock) { blocked[rock.row * GRID + rock.col] = 1; });
+  // ---------------- клетки карты ----------------
+  function inside(col, row) { return col >= 0 && row >= 0 && col < GRID && row < GRID; }
+  function floorAt(col, row, level) { return inside(col, row) && level >= 0 && level < LEVELS ? MAP.floor[level][row * GRID + col] : 0; }
+  function elevationOf(col, row, level) { return level * LEVEL_H + (inside(col, row) ? MAP.offset[level][row * GRID + col] : 0); }
+  function stairOffset(col, row, level) { return MAP.offset[level][row * GRID + col]; }
+  function walkable(col, row, level) { return floorAt(col, row, level) > 0 && !MAP.blocked[level][row * GRID + col]; }
+  function isIndoor(col, row, level) { return inside(col, row) && MAP.indoor[level][row * GRID + col] === 1; }
+  function wallBlocks(walls, level, col, row) { return WALL_BLOCKS[walls[level][row * WALL_STRIDE + col]]; }
+  // можно ли пересечь грань между соседними по стороне клетками
+  function edgeOpen(col, row, nextCol, nextRow, level) {
+    if (nextCol === col + 1) return !wallBlocks(MAP.wallW, level, col + 1, row);
+    if (nextCol === col - 1) return !wallBlocks(MAP.wallW, level, col, row);
+    if (nextRow === row + 1) return !wallBlocks(MAP.wallN, level, col, row + 1);
+    if (nextRow === row - 1) return !wallBlocks(MAP.wallN, level, col, row);
+    return true;
+  }
+  function nodeKey(col, row, level) { return (level * GRID + row) * GRID + col; }
+  function keyNode(key) { return { col: key % GRID, row: Math.floor(key / GRID) % GRID, level: Math.floor(key / (GRID * GRID)) }; }
 
-  function makeUnit(profile, col, row, direction) {
+  // препятствия-спрайты (камни старой карты); на карте базы всё нарисовано в фоне
+  var obstacles = MAP.props || [];
+
+  // ---------------- юниты ----------------
+  function makeUnit(profile, spawn) {
     var kind = KINDS[profile.kind || 'soldier'];
     var unit = {
       kind: profile.kind || 'soldier', size: kind.size, speed: kind.speed, frameMeters: kind.stride / WALK_FRAMES,
-      height: kind.height, pickWidth: kind.pickWidth, canKneel: kind.canKneel,
+      height: kind.height, pickWidth: kind.pickWidth, canKneel: kind.canKneel, groundOnly: !!kind.groundOnly,
       spriteSet: profile.camo, portrait: profile.camo, statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'ЗДОРОВЬЕ', 'ВЫНОСЛИВОСТЬ', 'МОРАЛЬ'],
-      col: col, row: row, x: col + kind.size / 2, y: row + kind.size / 2, direction: direction,
-      path: [], walked: 0, moveCol: 0, moveRow: 0, segmentLength: 0,
+      col: spawn[0], row: spawn[1], level: spawn[2], direction: spawn[3],
+      x: spawn[0] + kind.size / 2, y: spawn[1] + kind.size / 2, elevation: elevationOf(spawn[0], spawn[1], spawn[2]),
+      path: [], walked: 0, moveCol: 0, moveRow: 0, segmentLength: 0, stepFrom: 0,
       kneeling: false, fireMode: 0
     };
     Object.keys(profile).forEach(function (key) { unit[key] = profile[key]; });
     unit.timeUnits = unit.maxTimeUnits;
     return unit;
   }
-  var units = [
-    makeUnit({ name: 'Андрей Волков', callsign: 'ВОРОН-1', rank: 'ст. сержант', role: 'ШТУРМОВИК', missions: 14, camo: 'black',
+  var PROFILES = [
+    { name: 'Андрей Волков', callsign: 'ВОРОН-1', rank: 'ст. сержант', role: 'ШТУРМОВИК', missions: 14, camo: 'black',
       maxTimeUnits: 56, health: 38, maxHealth: 45, stamina: 61, maxStamina: 70, morale: 88, optics: 'ПНВ',
-      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 28, reserve: 4 }, 3, 3, 0),
-    makeUnit({ name: 'Ирина Соколова', callsign: 'ВОРОН-2', rank: 'сержант', role: 'СТРЕЛОК', missions: 9, camo: 'green',
+      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 28, reserve: 4 },
+    { name: 'Ирина Соколова', callsign: 'ВОРОН-2', rank: 'сержант', role: 'СТРЕЛОК', missions: 9, camo: 'green',
       maxTimeUnits: 60, health: 41, maxHealth: 41, stamina: 66, maxStamina: 66, morale: 92, optics: 'ОЧКИ',
-      weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 30, reserve: 5 }, 5, 3, 0),
-    makeUnit({ name: 'Тимур Ахметов', callsign: 'ВОРОН-3', rank: 'мл. сержант', role: 'ПУЛЕМЁТЧИК', missions: 11, camo: 'green',
+      weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 30, reserve: 5 },
+    { name: 'Тимур Ахметов', callsign: 'ВОРОН-3', rank: 'мл. сержант', role: 'ПУЛЕМЁТЧИК', missions: 11, camo: 'green',
       maxTimeUnits: 52, health: 50, maxHealth: 52, stamina: 74, maxStamina: 80, morale: 79, optics: 'ОЧКИ',
-      weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 17, reserve: 3 }, 3, 5, 0),
-    makeUnit({ name: 'Олег Ржевский', callsign: 'ВОРОН-4', rank: 'ефрейтор', role: 'РАЗВЕДЧИК', missions: 6, camo: 'black',
+      weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 17, reserve: 3 },
+    { name: 'Олег Ржевский', callsign: 'ВОРОН-4', rank: 'ефрейтор', role: 'РАЗВЕДЧИК', missions: 6, camo: 'black',
       maxTimeUnits: 62, health: 33, maxHealth: 40, stamina: 58, maxStamina: 64, morale: 71, optics: 'ПНВ',
-      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 30, reserve: 2 }, 5, 5, 7),
+      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 30, reserve: 2 },
     // пришельцы и робот — для проверки ходьбы, пока управляются тем же игроком
-    makeUnit({ kind: 'alien', name: 'Страж, особь 1', callsign: 'ЦЕЛЬ-1', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
-      maxTimeUnits: 64, health: 58, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ',
-      weapon: null }, 13, 3, 1),
-    makeUnit({ kind: 'alien', name: 'Страж, особь 2', callsign: 'ЦЕЛЬ-2', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
-      maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ',
-      weapon: null }, 15, 6, 2),
-    makeUnit({ kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
+    { kind: 'alien', name: 'Страж, особь 1', callsign: 'ЦЕЛЬ-1', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
+      maxTimeUnits: 64, health: 58, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ', weapon: null },
+    { kind: 'alien', name: 'Страж, особь 2', callsign: 'ЦЕЛЬ-2', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
+      maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ', weapon: null },
+    { kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
       maxTimeUnits: 48, health: 180, maxHealth: 180, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
-      statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'], weapon: null }, 6, 8, 0)
+      statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'], weapon: null }
   ];
+  var units = PROFILES.map(function (profile, index) { return makeUnit(profile, MAP.spawns[index]); });
   var selected = units[0];
   var hoverTile = null, hoverPath = null, hoverAffordable = 0;
-  var showGrid = true;
+  var showGrid = !!MAP.grid;
   var turn = 1;
   var message = { text: '', until: 0 };
 
   function say(text) { message.text = text; message.until = Date.now() + 2200; }
 
+  // юнит, чья площадка накрывает клетку (col, row) на уровне level
+  function unitAt(col, row, level, except) {
+    for (var index = 0; index < units.length; index++) {
+      var unit = units[index];
+      if (unit !== except && unit.level === level && col >= unit.col && col < unit.col + unit.size && row >= unit.row && row < unit.row + unit.size) return unit;
+    }
+    return null;
+  }
+  // может ли mover встать углом площадки в (col, row) на уровне level
+  function isFreeFor(mover) {
+    var size = mover ? mover.size : 1;
+    return function (col, row, level) {
+      if (mover && mover.groundOnly && level !== 0) return false;
+      for (var dy = 0; dy < size; dy++) {
+        for (var dx = 0; dx < size; dx++) {
+          var cellCol = col + dx, cellRow = row + dy;
+          if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover)) return false;
+          if (size > 1 && stairOffset(cellCol, cellRow, level) !== 0) return false;
+          // внутри площадки большого юнита не должно быть стен
+          if (dx > 0 && !edgeOpen(cellCol - 1, cellRow, cellCol, cellRow, level)) return false;
+          if (dy > 0 && !edgeOpen(cellCol, cellRow - 1, cellCol, cellRow, level)) return false;
+        }
+      }
+      return true;
+    };
+  }
+
+  // шаг из (col, row, level) в соседнюю клетку (nextCol, nextRow, nextLevel)
+  function canStep(mover, free, col, row, level, nextCol, nextRow, nextLevel) {
+    if (!free(nextCol, nextRow, nextLevel)) return false;
+    var deltaCol = nextCol - col, deltaRow = nextRow - row;
+    var size = mover.size;
+    if (size > 1) {
+      if (nextLevel !== level) return false;
+      for (var dy = 0; dy < size; dy++) {
+        for (var dx = 0; dx < size; dx++) {
+          var fromCol = col + dx, fromRow = row + dy;
+          if (!stepEdgesOpen(fromCol, fromRow, deltaCol, deltaRow, level)) return false;
+        }
+      }
+      if (deltaCol && deltaRow && (!free(col + deltaCol, row, level) || !free(col, row + deltaRow, level))) return false;
+      return true;
+    }
+    var from = elevationOf(col, row, level), to = elevationOf(nextCol, nextRow, nextLevel);
+    if (Math.abs(to - from) > MAX_STEP) return false;
+    if (deltaCol && deltaRow) {
+      if (nextLevel !== level) return false;
+      if (stairOffset(col, row, level) || stairOffset(nextCol, nextRow, level) || stairOffset(col + deltaCol, row, level) || stairOffset(col, row + deltaRow, level)) return false;
+      if (!free(col + deltaCol, row, level) || !free(col, row + deltaRow, level)) return false;
+      return stepEdgesOpen(col, row, deltaCol, deltaRow, level);
+    }
+    return edgeOpen(col, row, nextCol, nextRow, level) && (nextLevel === level || edgeOpen(col, row, nextCol, nextRow, nextLevel));
+  }
+  function stepEdgesOpen(col, row, deltaCol, deltaRow, level) {
+    if (!deltaCol || !deltaRow) return edgeOpen(col, row, col + deltaCol, row + deltaRow, level);
+    return edgeOpen(col, row, col + deltaCol, row, level) && edgeOpen(col, row, col, row + deltaRow, level) &&
+      edgeOpen(col + deltaCol, row, col + deltaCol, row + deltaRow, level) && edgeOpen(col, row + deltaRow, col + deltaCol, row + deltaRow, level);
+  }
+
+  var DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  function findPath(mover, goal) {
+    var free = isFreeFor(mover);
+    if (!free(goal.col, goal.row, goal.level)) return null;
+    var goalKey = nodeKey(goal.col, goal.row, goal.level);
+    function neighbours(key, visit) {
+      var node = keyNode(key);
+      for (var index = 0; index < DIRECTIONS.length; index++) {
+        var nextCol = node.col + DIRECTIONS[index][0], nextRow = node.row + DIRECTIONS[index][1];
+        for (var nextLevel = node.level - 1; nextLevel <= node.level + 1; nextLevel++) {
+          if (nextLevel < 0 || nextLevel >= LEVELS) continue;
+          if (!canStep(mover, free, node.col, node.row, node.level, nextCol, nextRow, nextLevel)) continue;
+          var cost = index < 4 ? COST.step : COST.diagonal;
+          if (Math.abs(elevationOf(nextCol, nextRow, nextLevel) - elevationOf(node.col, node.row, node.level)) > 0.2) cost += COST.stairs;
+          visit(nodeKey(nextCol, nextRow, nextLevel), cost, null);
+        }
+      }
+      // приставные лестницы: в обе стороны
+      if (mover.size === 1) {
+        MAP.links.forEach(function (link) {
+          var bottom = link.from, top = link.to;
+          if (node.col === bottom[0] && node.row === bottom[1] && node.level === bottom[2] && free(top[0], top[1], top[2])) visit(nodeKey(top[0], top[1], top[2]), link.cost, { link: link, up: true });
+          if (node.col === top[0] && node.row === top[1] && node.level === top[2] && free(bottom[0], bottom[1], bottom[2])) visit(nodeKey(bottom[0], bottom[1], bottom[2]), link.cost, { link: link, up: false });
+        });
+      }
+    }
+    function heuristic(key) {
+      var node = keyNode(key);
+      var dx = Math.abs(node.col - goal.col), dy = Math.abs(node.row - goal.row);
+      return COST.step * (dx + dy) + (COST.diagonal - 2 * COST.step) * Math.min(dx, dy) + Math.abs(node.level - goal.level) * 2;
+    }
+    var raw = PathFinder.find(nodeKey(mover.col, mover.row, mover.level), goalKey, neighbours, heuristic, 30000);
+    if (!raw) return null;
+    // шаги для движения: у лестницы — подъём на месте и шаг на площадку (или наоборот)
+    var steps = [];
+    raw.forEach(function (item) {
+      var node = keyNode(item.key);
+      var elevation = elevationOf(node.col, node.row, node.level);
+      if (item.extra && item.extra.link) {
+        var link = item.extra.link, bottom = link.from, top = link.to;
+        var topElevation = elevationOf(top[0], top[1], top[2]);
+        var face = Iso.directionOf(top[0] - bottom[0], top[1] - bottom[1]);
+        if (item.extra.up) {
+          steps.push({ col: bottom[0], row: bottom[1], level: top[2], elevation: topElevation, climb: true, face: face, cost: item.cost });
+          steps.push({ col: top[0], row: top[1], level: top[2], elevation: topElevation, cost: 0 });
+        } else {
+          steps.push({ col: bottom[0], row: bottom[1], level: top[2], elevation: topElevation, cost: 0, ladderTop: true });
+          steps.push({ col: bottom[0], row: bottom[1], level: bottom[2], elevation: elevationOf(bottom[0], bottom[1], bottom[2]), climb: true, face: face, cost: item.cost });
+        }
+        return;
+      }
+      steps.push({ col: node.col, row: node.row, level: node.level, elevation: elevation, cost: item.cost });
+    });
+    return steps;
+  }
+
+  // сколько первых шагов пути юнит может оплатить; с колена сначала нужно встать
+  function affordableSteps(unit, path) {
+    var budget = unit.timeUnits - (unit.kneeling ? COST.stand : 0), steps = 0;
+    for (var index = 0; index < path.length; index++) {
+      if (path[index].cost > budget) break;
+      budget -= path[index].cost;
+      steps++;
+    }
+    // не останавливаться посреди лестницы: на верхней точке без подъёма
+    while (steps > 0 && path[steps - 1].ladderTop) steps--;
+    return steps;
+  }
+  function pathCost(unit, path) {
+    var total = unit.kneeling ? COST.stand : 0;
+    path.forEach(function (step) { total += step.cost; });
+    return total;
+  }
+
+  // ---------------- уровни обзора и варианты картинки ----------------
+  var view = { level: 0, cut: false };
+  var followedLevel = -1;             // уровень выбранного юнита, под который подстроен обзор
+  var variants = {};
+  var shownVariant = null;
+
+  function variantKey(level, cut) {
+    var key = level + (cut ? 'c' : 'f');
+    if (MAP.variants[key]) return key;
+    key = level + 'f';
+    return MAP.variants[key] ? key : Object.keys(MAP.variants)[0];
+  }
+  function depthKey(col, row, level, part) { return (col + row) * 100 + level * 10 + part; }
+
+  function requestVariant(key) {
+    if (variants[key]) return variants[key];
+    var data = MAP.variants[key];
+    var variant = { key: key, data: data, pieces: [], ready: false };
+    variants[key] = variant;
+    variant.background = new Image();
+    variant.mask = data.mask ? new Image() : null;
+    function tryBuild() {
+      if (!variant.background.complete || !variant.background.naturalWidth) return;
+      if (variant.mask && (!variant.mask.complete || !variant.mask.naturalWidth)) return;
+      if (variant.ready) return;
+      buildPieces(variant);
+      variant.ready = true;
+    }
+    variant.background.onload = tryBuild;
+    variant.background.src = data.background;
+    if (variant.mask) { variant.mask.onload = tryBuild; variant.mask.src = data.mask; }
+    return variant;
+  }
+  // каждый кусок — свой маленький холст: фон, обрезанный маской куска
+  function buildPieces(variant) {
+    (variant.data.pieces || []).forEach(function (piece) {
+      var width = piece[6], height = piece[7];
+      var pieceCanvas = document.createElement('canvas');
+      pieceCanvas.width = width; pieceCanvas.height = height;
+      var pieceContext = pieceCanvas.getContext('2d');
+      pieceContext.drawImage(variant.background, piece[4], piece[5], width, height, 0, 0, width, height);
+      pieceContext.globalCompositeOperation = 'destination-in';
+      pieceContext.drawImage(variant.mask, piece[8], piece[9], width, height, 0, 0, width, height);
+      variant.pieces.push({
+        col: piece[0], row: piece[1], level: piece[2], part: piece[3], x: piece[4], y: piece[5], width: width, height: height,
+        canvas: pieceCanvas, depth: depthKey(piece[0], piece[1], piece[2], piece[3])
+      });
+    });
+  }
+  function setView(level, cut) {
+    view.level = Math.max(0, Math.min(LEVELS - 1, level));
+    view.cut = !!cut;
+    var variant = requestVariant(variantKey(view.level, view.cut));
+    if (variant.ready || !shownVariant) shownVariant = variant;
+    updateLevelBar();
+    updateHover();
+  }
+  // уровень обзора по юниту: его этаж; стены срезаются, если он в помещении
+  function viewFollow(unit) {
+    if (!unit) return;
+    followedLevel = unit.level;
+    setView(unit.level, isIndoor(unit.col, unit.row, unit.level));
+  }
+
+  // панель уровней в правом верхнем углу
+  var levelBar = document.getElementById('levelbar');
+  function updateLevelBar() {
+    if (!levelBar) return;
+    levelBar.querySelector('.level-number').textContent = (view.level + 1) + ' / ' + LEVELS;
+    levelBar.querySelector('.walls-state').textContent = view.cut ? 'СРЕЗАНЫ' : 'ЦЕЛЫЕ';
+    var marks = levelBar.querySelectorAll('.level-mark');
+    for (var index = 0; index < marks.length; index++) marks[index].className = 'level-mark' + (LEVELS - 1 - index <= view.level ? ' on' : '') + (LEVELS - 1 - index === view.level ? ' current' : '');
+  }
+  if (levelBar) {
+    if (LEVELS < 2) levelBar.style.display = 'none';
+    levelBar.querySelector('.level-up').addEventListener('click', function () { setView(view.level + 1, view.cut); });
+    levelBar.querySelector('.level-down').addEventListener('click', function () { setView(view.level - 1, view.cut); });
+    levelBar.querySelector('.walls').addEventListener('click', function () { setView(view.level, !view.cut); });
+  }
+
   // камера: пиксель фона, который виден в левом верхнем углу окна
   var camera = { x: 0, y: 0 };
-  function centerOn(col, row) {
-    var point = Iso.toScreen(col, row);
+  function centerOn(col, row, elevation) {
+    var point = Iso.toScreen(col, row, elevation || 0);
     centerOnPixel(point.x, point.y);
   }
   function centerOnPixel(x, y) {
@@ -119,60 +352,18 @@
   }
   window.addEventListener('resize', resize);
 
-  // ---------------- правила клеток ----------------
-  function inside(col, row) { return col >= 0 && row >= 0 && col < GRID && row < GRID; }
-  // юнит, чья площадка (size x size клеток от col, row) накрывает клетку
-  function unitAt(col, row, except) {
-    for (var index = 0; index < units.length; index++) {
-      var unit = units[index];
-      if (unit !== except && col >= unit.col && col < unit.col + unit.size && row >= unit.row && row < unit.row + unit.size) return unit;
-    }
-    return null;
-  }
-  // может ли mover встать так, чтобы угол его площадки был в (col, row)
-  function isFreeFor(mover) {
-    var size = mover ? mover.size : 1;
-    return function (col, row) {
-      for (var dy = 0; dy < size; dy++) {
-        for (var dx = 0; dx < size; dx++) {
-          var cellCol = col + dx, cellRow = row + dy;
-          if (!inside(cellCol, cellRow) || blocked[cellRow * GRID + cellCol] || unitAt(cellCol, cellRow, mover)) return false;
-        }
-      }
-      return true;
-    };
-  }
-
-  // сколько первых шагов пути боец может оплатить; с колена сначала нужно встать
-  function affordableSteps(unit, path) {
-    var budget = unit.timeUnits - (unit.kneeling ? COST.stand : 0);
-    var col = unit.col, row = unit.row, steps = 0;
-    for (var index = 0; index < path.length; index++) {
-      var cost = (path[index].col !== col && path[index].row !== row) ? 6 : 4;
-      if (cost > budget) break;
-      budget -= cost;
-      col = path[index].col; row = path[index].row;
-      steps++;
-    }
-    return steps;
-  }
-  function pathCost(unit, path) {
-    return PathFinder.cost(unit.col, unit.row, path) + (unit.kneeling ? COST.stand : 0);
-  }
-
   // ---------------- действия ----------------
   function busy() { return !selected || selected.path.length > 0; }
 
   function moveSelectedTo(tile) {
     if (busy() || !tile) return;
-    var path = PathFinder.find(GRID, GRID, selected.col, selected.row, tile.col, tile.row, isFreeFor(selected));
-    if (!path || !path.length) return;
+    var path = findPath(selected, tile);
+    if (!path || !path.length) { if (!path) say('Туда не пройти'); return; }
     var steps = affordableSteps(selected, path);
     if (steps === 0) { say('Не хватает очков действия'); return; }
+    var fullLength = path.length;
     path = path.slice(0, steps);
-    var cost = pathCost(selected, path);
-    var fullLength = PathFinder.find(GRID, GRID, selected.col, selected.row, tile.col, tile.row, isFreeFor(selected)).length;
-    selected.timeUnits -= cost;
+    selected.timeUnits -= pathCost(selected, path);
     selected.kneeling = false;
     selected.path = path;
     if (steps < fullLength) say('ОД хватит только на часть пути');
@@ -219,7 +410,8 @@
 
   function selectUnit(unit, center) {
     selected = unit;
-    if (unit && center) centerOn(unit.x, unit.y);
+    if (unit) viewFollow(unit);
+    if (unit && center) centerOn(unit.x, unit.y, unit.elevation);
     updateHover();
   }
   function selectNext() {
@@ -232,22 +424,35 @@
   // ---------------- мышь и клавиатура ----------------
   var mouse = { x: 0, y: 0, overView: false, dragging: false, dragStartX: 0, dragStartY: 0, cameraStartX: 0, cameraStartY: 0, moved: false };
 
+  // клетка под курсором: сначала на текущем уровне, ниже — если там нет пола
   function tileUnderMouse() {
     if (!mouse.overView) return null;
-    var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y);
-    var col = Math.floor(grid.col), row = Math.floor(grid.row);
-    return inside(col, row) ? { col: col, row: row } : null;
+    for (var level = view.level; level >= 0; level--) {
+      var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y + level * LEVEL_H * Iso.pixelsPerMeterUp);
+      var col = Math.floor(grid.col), row = Math.floor(grid.row);
+      if (!inside(col, row)) continue;
+      if (floorAt(col, row, level) > 0) return { col: col, row: row, level: level };
+    }
+    return null;
   }
 
-  // боец под курсором: по прямоугольнику фигуры, ближний к зрителю важнее
+  function spriteRect(unit, position) {
+    var name = spriteName(unit), image = images[name], anchor = SPRITE_ANCHORS[name];
+    var foot = Iso.toScreen(position.x, position.y, position.elevation);
+    if (!image || !anchor || !image.naturalWidth) return { x: foot.x - unit.pickWidth, y: foot.y - unit.height * Iso.pixelsPerMeterUp, width: unit.pickWidth * 2, height: unit.height * Iso.pixelsPerMeterUp };
+    return { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight };
+  }
+
+  // юнит под курсором: по прямоугольнику фигуры, ближний к зрителю важнее
   function unitUnderMouse() {
     var best = null;
     units.forEach(function (unit) {
-      var foot = Iso.toScreen(unit.x, unit.y);
+      if (unit.level > view.level) return;
+      var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
       var left = foot.x - camera.x - unit.pickWidth, right = foot.x - camera.x + unit.pickWidth;
       var top = foot.y - camera.y - unit.height * Iso.pixelsPerMeterUp, bottom = foot.y - camera.y + 8 * unit.size;
       if (mouse.x >= left && mouse.x <= right && mouse.y >= top && mouse.y <= bottom) {
-        if (!best || unit.x + unit.y > best.x + best.y) best = unit;
+        if (!best || unitDepth(unit) > unitDepth(best)) best = unit;
       }
     });
     return best;
@@ -257,8 +462,8 @@
     hoverTile = tileUnderMouse();
     hoverPath = null;
     hoverAffordable = 0;
-    if (hoverTile && !busy() && !unitAt(hoverTile.col, hoverTile.row)) {
-      hoverPath = PathFinder.find(GRID, GRID, selected.col, selected.row, hoverTile.col, hoverTile.row, isFreeFor(selected));
+    if (hoverTile && !busy() && !unitAt(hoverTile.col, hoverTile.row, hoverTile.level)) {
+      hoverPath = findPath(selected, hoverTile);
       if (hoverPath) hoverAffordable = affordableSteps(selected, hoverPath);
     }
   }
@@ -275,7 +480,7 @@
     if (event.button !== 0) return;
     var clickedUnit = unitUnderMouse();
     var tile = tileUnderMouse();
-    if (!clickedUnit && tile) clickedUnit = unitAt(tile.col, tile.row);
+    if (!clickedUnit && tile) clickedUnit = unitAt(tile.col, tile.row, tile.level);
     if (clickedUnit) { selectUnit(clickedUnit, false); return; }
     moveSelectedTo(tile);
     updateHover();
@@ -293,7 +498,7 @@
   });
   window.addEventListener('mouseup', function (event) {
     if (mouse.dragging && !mouse.moved && event.button === 2) {
-      var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y);
+      var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y + (selected ? selected.elevation : 0) * Iso.pixelsPerMeterUp);
       turnSelectedTo(grid.col, grid.row);
     }
     mouse.dragging = false;
@@ -305,6 +510,9 @@
     keys[event.key] = true;
     if (event.key === 'Escape') selectUnit(null);
     if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') showGrid = !showGrid;
+    if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
+    if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
+    if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
     if (event.key === ' ' || event.key === 'Tab') { event.preventDefault(); selectNext(); }
     if (ACTION_KEYS[event.key]) Game.action(ACTION_KEYS[event.key]);
   });
@@ -314,18 +522,40 @@
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
     var next = unit.path[0];
+    // подъём или спуск по приставной лестнице: на месте, меняется только высота
+    if (next.climb) {
+      if (unit.segmentLength === 0) {
+        unit.segmentLength = 1;
+        unit.direction = next.face;
+      }
+      var climb = CLIMB_SPEED * seconds;
+      if (Math.abs(next.elevation - unit.elevation) <= climb) {
+        unit.elevation = next.elevation;
+        unit.level = next.level;
+        unit.path.shift();
+        unit.segmentLength = 0;
+        unit.walked = 0;
+      } else {
+        unit.elevation += next.elevation > unit.elevation ? climb : -climb;
+        unit.level = Math.max(0, Math.min(LEVELS - 1, Math.floor(unit.elevation / LEVEL_H + 0.05)));
+      }
+      return;
+    }
     // перед входом в новую клетку проверить, что она свободна
-    if ((unit.col !== next.col || unit.row !== next.row) && !isFreeFor(unit)(next.col, next.row)) {
-      unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + unit.size / 2; unit.y = unit.row + unit.size / 2; return;
+    if ((unit.col !== next.col || unit.row !== next.row || unit.level !== next.level) && unitAt(next.col, next.row, next.level, unit)) {
+      unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + unit.size / 2; unit.y = unit.row + unit.size / 2;
+      unit.elevation = elevationOf(unit.col, unit.row, unit.level);
+      return;
     }
     var targetX = next.col + unit.size / 2, targetY = next.row + unit.size / 2;
     var deltaX = targetX - unit.x, deltaY = targetY - unit.y;
     var distanceTiles = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     if (unit.segmentLength === 0) {
       // начало шага в следующую клетку: направление и длина считаются один раз
-      unit.segmentLength = distanceTiles;
-      unit.moveCol = deltaX / distanceTiles;
-      unit.moveRow = deltaY / distanceTiles;
+      unit.segmentLength = Math.max(distanceTiles, 1e-6);
+      unit.moveCol = distanceTiles ? deltaX / distanceTiles : 0;
+      unit.moveRow = distanceTiles ? deltaY / distanceTiles : 0;
+      unit.stepFrom = unit.elevation;
       var direction = Iso.directionOf(deltaX, deltaY);
       if (direction >= 0) unit.direction = direction;
     }
@@ -333,21 +563,25 @@
     if (distanceTiles <= stepTiles) {
       unit.x = targetX; unit.y = targetY;
       unit.walked += distanceTiles * Iso.tileMeters;
-      unit.col = next.col; unit.row = next.row;
+      unit.col = next.col; unit.row = next.row; unit.level = next.level;
+      unit.elevation = next.elevation;
       unit.path.shift();
       unit.segmentLength = 0;
-      if (!unit.path.length) unit.walked = 0;   // направление сохраняется: стоит лицом туда, куда шёл
+      if (!unit.path.length) { unit.walked = 0; if (unit === selected) viewFollow(unit); }
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
       unit.y += deltaY / distanceTiles * stepTiles;
       unit.walked += stepTiles * Iso.tileMeters;
-      // клетка считается занятой, как только боец прошёл половину шага
-      if (distanceTiles < unit.segmentLength / 2) { unit.col = next.col; unit.row = next.row; }
+      var progress = 1 - (distanceTiles - stepTiles) / unit.segmentLength;
+      unit.elevation = unit.stepFrom + (next.elevation - unit.stepFrom) * Math.max(0, Math.min(1, progress));
+      // клетка считается занятой, как только юнит прошёл половину шага
+      if (distanceTiles < unit.segmentLength / 2) { unit.col = next.col; unit.row = next.row; unit.level = next.level; }
     }
   }
 
   function spriteName(unit) {
-    if (unit.path.length) {
+    var moving = unit.path.length && !unit.path[0].climb;
+    if (moving) {
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
       return unit.spriteSet + '_walk_f' + frame + '_d' + unit.direction;
     }
@@ -357,36 +591,44 @@
   // Фигура на экране сдвигается только при смене кадра: внутри кадра опорная нога
   // неподвижна относительно земли, поэтому ноги не скользят.
   function drawPosition(unit) {
-    if (!unit.path.length) return { x: unit.x, y: unit.y };
+    if (!unit.path.length || unit.path[0].climb) return { x: unit.x, y: unit.y, elevation: unit.elevation };
     var lagTiles = (unit.walked - Math.floor(unit.walked / unit.frameMeters) * unit.frameMeters) / Iso.tileMeters;
-    return { x: unit.x - unit.moveCol * lagTiles, y: unit.y - unit.moveRow * lagTiles };
+    return { x: unit.x - unit.moveCol * lagTiles, y: unit.y - unit.moveRow * lagTiles, elevation: unit.elevation };
   }
+  function unitDepth(unit) { return depthKey(unit.col, unit.row, unit.level, 3.5) + (unit.size - 1) * 100; }
 
   // ---------------- отрисовка ----------------
+  function line(first, second) {
+    context.moveTo(first.x - camera.x, first.y - camera.y);
+    context.lineTo(second.x - camera.x, second.y - camera.y);
+  }
+  // сетка: ромбы клеток текущего уровня, где есть пол
   function drawGrid() {
     context.save();
     context.beginPath();
-    for (var line = 0; line <= GRID; line++) {
-      var a = Iso.toScreen(line, 0), b = Iso.toScreen(line, GRID);
-      context.moveTo(a.x - camera.x, a.y - camera.y); context.lineTo(b.x - camera.x, b.y - camera.y);
-      a = Iso.toScreen(0, line); b = Iso.toScreen(GRID, line);
-      context.moveTo(a.x - camera.x, a.y - camera.y); context.lineTo(b.x - camera.x, b.y - camera.y);
+    var level = view.level;
+    for (var row = 0; row < GRID; row++) {
+      for (var col = 0; col < GRID; col++) {
+        if (!floorAt(col, row, level)) continue;
+        var corners = Iso.tileCorners(col, row, elevationOf(col, row, level));
+        line(corners[0], corners[1]); line(corners[1], corners[2]); line(corners[2], corners[3]); line(corners[3], corners[0]);
+      }
     }
-    // тёмная подложка и светлая линия: видно и на светлой, и на тёмной траве
-    context.strokeStyle = 'rgba(10, 20, 6, 0.35)';
+    context.strokeStyle = 'rgba(10, 20, 6, 0.3)';
     context.lineWidth = 2.2;
     context.stroke();
-    context.strokeStyle = 'rgba(235, 245, 215, 0.38)';
+    context.strokeStyle = 'rgba(235, 245, 215, 0.32)';
     context.lineWidth = 1;
     context.stroke();
     context.restore();
   }
 
-  // рамка-курсор: клетка на земле и такая же над ней, соединённые рёбрами
-  function drawBox(col, row, color, part, size) {
+  // рамка-курсор: клетка на полу и такая же над ней, соединённые рёбрами
+  function drawBox(tile, color, part, size) {
     size = size || 1;
+    var base = elevationOf(tile.col, tile.row, tile.level);
     var height = size > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
-    var bottom = Iso.tileCorners(col, row, 0, size), top = Iso.tileCorners(col, row, height, size);
+    var bottom = Iso.tileCorners(tile.col, tile.row, base, size), top = Iso.tileCorners(tile.col, tile.row, base + height, size);
     context.save();
     context.lineWidth = 1.6;
     context.strokeStyle = color;
@@ -409,10 +651,10 @@
     context.restore();
   }
 
-  function drawSprite(name, col, row) {
+  function drawSprite(name, col, row, elevation) {
     var image = images[name], anchor = SPRITE_ANCHORS[name];
     if (!image || !image.complete || !anchor) return;
-    var foot = Iso.toScreen(col, row);
+    var foot = Iso.toScreen(col, row, elevation || 0);
     context.drawImage(image, Math.round(foot.x - camera.x - anchor[0]), Math.round(foot.y - camera.y - anchor[1]));
   }
 
@@ -421,11 +663,13 @@
     if (!hoverPath || !hoverPath.length) return;
     context.save();
     hoverPath.forEach(function (step, index) {
-      var point = Iso.toScreen(step.col + selected.size / 2, step.row + selected.size / 2);
+      if (step.ladderTop) return;
+      var point = Iso.toScreen(step.col + selected.size / 2, step.row + selected.size / 2, step.elevation);
       var last = index === hoverPath.length - 1;
       context.fillStyle = index < hoverAffordable ? 'rgba(120, 230, 255, 0.85)' : 'rgba(255, 170, 60, 0.9)';
       context.beginPath();
-      context.ellipse(point.x - camera.x, point.y - camera.y, last ? 9 : 4, last ? 5 : 2.4, 0, 0, Math.PI * 2);
+      if (step.climb) context.rect(point.x - camera.x - 4, point.y - camera.y - 4, 8, 8);
+      else context.ellipse(point.x - camera.x, point.y - camera.y, last ? 9 : 4, last ? 5 : 2.4, 0, 0, Math.PI * 2);
       context.fill();
     });
     context.restore();
@@ -436,7 +680,7 @@
     var cost = pathCost(selected, hoverPath);
     var enough = hoverAffordable === hoverPath.length;
     var end = hoverPath[hoverPath.length - 1];
-    var label = Iso.toScreen(end.col + selected.size / 2, end.row + selected.size / 2, Math.max(BOX_HEIGHT, selected.height) + 0.25);
+    var label = Iso.toScreen(end.col + selected.size / 2, end.row + selected.size / 2, end.elevation + Math.max(BOX_HEIGHT, selected.height) + 0.25);
     context.save();
     context.font = 'bold 13px Arial, sans-serif';
     context.textAlign = 'center';
@@ -449,7 +693,7 @@
 
   function drawSelectionMarker(unit) {
     var position = drawPosition(unit);
-    var head = Iso.toScreen(position.x, position.y, unit.kneeling && !unit.path.length ? 1.6 : unit.height + 0.3);
+    var head = Iso.toScreen(position.x, position.y, position.elevation + (unit.kneeling && !unit.path.length ? 1.6 : unit.height + 0.3));
     var x = head.x - camera.x, y = head.y - camera.y + Math.sin(Date.now() / 220) * 2;
     context.save();
     context.fillStyle = '#ffd23a';
@@ -461,33 +705,53 @@
     context.restore();
   }
 
+  function overlaps(rect, piece) {
+    return rect.x < piece.x + piece.width && rect.x + rect.width > piece.x && rect.y < piece.y + piece.height && rect.y + rect.height > piece.y;
+  }
+
   function render() {
-    context.fillStyle = '#141a12';
+    context.fillStyle = '#141210';
     context.fillRect(0, 0, canvas.width, canvas.height);
-    if (background.complete) context.drawImage(background, -Math.round(camera.x), -Math.round(camera.y));
+    // показываем вариант, как только он готов; до этого — прежний
+    var wanted = variants[variantKey(view.level, view.cut)];
+    if (wanted && wanted.ready) shownVariant = wanted;
+    if (shownVariant && shownVariant.background.complete) context.drawImage(shownVariant.background, -Math.round(camera.x), -Math.round(camera.y));
     if (showGrid) drawGrid();
 
-    var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row));
+    var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level));
     var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
     // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка.
     // Для робота рамка охватывает всю его площадку 2x2.
     var boxSize = selected ? selected.size : 1;
-    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'back', boxSize);
+    if (hoverTile) drawBox(hoverTile, hoverColor, 'back', boxSize);
     drawPath();
 
-    // объекты по глубине: дальше от зрителя (меньше col + row) рисуются раньше
+    // объекты по глубине: диагональ клетки (col + row), затем уровень, затем часть клетки
     var drawList = [];
-    obstacles.forEach(function (rock) { drawList.push({ depth: rock.col + rock.row + 1, draw: function () { drawSprite(rock.sprite, rock.col + 0.5, rock.row + 0.5); } }); });
+    var rects = [];
     units.forEach(function (unit) {
+      if (unit.level > view.level) return;          // выше уровня обзора — не видно
       var position = drawPosition(unit);
-      drawList.push({ depth: position.x + position.y, draw: function () { drawSprite(spriteName(unit), position.x, position.y); } });
+      rects.push(spriteRect(unit, position));
+      drawList.push({ depth: unitDepth(unit), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation); } });
     });
+    obstacles.forEach(function (rock) { drawList.push({ depth: depthKey(rock.col, rock.row, 0, 4), draw: function () { drawSprite(rock.sprite, rock.col + 0.5, rock.row + 0.5); } }); });
+    if (shownVariant && shownVariant.ready) {
+      shownVariant.pieces.forEach(function (piece) {
+        for (var index = 0; index < rects.length; index++) {
+          if (overlaps(rects[index], piece)) {
+            drawList.push({ depth: piece.depth, draw: function () { context.drawImage(piece.canvas, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y)); } });
+            return;
+          }
+        }
+      });
+    }
     drawList.sort(function (first, second) { return first.depth - second.depth; });
     drawList.forEach(function (item) { item.draw(); });
 
-    if (selected) drawSelectionMarker(selected);
+    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
-    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'front', boxSize);
+    if (hoverTile) drawBox(hoverTile, hoverColor, 'front', boxSize);
   }
 
   // ---------------- связь с панелью ----------------
@@ -498,6 +762,7 @@
     get turn() { return turn; },
     get message() { return Date.now() < message.until ? message.text : ''; },
     get busy() { return busy(); },
+    get view() { return view; },
     viewSize: function () { return { width: canvas.width, height: canvas.height }; },
     centerOnPixel: centerOnPixel,
     selectUnit: function (unit) { selectUnit(unit, true); },
@@ -525,6 +790,8 @@
     clampCamera();
     var wasMoving = units.some(function (unit) { return unit.path.length > 0; });
     units.forEach(function (unit) { updateUnit(unit, seconds); });
+    // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
+    if (selected && selected.level !== followedLevel) viewFollow(selected);
     if (wasMoving) updateHover();
     render();
     if (window.Panel) window.Panel.update();
@@ -532,16 +799,18 @@
   }
 
   resize();
-  centerOn(selected.x, selected.y + 3);
+  setView(selected.level, false);
+  centerOn(selected.x, selected.y - 2);
   window.requestAnimationFrame(frame);
 
   // для автотеста
   window.__game = {
-    units: units, camera: camera, select: function (index) { selected = units[index]; }, drawPosition: drawPosition,
-    clickTile: function (col, row) {
-      var point = Iso.toScreen(col + 0.5, row + 0.5);
+    units: units, camera: camera, view: view, select: function (index) { selectUnit(units[index], false); }, drawPosition: drawPosition,
+    clickTile: function (col, row, level) {
+      var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
-    centerOn: centerOn
+    setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
+    centerOn: centerOn, variantReady: function () { var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

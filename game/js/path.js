@@ -1,27 +1,17 @@
-// Поиск пути A* по сетке, 8 направлений.
-// Шаг по прямой стоит 1, по диагонали 1.414. Диагональ запрещена, если любая из двух
-// соседних клеток занята (боец не протискивается между камнями по углу).
+// Поиск пути A* по графу клеток с уровнями.
+// Узел — целое число (ключ клетки и уровня); соседей и стоимость шагов даёт вызывающий:
+//   neighbours(key, visit) вызывает visit(nextKey, cost, extra) для каждого возможного шага;
+//   heuristic(key) — оценка оставшейся стоимости (не больше настоящей).
+// Возвращает массив шагов { key, cost, extra } без стартового узла, [] если уже на месте, null если пути нет.
 var PathFinder = (function () {
-  var DIAGONAL = Math.SQRT2;
-  var NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  function find(startKey, goalKey, neighbours, heuristic, limit) {
+    if (startKey === goalKey) return [];
+    var gScore = {}, parent = {}, stepCost = {}, stepExtra = {}, closed = {};
+    var heap = [];
+    var expanded = 0, maxExpanded = limit || 20000;
 
-  // isFree(col, row) -> можно ли встать на клетку
-  function find(width, height, startCol, startRow, goalCol, goalRow, isFree) {
-    if (!isFree(goalCol, goalRow)) return null;
-    if (startCol === goalCol && startRow === goalRow) return [];
-    var size = width * height;
-    var gScore = new Float64Array(size).fill(Infinity);
-    var parent = new Int32Array(size).fill(-1);
-    var closed = new Uint8Array(size);
-    var heap = [];                       // [f, index] — двоичная куча по f
-    var startIndex = startRow * width + startCol, goalIndex = goalRow * width + goalCol;
-
-    function heuristic(col, row) {       // октильное расстояние
-      var dx = Math.abs(col - goalCol), dy = Math.abs(row - goalRow);
-      return (dx + dy) + (DIAGONAL - 2) * Math.min(dx, dy);
-    }
-    function push(f, index) {
-      heap.push([f, index]);
+    function push(f, key) {
+      heap.push([f, key]);
       var child = heap.length - 1;
       while (child > 0) {
         var parentSlot = (child - 1) >> 1;
@@ -40,55 +30,39 @@ var PathFinder = (function () {
           if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;
           if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;
           if (smallest === slot) break;
-          var swap = heap[slot]; heap[slot] = heap[smallest]; heap[smallest] = swap;
+          var swap = heap[smallest]; heap[smallest] = heap[slot]; heap[slot] = swap;
           slot = smallest;
         }
       }
       return top;
     }
 
-    gScore[startIndex] = 0;
-    push(heuristic(startCol, startRow), startIndex);
+    gScore[startKey] = 0;
+    push(heuristic(startKey), startKey);
     while (heap.length) {
       var current = pop()[1];
-      if (current === goalIndex) break;
       if (closed[current]) continue;
-      closed[current] = 1;
-      var col = current % width, row = (current - col) / width;
-      for (var n = 0; n < NEIGHBOURS.length; n++) {
-        var stepCol = NEIGHBOURS[n][0], stepRow = NEIGHBOURS[n][1];
-        var nextCol = col + stepCol, nextRow = row + stepRow;
-        if (nextCol < 0 || nextRow < 0 || nextCol >= width || nextRow >= height) continue;
-        if (!isFree(nextCol, nextRow)) continue;
-        var diagonal = stepCol !== 0 && stepRow !== 0;
-        if (diagonal && (!isFree(col + stepCol, row) || !isFree(col, row + stepRow))) continue;
-        var nextIndex = nextRow * width + nextCol;
-        var tentative = gScore[current] + (diagonal ? DIAGONAL : 1);
-        if (tentative < gScore[nextIndex]) {
-          gScore[nextIndex] = tentative;
-          parent[nextIndex] = current;
-          push(tentative + heuristic(nextCol, nextRow), nextIndex);
+      if (current === goalKey) break;
+      closed[current] = true;
+      if (++expanded > maxExpanded) return null;
+      var base = gScore[current];
+      neighbours(current, function (next, cost, extra) {
+        if (closed[next]) return;
+        var tentative = base + cost;
+        if (gScore[next] === undefined || tentative < gScore[next]) {
+          gScore[next] = tentative;
+          parent[next] = current;
+          stepCost[next] = cost;
+          stepExtra[next] = extra;
+          push(tentative + heuristic(next), next);
         }
-      }
+      });
     }
-    if (parent[goalIndex] === -1) return null;
+    if (gScore[goalKey] === undefined) return null;
     var path = [];
-    for (var index = goalIndex; index !== startIndex; index = parent[index]) {
-      path.push({ col: index % width, row: Math.floor(index / width) });
-    }
-    path.reverse();
+    for (var key = goalKey; key !== startKey; key = parent[key]) path.unshift({ key: key, cost: stepCost[key], extra: stepExtra[key] });
     return path;
   }
 
-  // стоимость пути в очках времени: прямо 4, диагональ 6
-  function cost(startCol, startRow, path) {
-    var total = 0, col = startCol, row = startRow;
-    for (var index = 0; index < path.length; index++) {
-      total += (path[index].col !== col && path[index].row !== row) ? 6 : 4;
-      col = path[index].col; row = path[index].row;
-    }
-    return total;
-  }
-
-  return { find: find, cost: cost };
+  return { find: find };
 })();

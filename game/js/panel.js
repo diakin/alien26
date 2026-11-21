@@ -101,7 +101,7 @@ var Panel = (function () {
       mapContext.beginPath(); mapContext.moveTo(0, line + 0.5); mapContext.lineTo(minimap.width, line + 0.5); mapContext.stroke();
     }
   };
-  fieldImage.src = 'assets/maps/field01.jpg';
+  fieldImage.src = MAP.minimap;
 
   function mapPoint(col, row) {
     var point = Iso.toScreen(col, row);
