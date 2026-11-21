@@ -340,10 +340,158 @@
   function setView(level, cut) {
     view.level = Math.max(0, Math.min(LEVELS - 1, level));
     view.cut = !!cut;
-    var variant = requestVariant(variantKey(view.level, view.cut));
-    if (variant.ready || !shownVariant) shownVariant = variant;
+    if (!TILESET) {
+      var variant = requestVariant(variantKey(view.level, view.cut));
+      if (variant.ready || !shownVariant) shownVariant = variant;
+    }
     updateLevelBar();
     updateHover();
+  }
+
+  // ---------------- карта из тайлов (как в UFO) ----------------
+  // MAP.tileset: атлас тайлов и теней; слои земля, пол, стены W и N по уровням, предметы.
+  // Запись тайла: [x, y, w, h, ax, ay, часть, срез, sx, sy, sw, sh, sax, say]; anchor — угол клетки на полу уровня.
+  // Срез — номер тайла того же элемента, срезанного до пояса (стены и фасад текущего уровня в режиме «стены срезаны»).
+  var TILESET = MAP.tileset || null;
+  var tileImage = null, shadowImage = null, shadowCanvas = null, groundPieces = null, tileViews = {};
+  var tileStats = { ground: 0, shadows: 0, pieces: 0 };
+  if (TILESET) {
+    tileImage = new Image(); tileImage.src = TILESET.image;
+    shadowImage = new Image(); shadowImage.src = TILESET.shadows;
+    shadowCanvas = document.createElement('canvas');
+  }
+  // кусок картинки тайла на месте клетки: прямоугольник в пикселях карты и в атласе
+  function tilePiece(tile, col, row, level, part, shadow) {
+    var entry = TILESET.list[tile];
+    var offset = shadow ? 8 : 0;
+    if (!entry || entry[offset] < 0) return null;
+    var corner = Iso.toScreen(col, row, level * LEVEL_H);
+    return {
+      x: Math.round(corner.x - entry[offset + 4]), y: Math.round(corner.y - entry[offset + 5]),
+      width: entry[offset + 2], height: entry[offset + 3], sx: entry[offset], sy: entry[offset + 1],
+      depth: depthKey(col, row, level, part === undefined ? entry[6] : part)
+    };
+  }
+  function cutTile(tile, level, viewLevel, cut) {
+    if (!cut || level !== viewLevel) return tile;
+    var alternative = TILESET.list[tile][7];
+    return alternative >= 0 ? alternative : tile;
+  }
+  // всё, что видно при уровне обзора и срезе стен: куски по глубине и тени на земле
+  function tileView(viewLevel, cut) {
+    var key = viewLevel + (cut ? 'c' : 'f');
+    if (tileViews[key]) return tileViews[key];
+    var pieces = [], shadows = [];
+    function add(tile, col, row, level) {
+      if (tile < 0) return;
+      var piece = tilePiece(tile, col, row, level);
+      if (piece) pieces.push(piece);
+      var shadow = tilePiece(tile, col, row, level, 0, true);
+      if (shadow) shadows.push(shadow);
+    }
+    for (var level = 0; level <= viewLevel; level++) {
+      for (var cell = 0; cell < GRID * GRID; cell++) add(TILESET.floor[level][cell], cell % GRID, Math.floor(cell / GRID), level);
+      for (var edge = 0; edge < WALL_STRIDE * WALL_STRIDE; edge++) {
+        var col = edge % WALL_STRIDE, row = Math.floor(edge / WALL_STRIDE);
+        if (TILESET.wallW[level][edge] >= 0) add(cutTile(TILESET.wallW[level][edge], level, viewLevel, cut), col, row, level);
+        if (TILESET.wallN[level][edge] >= 0) add(cutTile(TILESET.wallN[level][edge], level, viewLevel, cut), col, row, level);
+      }
+    }
+    TILESET.objects.forEach(function (item) { if (item[3] <= viewLevel) add(cutTile(item[0], item[3], viewLevel, cut), item[1], item[2], item[3]); });
+    pieces.sort(function (first, second) { return first.depth - second.depth; });
+    // створки дверей: тот же формат, что у атласа створок прежней карты [дверь, x, y, w, h, sx, sy]
+    var doorEntries = [];
+    doors.forEach(function (door, index) {
+      if (door.level > viewLevel) return;
+      var piece = tilePiece(cutTile(TILESET.doors[index], door.level, viewLevel, cut), door.col, door.row, door.level);
+      if (piece) doorEntries.push([index, piece.x, piece.y, piece.width, piece.height, piece.sx, piece.sy]);
+    });
+    tileViews[key] = { key: key, pieces: pieces, shadows: shadows, doors: doorEntries };
+    return tileViews[key];
+  }
+  // прямоугольник, в который сейчас идёт отрисовка (окно или кусок кэша), в пикселях карты
+  var target = { x: 0, y: 0, width: 0, height: 0 };
+  function visibleRect(item) {
+    return item.x < target.x + target.width && item.x + item.width > target.x && item.y < target.y + target.height && item.y + item.height > target.y;
+  }
+  // нарисовать work() в другой холст: context, камера и рамка отрисовки временно подменяются
+  function withTarget(targetContext, x, y, width, height, work) {
+    var saved = { context: context, x: camera.x, y: camera.y, target: target };
+    context = targetContext; camera.x = x; camera.y = y; target = { x: x, y: y, width: width, height: height };
+    try { work(); } finally { context = saved.context; camera.x = saved.x; camera.y = saved.y; target = saved.target; }
+  }
+  // статическая подсветка пола вида (тонировка, сетка) — входит в кэш, при перерисовке у юнитов повторяется
+  function staticItems(current) {
+    var key = showGrid ? 'grid' : 'plain';
+    if (!current.overlays || current.overlaysKey !== key) { current.overlays = staticOverlays(); current.overlaysKey = key; }
+    return current.overlays;
+  }
+
+  // Статический слой (земля, тени, все куски, тонировка пола) рисуется кусками CHUNK x CHUNK пикселей карты
+  // и хранится: в кадре — только готовые куски окна. Хранится не больше CHUNK_LIMIT кусков (около 1 МБ каждый).
+  var CHUNK = 512, CHUNK_LIMIT = 64;
+  var chunks = new Map();
+  function drawChunks(current) {
+    target = { x: camera.x, y: camera.y, width: canvas.width, height: canvas.height };
+    var firstX = Math.floor(camera.x / CHUNK), lastX = Math.floor((camera.x + canvas.width - 1) / CHUNK);
+    var firstY = Math.floor(camera.y / CHUNK), lastY = Math.floor((camera.y + canvas.height - 1) / CHUNK);
+    var viewKey = current.key + (showGrid ? 'g' : '');
+    tileStats.chunksBuilt = 0;
+    for (var chunkY = firstY; chunkY <= lastY; chunkY++) {
+      for (var chunkX = firstX; chunkX <= lastX; chunkX++) {
+        var key = viewKey + ':' + chunkX + ':' + chunkY;
+        var chunk = chunks.get(key);
+        if (chunk) chunks.delete(key);                 // поднять в конец очереди (недавно использованный)
+        else { chunk = buildChunk(current, chunkX, chunkY); tileStats.chunksBuilt++; }
+        chunks.set(key, chunk);
+        context.drawImage(chunk, chunkX * CHUNK - Math.round(camera.x), chunkY * CHUNK - Math.round(camera.y));
+      }
+    }
+    while (chunks.size > CHUNK_LIMIT) chunks.delete(chunks.keys().next().value);
+    tileStats.chunks = chunks.size;
+  }
+  function buildChunk(current, chunkX, chunkY) {
+    var chunk = document.createElement('canvas');
+    chunk.width = chunk.height = CHUNK;
+    withTarget(chunk.getContext('2d'), chunkX * CHUNK, chunkY * CHUNK, CHUNK, CHUNK, function () {
+      drawTileGround(current);
+      var list = [];
+      current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
+      staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
+      list.sort(function (first, second) { return first.depth - second.depth; });
+      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else item.draw(); });
+    });
+    return chunk;
+  }
+  function drawTilePiece(image, piece) {
+    context.drawImage(image, piece.sx, piece.sy, piece.width, piece.height, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y), piece.width, piece.height);
+  }
+  // земля и тени на ней: рисуются до всего остального, тени — одним слоем (объединение, без наложения)
+  function drawTileGround(current) {
+    if (!groundPieces) {
+      groundPieces = [];
+      for (var cell = 0; cell < GRID * GRID; cell++) {
+        var piece = tilePiece(TILESET.ground[cell], cell % GRID, Math.floor(cell / GRID), 0);
+        if (piece) groundPieces.push(piece);
+      }
+    }
+    tileStats.ground = tileStats.shadows = 0;
+    groundPieces.forEach(function (piece) { if (visibleRect(piece)) { drawTilePiece(tileImage, piece); tileStats.ground++; } });
+    if (shadowCanvas.width !== target.width || shadowCanvas.height !== target.height) { shadowCanvas.width = target.width; shadowCanvas.height = target.height; }
+    var shadowContext = shadowCanvas.getContext('2d');
+    shadowContext.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+    current.shadows.forEach(function (piece) {
+      if (!visibleRect(piece)) return;
+      shadowContext.drawImage(shadowImage, piece.sx, piece.sy, piece.width, piece.height, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y), piece.width, piece.height);
+      tileStats.shadows++;
+    });
+    // тень только на земле карты: за краем карты её нет
+    context.save();
+    quadPath(Iso.tileCorners(0, 0, 0, GRID));
+    context.clip();
+    context.globalAlpha = TILESET.shadowStrength;
+    context.drawImage(shadowCanvas, 0, 0);
+    context.restore();
   }
   // уровень обзора по юниту: его этаж; стены срезаются, если он в помещении
   function viewFollow(unit) {
@@ -719,7 +867,8 @@
     return { x: left, y: top, width: Math.max.apply(null, xs) + pad - left, height: Math.max.apply(null, ys) + pad - top };
   }
   // элементы подсветки на полу: рисуются в общем порядке глубины, стены и предметы впереди их закрывают
-  function floorOverlays() {
+  // тонировка пола верхнего уровня и сетка: не меняются, пока не сменится уровень обзора или сетка
+  function staticOverlays() {
     var items = [];
     var level = view.level;
     var tint = level > 0, edges = boundaryEdges(level);
@@ -755,6 +904,10 @@
         }
       }
     }
+    return items;
+  }
+  function floorOverlays() {
+    var items = [];
     // клетка выбранного юнита
     if (selected && selected.level <= view.level && !selected.path.length) {
       var unitCorners = Iso.tileCorners(selected.col, selected.row, elevationOf(selected.col, selected.row, selected.level), selected.size);
@@ -880,11 +1033,12 @@
     context.restore();
   }
 
-  function drawDoor(variant, entry) {
+  // створка: entry = [дверь, x, y, w, h, sx, sy] — место на карте и в атласе; cutLevel — срезанный уровень или -1
+  function drawDoor(atlas, entry, cutLevel) {
     var door = doors[entry[0]];
-    if (!door || !variant.doorAtlas || !variant.doorAtlas.complete) return;
+    if (!door || !atlas || !atlas.complete) return;
     var tile = Iso.tileMeters;
-    var cut = variant.key.charAt(1) === 'c' && Number(variant.key.charAt(0)) === door.level;
+    var cut = cutLevel === door.level;
     var top = cut ? 0.8 : 2.12;
     var base = door.level * LEVEL_H;
     var left = (tile - DOOR_WIDTH) / 2 / tile - 0.02, right = (tile + DOOR_WIDTH) / 2 / tile + 0.02;
@@ -903,7 +1057,7 @@
       context.closePath();
     });
     context.clip();
-    context.drawImage(variant.doorAtlas, entry[5], entry[6], entry[3], entry[4],
+    context.drawImage(atlas, entry[5], entry[6], entry[3], entry[4],
       Math.round(entry[1] + shifted.x - start.x - camera.x), Math.round(entry[2] + shifted.y - start.y - camera.y), entry[3], entry[4]);
     context.restore();
   }
@@ -915,6 +1069,7 @@
   function render() {
     context.fillStyle = '#141210';
     context.fillRect(0, 0, canvas.width, canvas.height);
+    if (TILESET) { renderTiles(); return; }
     // показываем вариант, как только он готов; до этого — прежний
     var wanted = variants[variantKey(view.level, view.cut)];
     if (wanted && wanted.ready) shownVariant = wanted;
@@ -928,6 +1083,7 @@
     // объекты по глубине: диагональ клетки (col + row), затем уровень, затем часть клетки
     var drawList = [];
     var rects = [];
+    staticOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     floorOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     if (hoverTile) drawList.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
     drawList.push({ depth: -1, draw: drawPath });
@@ -952,12 +1108,86 @@
       shownVariant.data.doors.forEach(function (entry) {
         var door = doors[entry[0]];
         if (!door || door.open > 0.995) return;
-        drawList.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), draw: function () { drawDoor(shownVariant, entry); } });
+        var cutLevel = shownVariant.key.charAt(1) === 'c' ? Number(shownVariant.key.charAt(0)) : -1;
+        drawList.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), draw: function () { drawDoor(shownVariant.doorAtlas, entry, cutLevel); } });
       });
     }
     drawList.sort(function (first, second) { return first.depth - second.depth; });
     drawList.forEach(function (item) { item.draw(); });
 
+    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
+    drawPathLabel();
+    if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
+  }
+
+  // Карта из тайлов: статический слой — готовые куски кэша. Подвижное (юниты, створки, подсветка курсора)
+  // собирается в группы по перекрытию прямоугольников; в рамке группы поверх кэша рисуются по глубине
+  // подвижные элементы и все куски ближе самого дальнего из них. Дальние куски уже есть в кэше под ними,
+  // а за рамку ничего не выходит, поэтому ближние куски вне группы не страдают.
+  function renderTiles() {
+    var current = tileView(view.level, view.cut);
+    if (!tileImage.complete || !shadowImage.complete) return;
+    drawChunks(current);
+    var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level));
+    var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
+    var boxSize = selected ? selected.size : 1;
+
+    var dynamic = floorOverlays();
+    if (hoverTile) {
+      var base = elevationOf(hoverTile.col, hoverTile.row, hoverTile.level), boxHeight = boxSize > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
+      var boxCorners = Iso.tileCorners(hoverTile.col, hoverTile.row, base, boxSize).concat(Iso.tileCorners(hoverTile.col, hoverTile.row, base + boxHeight, boxSize));
+      dynamic.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), rect: quadRect(boxCorners, 3), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
+    }
+    units.forEach(function (unit) {
+      if (unit.level > view.level) return;
+      var position = drawPosition(unit);
+      dynamic.push({ depth: unitDepth(unit), rect: spriteRect(unit, position), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation); } });
+    });
+    current.doors.forEach(function (entry) {
+      var door = doors[entry[0]];
+      if (!door || door.open > 0.995) return;
+      var cutLevel = view.cut ? view.level : -1;
+      dynamic.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), rect: { x: entry[1], y: entry[2], width: entry[3], height: entry[4] },
+        draw: function () { drawDoor(tileImage, entry, cutLevel); } });
+    });
+
+    // группы по перекрытию: рамка группы — общий прямоугольник её элементов
+    var groups = [];
+    dynamic.forEach(function (item) {
+      if (!visibleRect(item.rect)) return;
+      var group = { rect: { x: item.rect.x, y: item.rect.y, width: item.rect.width, height: item.rect.height }, items: [item] };
+      for (var merged = true; merged;) {
+        merged = false;
+        for (var index = groups.length - 1; index >= 0; index--) {
+          if (!overlaps(groups[index].rect, group.rect)) continue;
+          var other = groups.splice(index, 1)[0];
+          var left = Math.min(group.rect.x, other.rect.x), top = Math.min(group.rect.y, other.rect.y);
+          var right = Math.max(group.rect.x + group.rect.width, other.rect.x + other.rect.width), bottom = Math.max(group.rect.y + group.rect.height, other.rect.y + other.rect.height);
+          group.rect = { x: left, y: top, width: right - left, height: bottom - top };
+          group.items = group.items.concat(other.items);
+          merged = true;
+        }
+      }
+      groups.push(group);
+    });
+    tileStats.pieces = 0;
+    var overlays = staticItems(current);
+    groups.forEach(function (group) {
+      var threshold = Infinity;
+      group.items.forEach(function (item) { threshold = Math.min(threshold, item.depth); });
+      var list = group.items.slice();
+      current.pieces.forEach(function (piece) { if (piece.depth > threshold && overlaps(group.rect, piece)) { list.push({ depth: piece.depth, piece: piece }); tileStats.pieces++; } });
+      overlays.forEach(function (item) { if (item.depth > threshold && overlaps(group.rect, item.rect)) list.push(item); });
+      list.sort(function (first, second) { return first.depth - second.depth; });
+      context.save();
+      context.beginPath();
+      context.rect(Math.floor(group.rect.x - camera.x), Math.floor(group.rect.y - camera.y), Math.ceil(group.rect.width) + 1, Math.ceil(group.rect.height) + 1);
+      context.clip();
+      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else item.draw(); });
+      context.restore();
+    });
+
+    drawPath();
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
     if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
@@ -973,6 +1203,13 @@
     get busy() { return busy(); },
     get view() { return view; },
     viewSize: function () { return { width: canvas.width, height: canvas.height }; },
+    // замер отрисовки: средняя длительность кадра и число нарисованных кусков (для проверки карты из тайлов)
+    benchmark: function (frames) {
+      var started = performance.now();
+      // getImageData дожидается растеризации: без него замер покажет только запись команд холста
+      for (var index = 0; index < frames; index++) { render(); context.getImageData(0, 0, 1, 1); }
+      return { milliseconds: (performance.now() - started) / frames, pieces: tileStats.pieces, chunks: tileStats.chunks };
+    },
     centerOnPixel: centerOnPixel,
     selectUnit: function (unit) { selectUnit(unit, true); },
     setFireMode: setFireMode,
@@ -1021,6 +1258,6 @@
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
-    centerOn: centerOn, variantReady: function () { var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
+    centerOn: centerOn, variantReady: function () { if (TILESET) return tileImage.complete; var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

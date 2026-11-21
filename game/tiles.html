@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>alien26 — карта из тайлов</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1012; font-family: "Segoe UI", Arial, Helvetica, sans-serif; }
+  #view { display: block; cursor: crosshair; }
+  .mono { font-family: Consolas, "DejaVu Sans Mono", "Courier New", monospace; }
+
+  /* верхние плашки */
+  .plate { position: absolute; background: rgba(12, 15, 17, 0.78); border: 1px solid #2f373c; color: #8a959c; }
+  #turn { left: 16px; top: 14px; padding: 6px 12px; }
+  #turn .big { color: #e4e8ea; font-size: 15px; font-weight: bold; letter-spacing: 1.5px; }
+  #turn .phase { color: #e8a33a; font-size: 11px; font-weight: bold; letter-spacing: 1.2px; margin-left: 10px; }
+  #turn .task { font-size: 11px; margin-top: 3px; }
+  #help { right: 16px; top: 14px; padding: 6px 12px; font-size: 11px; line-height: 1.6; text-align: right; }
+  #help b { color: #e8a33a; }
+  #toast { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); padding: 7px 16px; background: rgba(10, 13, 15, 0.88);
+    border: 1px solid #e8a33a; color: #ffd28a; font-size: 13px; font-weight: bold; letter-spacing: 0.6px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  #toast.visible { opacity: 1; }
+
+  /* уровни по высоте */
+  #levelbar { right: 16px; top: 104px; width: 150px; padding: 6px 8px 8px; user-select: none; white-space: nowrap; }
+  #levelbar .title { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
+  #levelbar .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  #levelbar button { width: 26px; height: 22px; padding: 0; background: #161b1e; border: 1px solid #3a454b; color: #cfd8dc; font-size: 11px; cursor: pointer; }
+  #levelbar button:hover { border-color: #8a959c; }
+  #levelbar .level-number { color: #e4e8ea; font: bold 15px Consolas, "DejaVu Sans Mono", monospace; flex: 1; text-align: center; }
+  #levelbar .marks { display: flex; flex-direction: column; gap: 2px; }
+  #levelbar .level-mark { width: 10px; height: 4px; background: #20272b; }
+  #levelbar .level-mark.on { background: #4f6d78; }
+  #levelbar .level-mark.current { background: #e8a33a; }
+  #levelbar .walls { width: 100%; height: 22px; font-size: 9px; font-weight: bold; letter-spacing: 0.8px; color: #9fb7c2; }
+  #levelbar .walls-state { color: #e8a33a; }
+
+  /* нижняя панель */
+  #panel { position: absolute; left: 0; right: 0; bottom: 0; height: 260px; overflow: hidden;
+    background: linear-gradient(#1a1f22, #0d1012); border-top: 1px solid #4a555c; box-shadow: 0 -2px 0 #000; }
+  .panel-inner { position: absolute; top: 0; width: 1280px; height: 260px; transform-origin: 0 0; color: #e4e8ea; user-select: none; }
+  .panel-inner > * { position: absolute; }
+  .box { background: #0a0d0f; border: 1px solid #2f373c; box-sizing: border-box; }
+  .box::before, .box::after { content: ""; position: absolute; width: 12px; height: 12px; border-color: #5c6a72; border-style: solid; pointer-events: none; }
+  .box::before { left: -1px; top: -1px; border-width: 1.5px 0 0 1.5px; }
+  .box::after { right: -1px; bottom: -1px; border-width: 0 1.5px 1.5px 0; }
+  .box-title { color: #8a959c; font-size: 10px; font-weight: bold; letter-spacing: 1px; margin: 8px 10px 6px; }
+
+  .minimap { left: 16px; top: 18px; width: 224px; height: 224px; background: #050708; }
+  .minimap canvas { position: absolute; left: 3px; top: 3px; cursor: pointer; }
+  .minimap .caption { position: absolute; left: 10px; bottom: 6px; font: 10px Consolas, "DejaVu Sans Mono", monospace; letter-spacing: 1px; color: #c9d3d8; pointer-events: none; }
+
+  .portrait { left: 248px; top: 18px; width: 184px; height: 224px; background: #1b2024; overflow: hidden; }
+  .portrait img { position: absolute; left: 0; top: 4px; width: 184px; height: 221px; object-fit: cover; }
+  .portrait .scan { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.22) 2px 3px), rgba(42,74,88,0.12); }
+  .nameplate { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 24px; background: rgba(0,0,0,0.65); display: flex; justify-content: space-between; align-items: center; padding: 0 8px; }
+  #callsign { color: #e8a33a; font: bold 12px Consolas, "DejaVu Sans Mono", monospace; letter-spacing: 1.5px; }
+  #rank { color: #8a959c; font-size: 10px; }
+
+  .stats { left: 450px; top: 18px; width: 342px; }
+  .unit-name { font-size: 20px; font-weight: bold; letter-spacing: 0.3px; line-height: 24px; }
+  .unit-sub { font-size: 10px; font-weight: bold; letter-spacing: 1px; color: #8a959c; margin: 2px 0 14px; }
+  .stat { margin-bottom: 10px; }
+  .stat-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .stat-label { font-size: 10px; font-weight: bold; letter-spacing: 1px; color: #8a959c; }
+  .stat-value { font: 13px Consolas, "DejaVu Sans Mono", monospace; }
+  .stat-value b { color: #e4e8ea; }
+  .stat-value span { color: #8a959c; font-size: 10px; }
+  .stat-track { position: relative; height: 8px; margin-top: 3px; background: #060809; border: 1px solid #262d31; }
+  .stat-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.25s; }
+  .stat-ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 33px, rgba(0,0,0,0.6) 33px 34px); }
+  #tu-fill { background: #e8a33a; } #hp-fill { background: #d9534a; } #st-fill { background: #c9b24a; } #mo-fill { background: #5fa8e8; }
+  .chips { display: flex; gap: 8px; margin-top: 2px; }
+  .chip { border: 1px solid #39444a; padding: 2px 8px; font-size: 9px; font-weight: bold; letter-spacing: 0.8px; color: #9fb7c2; }
+  .chip.green { color: #8fd18a; }
+
+  .actions { left: 812px; top: 18px; width: 234px; }
+  .action-grid { display: grid; grid-template-columns: repeat(5, 42px); column-gap: 6px; row-gap: 4px; }
+  .action { cursor: pointer; }
+  .action-box { position: relative; width: 42px; height: 42px; box-sizing: border-box; background: #161b1e; border: 1px solid #3a454b; display: flex; align-items: center; justify-content: center; }
+  .action-box svg { fill: none; stroke: #cfd8dc; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .action-key { position: absolute; right: 3px; top: 1px; font: 8px Consolas, "DejaVu Sans Mono", monospace; color: #56636a; }
+  .action-label { font-size: 8px; font-weight: bold; letter-spacing: 0.3px; color: #8a959c; text-align: center; margin-top: 3px; height: 10px; white-space: nowrap; }
+  .action:last-child .action-label { letter-spacing: 0; transform: translateX(-6px); }
+  .action:hover .action-box { border-color: #8a959c; }
+  .action.active .action-box { background: #2a2210; border-color: #e8a33a; }
+  .action.active svg { stroke: #e8a33a; } .action.active .action-label { color: #e8a33a; }
+  .action.disabled, .action.short, .busy .action { cursor: default; opacity: 0.38; }
+  .action.disabled:hover .action-box, .action.short:hover .action-box { border-color: #3a454b; }
+  .firemodes { margin-top: 10px; width: 234px; height: 100px; }
+  .mode { display: flex; align-items: center; height: 21px; margin: 0 4px 2px; padding: 0 6px; cursor: pointer; font-size: 12px; border: 1px solid transparent; }
+  .mode-name { flex: 1; }
+  .mode-cost { width: 60px; text-align: right; color: #8a959c; font: 11px Consolas, "DejaVu Sans Mono", monospace; }
+  .mode-chance { width: 50px; text-align: right; font: bold 12px Consolas, "DejaVu Sans Mono", monospace; }
+  .mode.active { background: #2a2210; border-color: #e8a33a; color: #e8a33a; font-weight: bold; }
+  .mode.short { opacity: 0.45; }
+
+  .weapon { left: 1060px; top: 18px; width: 204px; height: 224px; }
+  .weapon-name { font-size: 12px; font-weight: bold; letter-spacing: 0.8px; margin: 12px 12px 2px; }
+  .weapon-note { white-space: nowrap; font-size: 8px; font-weight: bold; letter-spacing: 0.5px; color: #8a959c; margin: 0 12px; }
+  #weapon-image { position: absolute; left: 6px; top: 46px; width: 192px; height: 152px; }
+  .ammo { position: absolute; left: 12px; right: 12px; top: 172px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .ammo-label { font-size: 9px; font-weight: bold; letter-spacing: 1px; color: #8a959c; }
+  .ammo-reserve { font: 9px Consolas, "DejaVu Sans Mono", monospace; color: #6f7c84; margin-top: 2px; }
+  .ammo-count { font: bold 22px Consolas, "DejaVu Sans Mono", monospace; }
+  .ammo-count span { font-size: 13px; color: #5f6b72; }
+  .ammo-pips { position: absolute; left: 12px; top: 204px; display: flex; gap: 2px; }
+  .ammo-pips i { display: block; width: 4px; height: 12px; background: #20272b; }
+  .ammo-pips i.on { background: #e8a33a; }
+
+  .no-weapon { display: none; position: absolute; left: 0; right: 0; top: 104px; text-align: center; color: #56636a; font-size: 12px; font-weight: bold; letter-spacing: 2px; }
+  .unarmed .no-weapon { display: block; }
+  .unarmed #weapon-image, .unarmed .ammo, .unarmed .ammo-pips { visibility: hidden; }
+  .no-unit .portrait img, .no-unit .nameplate, .no-unit .stat, .no-unit .chips, .no-unit .actions, .no-unit .weapon > * { visibility: hidden; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="turn" class="plate"><span class="big mono">ХОД <span id="turn-number">01</span></span><span class="phase">ФАЗА ОТРЯДА</span>
+  <div class="task" id="task">Тест: база на плато — этажи, лестницы</div></div>
+<div id="help" class="plate">
+  <b>ЛКМ</b> по бойцу — выбрать · <b>ЛКМ</b> по клетке — идти · <b>ПКМ</b> щелчком — повернуться (1 ОД за 45°)<br>
+  <b>ПКМ / колесо</b> с протяжкой, <b>стрелки / WASD</b>, мини-карта — прокрутка<br>
+  <b>Пробел</b> — следующий боец · <b>Esc</b> — снять выбор · <b>G</b> — сетка · <b>1–0</b> — кнопки панели<br>
+  <b>PgUp / PgDn</b> (<b>E / Q</b>) — уровень выше / ниже · <b>H</b> — стены целые / срезанные
+</div>
+<div id="levelbar" class="plate">
+  <div class="title">УРОВЕНЬ</div>
+  <div class="row"><button class="level-down" title="Ниже (PgDn)">▼</button><span class="level-number">1 / 4</span><button class="level-up" title="Выше (PgUp)">▲</button>
+    <div class="marks"><i class="level-mark"></i><i class="level-mark"></i><i class="level-mark"></i><i class="level-mark"></i></div></div>
+  <div class="row"><button class="walls" title="Стены текущего уровня (H)">СТЕНЫ: <span class="walls-state">ЦЕЛЫЕ</span></button></div>
+</div>
+<div id="toast"></div>
+<div id="panel"></div>
+<script src="js/data.js"></script>
+<script src="js/maps/outpost_tiles.js"></script>
+<script src="js/iso.js"></script>
+<script src="js/path.js"></script>
+<script src="js/panel.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
