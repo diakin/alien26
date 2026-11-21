@@ -257,7 +257,7 @@ export function buildSoldier({ camo = 'black', pose = 'standAim', nvg = false, g
 // ---------- пришелец ----------
 
 let alienMats = null;
-function alienMaterials() {
+export function alienMaterials() {
   if (alienMats) return alienMats;
   const skin = alienSkinTextures();
   const chitin = chitinTextures();
@@ -304,7 +304,7 @@ export function buildAlienWeapon() {
 
 // голова: купол, вытянутый назад и вверх, сужение к подбородку
 let alienHeadGeometry = null;
-function getAlienHeadGeometry() {
+export function getAlienHeadGeometry() {
   if (alienHeadGeometry) return alienHeadGeometry;
   const geometry = new THREE.SphereGeometry(1, 36, 28);
   const position = geometry.attributes.position;

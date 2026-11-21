@@ -1,0 +1,205 @@
+[
+ {
+  "name": "mech_idle",
+  "options": {
+   "mech": true,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f0",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.0,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f1",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.0625,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f2",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.125,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f3",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.1875,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f4",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.25,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f5",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.3125,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f6",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.375,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f7",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.4375,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f8",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.5,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f9",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.5625,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f10",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.625,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f11",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.6875,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f12",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.75,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f13",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.8125,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f14",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.875,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ },
+ {
+  "name": "mech_walk_f15",
+  "options": {
+   "mech": true,
+   "walkPhase": 0.9375,
+   "frame": [
+    5.4,
+    4.8,
+    1.6
+   ]
+  }
+ }
+]

@@ -1,0 +1,120 @@
+[
+ {
+  "name": "alien_idle",
+  "options": {
+   "alien": true
+  }
+ },
+ {
+  "name": "alien_walk_f0",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.0
+  }
+ },
+ {
+  "name": "alien_walk_f1",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.0625
+  }
+ },
+ {
+  "name": "alien_walk_f2",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.125
+  }
+ },
+ {
+  "name": "alien_walk_f3",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.1875
+  }
+ },
+ {
+  "name": "alien_walk_f4",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.25
+  }
+ },
+ {
+  "name": "alien_walk_f5",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.3125
+  }
+ },
+ {
+  "name": "alien_walk_f6",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.375
+  }
+ },
+ {
+  "name": "alien_walk_f7",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.4375
+  }
+ },
+ {
+  "name": "alien_walk_f8",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.5
+  }
+ },
+ {
+  "name": "alien_walk_f9",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.5625
+  }
+ },
+ {
+  "name": "alien_walk_f10",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.625
+  }
+ },
+ {
+  "name": "alien_walk_f11",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.6875
+  }
+ },
+ {
+  "name": "alien_walk_f12",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.75
+  }
+ },
+ {
+  "name": "alien_walk_f13",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.8125
+  }
+ },
+ {
+  "name": "alien_walk_f14",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.875
+  }
+ },
+ {
+  "name": "alien_walk_f15",
+  "options": {
+   "alien": true,
+   "walkPhase": 0.9375
+  }
+ }
+]

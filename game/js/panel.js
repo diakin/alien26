@@ -35,7 +35,7 @@ var Panel = (function () {
   ];
 
   function bar(id, label) {
-    return '<div class="stat"><div class="stat-head"><span class="stat-label">' + label + '</span>' +
+    return '<div class="stat"><div class="stat-head"><span class="stat-label" id="' + id + '-label">' + label + '</span>' +
       '<span class="stat-value"><b id="' + id + '-value"></b><span id="' + id + '-max"></span></span></div>' +
       '<div class="stat-track"><div class="stat-fill" id="' + id + '-fill"></div><div class="stat-ticks"></div></div></div>';
   }
@@ -58,6 +58,7 @@ var Panel = (function () {
     '<div class="actions"><div class="action-grid">' + buttonsHtml + '</div>' +
       '<div class="box firemodes"><div class="box-title">РЕЖИМ ОГНЯ</div><div id="modes"></div></div></div>' +
     '<div class="box weapon"><div class="weapon-name" id="weapon-name"></div><div class="weapon-note" id="weapon-note"></div>' +
+      '<div class="no-weapon" id="no-weapon">НЕТ ОРУЖИЯ</div>' +
       '<img id="weapon-image" alt=""><div class="ammo"><div><div class="ammo-label">МАГАЗИН</div>' +
       '<div class="ammo-reserve" id="ammo-reserve"></div></div><div class="ammo-count" id="ammo-count"></div></div>' +
       '<div class="ammo-pips" id="ammo-pips"></div></div>';
@@ -117,12 +118,19 @@ var Panel = (function () {
     });
     Game.units.forEach(function (unit) {
       var point = mapPoint(unit.x, unit.y);
-      minimapContext.fillStyle = '#7cc4ff';
       minimapContext.strokeStyle = '#000';
       minimapContext.beginPath();
-      minimapContext.moveTo(point.x, point.y - 4.5);
-      minimapContext.lineTo(point.x + 4, point.y + 3);
-      minimapContext.lineTo(point.x - 4, point.y + 3);
+      if (unit.kind === 'alien') {            // пришелец — красный ромб
+        minimapContext.fillStyle = '#e2553f';
+        minimapContext.moveTo(point.x, point.y - 5); minimapContext.lineTo(point.x + 5, point.y);
+        minimapContext.lineTo(point.x, point.y + 5); minimapContext.lineTo(point.x - 5, point.y);
+      } else if (unit.kind === 'mech') {      // робот — крупный квадрат
+        minimapContext.fillStyle = '#7cc4ff';
+        minimapContext.rect(point.x - 5, point.y - 5, 10, 10);
+      } else {                                // боец — треугольник
+        minimapContext.fillStyle = '#7cc4ff';
+        minimapContext.moveTo(point.x, point.y - 4.5); minimapContext.lineTo(point.x + 4, point.y + 3); minimapContext.lineTo(point.x - 4, point.y + 3);
+      }
       minimapContext.closePath(); minimapContext.fill(); minimapContext.stroke();
       if (unit === Game.selected) {
         minimapContext.strokeStyle = '#e8a33a';
@@ -183,36 +191,40 @@ var Panel = (function () {
       setText('unit-sub', 'Выберите бойца щелчком или клавишей Пробел');
       return;
     }
-    setImage('portrait', 'assets/ui/portrait_' + unit.camo + '.png');
-    setImage('weapon-image', 'assets/ui/weapon_' + unit.camo + '.png');
+    setImage('portrait', 'assets/ui/portrait_' + unit.portrait + '.png');
+    setClass(inner, 'unarmed', !unit.weapon);
+    if (unit.weapon) setImage('weapon-image', 'assets/ui/weapon_' + unit.camo + '.png');
     setText('callsign', unit.callsign);
     setText('rank', unit.rank);
     setText('unit-name', unit.name);
-    setText('unit-sub', unit.role + ' · 2-Е ОТДЕЛЕНИЕ · ' + unit.missions + ' ВЫХОДОВ');
+    setText('unit-sub', unit.subtitle || (unit.role + ' · 2-Е ОТДЕЛЕНИЕ · ' + unit.missions + ' ВЫХОДОВ'));
+    ['tu', 'hp', 'st', 'mo'].forEach(function (id, index) { setText(id + '-label', unit.statLabels[index]); });
     setStat('tu', unit.timeUnits, unit.maxTimeUnits);
     setStat('hp', unit.health, unit.maxHealth);
     setStat('st', unit.stamina, unit.maxStamina);
     setStat('mo', unit.morale, 100);
-    setText('chip-stance', 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : 'СТОЯ'));
+    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : 'СТОЯ') : (unit.kind === 'mech' ? 'ХОДОВАЯ: ИСПРАВНА' : 'СТОЙКА: СТОЯ'));
     setText('chip-optics', unit.optics);
     setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
-    setText('weapon-name', unit.weapon);
-    setText('weapon-note', unit.weaponNote);
-    setText('ammo-reserve', 'ЗАПАС: ' + unit.reserve);
-    setHtml('ammo-count', unit.ammo + '<span>/' + Game.MAGAZINE + '</span>');
-    var pips = '';
-    for (var index = 0; index < Game.MAGAZINE; index++) pips += '<i' + (index < unit.ammo ? ' class="on"' : '') + '></i>';
-    setHtml('ammo-pips', pips);
+    setText('weapon-name', unit.weapon || (unit.kind === 'mech' ? 'ВООРУЖЕНИЕ' : 'ОРУЖИЕ'));
+    setText('weapon-note', unit.weapon ? unit.weaponNote : (unit.kind === 'mech' ? 'НЕ УСТАНОВЛЕНО' : 'ТОЛЬКО ТЕЛО, БЕЗ СНАРЯЖЕНИЯ'));
+    if (unit.weapon) {
+      setText('ammo-reserve', 'ЗАПАС: ' + unit.reserve);
+      setHtml('ammo-count', unit.ammo + '<span>/' + Game.MAGAZINE + '</span>');
+      var pips = '';
+      for (var index = 0; index < Game.MAGAZINE; index++) pips += '<i' + (index < unit.ammo ? ' class="on"' : '') + '></i>';
+      setHtml('ammo-pips', pips);
+    }
     var modes = Game.FIRE_MODES.map(function (mode, index) {
-      var classes = 'mode' + (index === unit.fireMode ? ' active' : '') + (mode.cost > unit.timeUnits ? ' short' : '');
+      var classes = 'mode' + (unit.weapon && index === unit.fireMode ? ' active' : '') + (!unit.weapon || mode.cost > unit.timeUnits ? ' short' : '');
       return '<div class="' + classes + '" data-mode="' + index + '"><span class="mode-name">' + mode.name + '</span>' +
         '<span class="mode-cost">' + mode.cost + ' ОД</span><span class="mode-chance">—</span></div>';
     }).join('');
     setHtml('modes', modes);
     // кнопки, на которые не хватает ОД
     var tu = unit.timeUnits;
-    setClass(inner.querySelector('[data-action="kneel"]'), 'short', (unit.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
-    setClass(inner.querySelector('[data-action="reload"]'), 'short', Game.COST.reload > tu || unit.ammo >= Game.MAGAZINE || unit.reserve <= 0);
+    setClass(inner.querySelector('[data-action="kneel"]'), 'short', !unit.canKneel || (unit.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
+    setClass(inner.querySelector('[data-action="reload"]'), 'short', !unit.weapon || Game.COST.reload > tu || unit.ammo >= Game.MAGAZINE || unit.reserve <= 0);
     setClass(inner.querySelector('[data-action="step"]'), 'active', true);
     setClass(inner, 'busy', Game.busy);
   }

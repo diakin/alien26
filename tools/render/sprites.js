@@ -8,13 +8,16 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { toXZ } from './world.js';
 import { buildStockySoldier, walkCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
+import { buildStockyAlien, alienWalkCycle } from './alien2.js';
+import { buildMechPosed } from './mechpose.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
 
 // масштаб как у сцены: 18.5 м на 1280 px, рендер в 2 раза крупнее
 const PIXELS_PER_METER = 1280 / 18.5 * 2;
-const FRAME_W_M = 4.2, FRAME_H_M = 2.8;
-const WIDTH = Math.round(FRAME_W_M * PIXELS_PER_METER), HEIGHT = Math.round(FRAME_H_M * PIXELS_PER_METER);
+const DEFAULT_FRAME = [4.2, 2.8, 0.95];
+let FRAME_W_M = 4.2, FRAME_H_M = 2.8;
+let WIDTH = Math.round(FRAME_W_M * PIXELS_PER_METER), HEIGHT = Math.round(FRAME_H_M * PIXELS_PER_METER);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
@@ -61,19 +64,41 @@ const camera = new THREE.OrthographicCamera(-FRAME_W_M / 2, FRAME_W_M / 2, FRAME
 }
 
 let composer = null;
-try {
-  composer = new EffectComposer(renderer);
-  composer.setSize(WIDTH, HEIGHT);
-  composer.addPass(new RenderPass(scene, camera));
-  const gtao = new GTAOPass(scene, camera, WIDTH, HEIGHT);
-  gtao.updateGtaoMaterial({ radius: 0.18, distanceExponent: 1.5, thickness: 1.5, scale: 1.4, samples: 16 });
-  gtao.blendIntensity = 1.0;
-  composer.addPass(gtao);
-  composer.addPass(new OutputPass());
-} catch (error) {
-  console.warn('GTAO недоступен:', error.message);
-  composer = null;
+let currentFrame = '';
+// кадр [ширина м, высота м, высота центра м]; камера, буфер и проход затенения подстраиваются
+function setFrame(frame) {
+  const key = frame.join(',');
+  if (key === currentFrame) return;
+  currentFrame = key;
+  [FRAME_W_M, FRAME_H_M] = frame;
+  WIDTH = Math.round(FRAME_W_M * PIXELS_PER_METER);
+  HEIGHT = Math.round(FRAME_H_M * PIXELS_PER_METER);
+  renderer.setSize(WIDTH, HEIGHT);
+  Object.assign(camera, { left: -FRAME_W_M / 2, right: FRAME_W_M / 2, top: FRAME_H_M / 2, bottom: -FRAME_H_M / 2 });
+  lookAt.set(0, frame[2], 0);
+  const down = toXZ(0, 1);
+  camera.position.set(down.x * Math.cos(elevation) * 30, lookAt.y + Math.sin(elevation) * 30, down.y * Math.cos(elevation) * 30);
+  camera.lookAt(lookAt);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const reach = Math.max(3, FRAME_W_M * 0.8);
+  Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach });
+  sun.shadow.camera.updateProjectionMatrix();
+  try {
+    composer = new EffectComposer(renderer);
+    composer.setSize(WIDTH, HEIGHT);
+    composer.addPass(new RenderPass(scene, camera));
+    const gtao = new GTAOPass(scene, camera, WIDTH, HEIGHT);
+    gtao.updateGtaoMaterial({ radius: 0.18 * Math.max(1, frame[1] / 2.8), distanceExponent: 1.5, thickness: 1.5, scale: 1.4, samples: 16 });
+    gtao.blendIntensity = 1.0;
+    composer.addPass(gtao);
+    composer.addPass(new OutputPass());
+  } catch (error) {
+    console.warn('GTAO недоступен:', error.message);
+    composer = null;
+  }
 }
+setFrame(DEFAULT_FRAME);
 
 const white = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
 const invisible = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
@@ -110,7 +135,10 @@ function buildRockObject(seed, radius) {
 
 window.renderSprite = (options, direction) => {
   let soldier;
+  setFrame(options.frame || DEFAULT_FRAME);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
+  else if (options.alien) soldier = buildStockyAlien(options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
+  else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {
     const spriteOptions = { ...options };
     if (options.walkPhase !== undefined) spriteOptions.pose = walkCycle(options.walkPhase);

@@ -4,6 +4,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildStockySoldier } from './soldier2.js';
 import { buildRifle } from './actors.js';
 import { setEnvIntensity } from './lib.js';
+import { buildStockyAlien } from './alien2.js';
+import { buildMechPosed } from './mechpose.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
@@ -24,15 +26,31 @@ window.renderPortrait = (camo) => {
   studio.add(new THREE.HemisphereLight(0xb8c4cc, 0x202020, 0.8));
   const key = new THREE.DirectionalLight(0xfff0dc, 2.6); key.position.set(-1.5, 2.5, 2.5); studio.add(key);
   const rim = new THREE.DirectionalLight(0x9fd8ff, 2.0); rim.position.set(2, 1.5, -2); studio.add(rim);
-  const model = buildStockySoldier({ ...LOADOUTS[camo], pose: 'idle' });
+  let model, camera = new THREE.PerspectiveCamera(22, 300 / 360, 0.1, 40);
+  if (camo === 'mech') {
+    model = buildMechPosed(null);
+    model.rotation.y = 0.45;
+    studio.add(model);
+    camera.position.set(2.6, 3.9, 9.0);
+    camera.lookAt(0.15, 2.5, 0);
+  } else if (camo === 'alien') {
+    model = buildStockyAlien('idle');
+    model.rotation.y = 1.0;
+    studio.add(model);
+    model.updateMatrixWorld(true);
+    const head = model.localToWorld(model.userData.head.clone());
+    camera.position.set(head.x + 0.3, head.y - 0.05, head.z + 2.4);
+    camera.lookAt(head.x - 0.02, head.y - 0.22, head.z);
+  } else {
+    model = buildStockySoldier({ ...LOADOUTS[camo], pose: 'idle' });
+    model.rotation.y = 0.35;
+    studio.add(model);
+    model.updateMatrixWorld(true);
+    const head = model.localToWorld(model.userData.head.clone());
+    camera.position.set(head.x + 0.5, head.y - 0.12, head.z + 2.2);
+    camera.lookAt(head.x + 0.02, head.y - 0.16, head.z);
+  }
   setEnvIntensity(model, 0.5);
-  model.rotation.y = 0.35;
-  studio.add(model);
-  model.updateMatrixWorld(true);
-  const head = model.localToWorld(model.userData.head.clone());
-  const camera = new THREE.PerspectiveCamera(22, 300 / 360, 0.1, 20);
-  camera.position.set(head.x + 0.5, head.y - 0.12, head.z + 2.2);
-  camera.lookAt(head.x + 0.02, head.y - 0.16, head.z);
   renderer.setClearColor(0x000000, 1);
   renderer.setSize(300, 360);
   renderer.render(studio, camera);

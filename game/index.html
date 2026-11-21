@@ -93,13 +93,16 @@
   .ammo-pips i { display: block; width: 4px; height: 12px; background: #20272b; }
   .ammo-pips i.on { background: #e8a33a; }
 
+  .no-weapon { display: none; position: absolute; left: 0; right: 0; top: 104px; text-align: center; color: #56636a; font-size: 12px; font-weight: bold; letter-spacing: 2px; }
+  .unarmed .no-weapon { display: block; }
+  .unarmed #weapon-image, .unarmed .ammo, .unarmed .ammo-pips { visibility: hidden; }
   .no-unit .portrait img, .no-unit .nameplate, .no-unit .stat, .no-unit .chips, .no-unit .actions, .no-unit .weapon > * { visibility: hidden; }
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
 <div id="turn" class="plate"><span class="big mono">ХОД <span id="turn-number">01</span></span><span class="phase">ФАЗА ОТРЯДА</span>
-  <div class="task">Задача: пройти поле, осмотреться</div></div>
+  <div class="task">Тест: бойцы, пришельцы и робот K7</div></div>
 <div id="help" class="plate">
   <b>ЛКМ</b> по бойцу — выбрать · <b>ЛКМ</b> по клетке — идти · <b>ПКМ</b> щелчком — повернуться (1 ОД за 45°)<br>
   <b>ПКМ / колесо</b> с протяжкой, <b>стрелки / WASD</b>, мини-карта — прокрутка<br>

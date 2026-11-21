@@ -8,8 +8,8 @@ const page = await browser.newPage();
 page.on('pageerror', (error) => console.log('pageerror', error.message));
 await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/portrait.html`);
 await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
-for (const camo of ['black', 'green']) {
-  for (const kind of ['Portrait', 'Weapon']) {
+for (const camo of ['black', 'green', 'alien', 'mech']) {
+  for (const kind of (camo === 'alien' || camo === 'mech') ? ['Portrait'] : ['Portrait', 'Weapon']) {
     const url = await page.evaluate(([fn, c]) => window['render' + fn](c), [kind, camo]);
     fs.writeFileSync(`${outDir}/${kind.toLowerCase()}_${camo}.png`, Buffer.from(url.split(',')[1], 'base64'));
   }

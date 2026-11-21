@@ -4,11 +4,15 @@
   'use strict';
 
   var GRID = FIELD.tiles;
-  var WALK_SPEED = 1.5;                       // м/с
-  var STRIDE = 1.32;                          // м на полный цикл ходьбы (два шага), как в рендере
   var WALK_FRAMES = 16;
-  var FRAME_METERS = STRIDE / WALK_FRAMES;    // на столько смещается фигура при смене кадра
   var BOX_HEIGHT = 1.9;                       // высота рамки-курсора, м
+
+  // типы юнитов: шаг анимации (stride, м за 16 кадров) совпадает с рендером спрайтов
+  var KINDS = {
+    soldier: { size: 1, speed: 1.5, stride: 1.32, height: 1.85, pickWidth: 26, canKneel: true },
+    alien: { size: 1, speed: 1.5, stride: 1.2, height: 2.0, pickWidth: 26, canKneel: false },
+    mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false }
+  };
 
   // стоимость действий в очках действия (ОД)
   var COST = { kneel: 4, stand: 8, turnStep: 1, reload: 15 };
@@ -46,8 +50,12 @@
   obstacles.forEach(function (rock) { blocked[rock.row * GRID + rock.col] = 1; });
 
   function makeUnit(profile, col, row, direction) {
+    var kind = KINDS[profile.kind || 'soldier'];
     var unit = {
-      col: col, row: row, x: col + 0.5, y: row + 0.5, direction: direction,
+      kind: profile.kind || 'soldier', size: kind.size, speed: kind.speed, frameMeters: kind.stride / WALK_FRAMES,
+      height: kind.height, pickWidth: kind.pickWidth, canKneel: kind.canKneel,
+      spriteSet: profile.camo, portrait: profile.camo, statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'ЗДОРОВЬЕ', 'ВЫНОСЛИВОСТЬ', 'МОРАЛЬ'],
+      col: col, row: row, x: col + kind.size / 2, y: row + kind.size / 2, direction: direction,
       path: [], walked: 0, moveCol: 0, moveRow: 0, segmentLength: 0,
       kneeling: false, fireMode: 0
     };
@@ -67,7 +75,17 @@
       weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 17, reserve: 3 }, 3, 5, 0),
     makeUnit({ name: 'Олег Ржевский', callsign: 'ВОРОН-4', rank: 'ефрейтор', role: 'РАЗВЕДЧИК', missions: 6, camo: 'black',
       maxTimeUnits: 62, health: 33, maxHealth: 40, stamina: 58, maxStamina: 64, morale: 71, optics: 'ПНВ',
-      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 30, reserve: 2 }, 5, 5, 7)
+      weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 30, reserve: 2 }, 5, 5, 7),
+    // пришельцы и робот — для проверки ходьбы, пока управляются тем же игроком
+    makeUnit({ kind: 'alien', name: 'Страж, особь 1', callsign: 'ЦЕЛЬ-1', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
+      maxTimeUnits: 64, health: 58, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ',
+      weapon: null }, 13, 3, 1),
+    makeUnit({ kind: 'alien', name: 'Страж, особь 2', callsign: 'ЦЕЛЬ-2', rank: 'тест', subtitle: 'ПРИШЕЛЕЦ · ТЕСТОВОЕ УПРАВЛЕНИЕ', camo: 'alien',
+      maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'БЕЗ СНАРЯЖЕНИЯ',
+      weapon: null }, 15, 6, 2),
+    makeUnit({ kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
+      maxTimeUnits: 48, health: 180, maxHealth: 180, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
+      statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'], weapon: null }, 6, 8, 0)
   ];
   var selected = units[0];
   var hoverTile = null, hoverPath = null, hoverAffordable = 0;
@@ -103,15 +121,26 @@
 
   // ---------------- правила клеток ----------------
   function inside(col, row) { return col >= 0 && row >= 0 && col < GRID && row < GRID; }
+  // юнит, чья площадка (size x size клеток от col, row) накрывает клетку
   function unitAt(col, row, except) {
     for (var index = 0; index < units.length; index++) {
       var unit = units[index];
-      if (unit !== except && unit.col === col && unit.row === row) return unit;
+      if (unit !== except && col >= unit.col && col < unit.col + unit.size && row >= unit.row && row < unit.row + unit.size) return unit;
     }
     return null;
   }
+  // может ли mover встать так, чтобы угол его площадки был в (col, row)
   function isFreeFor(mover) {
-    return function (col, row) { return inside(col, row) && !blocked[row * GRID + col] && !unitAt(col, row, mover); };
+    var size = mover ? mover.size : 1;
+    return function (col, row) {
+      for (var dy = 0; dy < size; dy++) {
+        for (var dx = 0; dx < size; dx++) {
+          var cellCol = col + dx, cellRow = row + dy;
+          if (!inside(cellCol, cellRow) || blocked[cellRow * GRID + cellCol] || unitAt(cellCol, cellRow, mover)) return false;
+        }
+      }
+      return true;
+    };
   }
 
   // сколько первых шагов пути боец может оплатить; с колена сначала нужно встать
@@ -142,12 +171,11 @@
     if (steps === 0) { say('Не хватает очков действия'); return; }
     path = path.slice(0, steps);
     var cost = pathCost(selected, path);
+    var fullLength = PathFinder.find(GRID, GRID, selected.col, selected.row, tile.col, tile.row, isFreeFor(selected)).length;
     selected.timeUnits -= cost;
     selected.kneeling = false;
     selected.path = path;
-    if (steps < PathFinder.find(GRID, GRID, selected.col, selected.row, tile.col, tile.row, isFreeFor(selected)).length) {
-      say('ОД хватит только на часть пути');
-    }
+    if (steps < fullLength) say('ОД хватит только на часть пути');
   }
 
   // поворот лицом к точке; 1 ОД за каждые 45 градусов
@@ -164,6 +192,7 @@
 
   function toggleKneel() {
     if (busy()) return;
+    if (!selected.canKneel) { say('Этот юнит не может присесть'); return; }
     var cost = selected.kneeling ? COST.stand : COST.kneel;
     if (cost > selected.timeUnits) { say('Не хватает очков действия'); return; }
     selected.timeUnits -= cost;
@@ -172,6 +201,7 @@
 
   function reload() {
     if (busy()) return;
+    if (!selected.weapon) { say('Нет оружия'); return; }
     if (selected.ammo >= MAGAZINE) { say('Магазин полон'); return; }
     if (selected.reserve <= 0) { say('Нет запасных магазинов'); return; }
     if (COST.reload > selected.timeUnits) { say('Не хватает очков действия'); return; }
@@ -214,8 +244,8 @@
     var best = null;
     units.forEach(function (unit) {
       var foot = Iso.toScreen(unit.x, unit.y);
-      var left = foot.x - camera.x - 26, right = foot.x - camera.x + 26;
-      var top = foot.y - camera.y - 1.85 * Iso.pixelsPerMeterUp, bottom = foot.y - camera.y + 8;
+      var left = foot.x - camera.x - unit.pickWidth, right = foot.x - camera.x + unit.pickWidth;
+      var top = foot.y - camera.y - unit.height * Iso.pixelsPerMeterUp, bottom = foot.y - camera.y + 8 * unit.size;
       if (mouse.x >= left && mouse.x <= right && mouse.y >= top && mouse.y <= bottom) {
         if (!best || unit.x + unit.y > best.x + best.y) best = unit;
       }
@@ -285,10 +315,10 @@
     if (!unit.path.length) return;
     var next = unit.path[0];
     // перед входом в новую клетку проверить, что она свободна
-    if (unit.col !== next.col || unit.row !== next.row) {
-      if (unitAt(next.col, next.row, unit)) { unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + 0.5; unit.y = unit.row + 0.5; return; }
+    if ((unit.col !== next.col || unit.row !== next.row) && !isFreeFor(unit)(next.col, next.row)) {
+      unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + unit.size / 2; unit.y = unit.row + unit.size / 2; return;
     }
-    var targetX = next.col + 0.5, targetY = next.row + 0.5;
+    var targetX = next.col + unit.size / 2, targetY = next.row + unit.size / 2;
     var deltaX = targetX - unit.x, deltaY = targetY - unit.y;
     var distanceTiles = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     if (unit.segmentLength === 0) {
@@ -299,7 +329,7 @@
       var direction = Iso.directionOf(deltaX, deltaY);
       if (direction >= 0) unit.direction = direction;
     }
-    var stepTiles = WALK_SPEED * seconds / Iso.tileMeters;
+    var stepTiles = unit.speed * seconds / Iso.tileMeters;
     if (distanceTiles <= stepTiles) {
       unit.x = targetX; unit.y = targetY;
       unit.walked += distanceTiles * Iso.tileMeters;
@@ -318,17 +348,17 @@
 
   function spriteName(unit) {
     if (unit.path.length) {
-      var frame = Math.floor(unit.walked / FRAME_METERS) % WALK_FRAMES;
-      return unit.camo + '_walk_f' + frame + '_d' + unit.direction;
+      var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
+      return unit.spriteSet + '_walk_f' + frame + '_d' + unit.direction;
     }
-    return unit.camo + (unit.kneeling ? '_kneelAim_d' : '_idle_d') + unit.direction;
+    return unit.spriteSet + (unit.kneeling ? '_kneelAim_d' : '_idle_d') + unit.direction;
   }
 
   // Фигура на экране сдвигается только при смене кадра: внутри кадра опорная нога
   // неподвижна относительно земли, поэтому ноги не скользят.
   function drawPosition(unit) {
     if (!unit.path.length) return { x: unit.x, y: unit.y };
-    var lagTiles = (unit.walked - Math.floor(unit.walked / FRAME_METERS) * FRAME_METERS) / Iso.tileMeters;
+    var lagTiles = (unit.walked - Math.floor(unit.walked / unit.frameMeters) * unit.frameMeters) / Iso.tileMeters;
     return { x: unit.x - unit.moveCol * lagTiles, y: unit.y - unit.moveRow * lagTiles };
   }
 
@@ -353,8 +383,10 @@
   }
 
   // рамка-курсор: клетка на земле и такая же над ней, соединённые рёбрами
-  function drawBox(col, row, color, part) {
-    var bottom = Iso.tileCorners(col, row, 0), top = Iso.tileCorners(col, row, BOX_HEIGHT);
+  function drawBox(col, row, color, part, size) {
+    size = size || 1;
+    var height = size > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
+    var bottom = Iso.tileCorners(col, row, 0, size), top = Iso.tileCorners(col, row, height, size);
     context.save();
     context.lineWidth = 1.6;
     context.strokeStyle = color;
@@ -389,7 +421,7 @@
     if (!hoverPath || !hoverPath.length) return;
     context.save();
     hoverPath.forEach(function (step, index) {
-      var point = Iso.toScreen(step.col + 0.5, step.row + 0.5);
+      var point = Iso.toScreen(step.col + selected.size / 2, step.row + selected.size / 2);
       var last = index === hoverPath.length - 1;
       context.fillStyle = index < hoverAffordable ? 'rgba(120, 230, 255, 0.85)' : 'rgba(255, 170, 60, 0.9)';
       context.beginPath();
@@ -404,7 +436,7 @@
     var cost = pathCost(selected, hoverPath);
     var enough = hoverAffordable === hoverPath.length;
     var end = hoverPath[hoverPath.length - 1];
-    var label = Iso.toScreen(end.col + 0.5, end.row + 0.5, BOX_HEIGHT + 0.25);
+    var label = Iso.toScreen(end.col + selected.size / 2, end.row + selected.size / 2, Math.max(BOX_HEIGHT, selected.height) + 0.25);
     context.save();
     context.font = 'bold 13px Arial, sans-serif';
     context.textAlign = 'center';
@@ -417,7 +449,7 @@
 
   function drawSelectionMarker(unit) {
     var position = drawPosition(unit);
-    var head = Iso.toScreen(position.x, position.y, unit.kneeling && !unit.path.length ? 1.6 : 2.15);
+    var head = Iso.toScreen(position.x, position.y, unit.kneeling && !unit.path.length ? 1.6 : unit.height + 0.3);
     var x = head.x - camera.x, y = head.y - camera.y + Math.sin(Date.now() / 220) * 2;
     context.save();
     context.fillStyle = '#ffd23a';
@@ -437,8 +469,10 @@
 
     var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row));
     var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
-    // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка
-    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'back');
+    // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка.
+    // Для робота рамка охватывает всю его площадку 2x2.
+    var boxSize = selected ? selected.size : 1;
+    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'back', boxSize);
     drawPath();
 
     // объекты по глубине: дальше от зрителя (меньше col + row) рисуются раньше
@@ -453,13 +487,13 @@
 
     if (selected) drawSelectionMarker(selected);
     drawPathLabel();
-    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'front');
+    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'front', boxSize);
   }
 
   // ---------------- связь с панелью ----------------
   var Game = window.Game = {
     COST: COST, MAGAZINE: MAGAZINE, FIRE_MODES: FIRE_MODES, GRID: GRID,
-    units: units, obstacles: obstacles, camera: camera,
+    units: units, obstacles: obstacles, camera: camera, KINDS: KINDS,
     get selected() { return selected; },
     get turn() { return turn; },
     get message() { return Date.now() < message.until ? message.text : ''; },

@@ -25,11 +25,12 @@ var Iso = (function () {
     };
   }
 
-  // четыре угла клетки на заданной высоте (для рамок)
-  function tileCorners(col, row, heightMeters) {
+  // четыре угла клетки (или квадрата size x size клеток) на заданной высоте — для рамок
+  function tileCorners(col, row, heightMeters, size) {
+    var span = size || 1;
     return [
-      toScreen(col, row, heightMeters), toScreen(col + 1, row, heightMeters),
-      toScreen(col + 1, row + 1, heightMeters), toScreen(col, row + 1, heightMeters)
+      toScreen(col, row, heightMeters), toScreen(col + span, row, heightMeters),
+      toScreen(col + span, row + span, heightMeters), toScreen(col, row + span, heightMeters)
     ];
   }
 
