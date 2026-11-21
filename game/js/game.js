@@ -342,15 +342,10 @@
     if (background.complete) context.drawImage(background, -Math.round(camera.x), -Math.round(camera.y));
     if (showGrid) drawGrid();
 
-    if (selected) {
-      polygon(Iso.tileCorners(selected.col, selected.row, 0), 'rgba(255, 210, 60, 0.18)');
-      drawBox(selected.col, selected.row, '#ffd23a', 'back');
-    }
     var hoverReachable = hoverTile && (!selected || selected.path.length || hoverPath || unitAt(hoverTile.col, hoverTile.row));
     var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
-    if (hoverTile && !(selected && hoverTile.col === selected.col && hoverTile.row === selected.row)) {
-      drawBox(hoverTile.col, hoverTile.row, hoverColor, 'back');
-    }
+    // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка
+    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'back');
     drawPath();
 
     // объекты по глубине: дальше от зрителя (меньше col + row) рисуются раньше
@@ -363,11 +358,9 @@
     drawList.sort(function (first, second) { return first.depth - second.depth; });
     drawList.forEach(function (item) { item.draw(); });
 
-    if (selected) { drawBox(selected.col, selected.row, '#ffd23a', 'front'); drawSelectionMarker(selected); }
+    if (selected) drawSelectionMarker(selected);
     drawPath(true);
-    if (hoverTile && !(selected && hoverTile.col === selected.col && hoverTile.row === selected.row)) {
-      drawBox(hoverTile.col, hoverTile.row, hoverColor, 'front');
-    }
+    if (hoverTile) drawBox(hoverTile.col, hoverTile.row, hoverColor, 'front');
     updateHud();
   }
 
