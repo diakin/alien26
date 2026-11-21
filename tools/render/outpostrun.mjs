@@ -36,7 +36,11 @@ if (mode === 'info') {
       const result = await page.evaluate(([cx, cy, size, margin]) => window.renderChunk(cx, cy, size, size, margin), [x, y, CHUNK, MARGIN]);
       save(`${dir}/c_${x}_${y}.png`, result.color);
       save(`${dir}/i_${x}_${y}.png`, result.id);
-      chunks.push({ x, y, size: CHUNK, margin: MARGIN });
+      if (result.doorColor) {
+        save(`${dir}/d_${x}_${y}.png`, result.doorColor);
+        save(`${dir}/j_${x}_${y}.png`, result.doorId);
+      }
+      chunks.push({ x, y, size: CHUNK, margin: MARGIN, doors: !!result.doorColor });
     }
   }
   fs.writeFileSync(`${dir}/chunks.json`, JSON.stringify({ level, cut, chunks, width: info.width, height: info.height }));

@@ -7102,5 +7102,1157 @@
   "anchor_y": 213.7,
   "width": 311,
   "height": 253
+ },
+ "black_climb_f0_d1_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 291.3,
+  "width": 128,
+  "height": 306
+ },
+ "black_climb_f0_d1_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 148.2,
+  "width": 70,
+  "height": 158
+ },
+ "black_climb_f0_d3_x2": {
+  "anchor_x": 81.0,
+  "anchor_y": 252.3,
+  "width": 145,
+  "height": 244
+ },
+ "black_climb_f0_d3_x1": {
+  "anchor_x": 43.0,
+  "anchor_y": 129.2,
+  "width": 78,
+  "height": 128
+ },
+ "black_climb_f0_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 230.3,
+  "width": 128,
+  "height": 236
+ },
+ "black_climb_f0_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 118.2,
+  "width": 70,
+  "height": 124
+ },
+ "black_climb_f0_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 296.3,
+  "width": 145,
+  "height": 326
+ },
+ "black_climb_f0_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 151.2,
+  "width": 78,
+  "height": 169
+ },
+ "black_climb_f1_d1_x2": {
+  "anchor_x": 68.0,
+  "anchor_y": 300.3,
+  "width": 134,
+  "height": 296
+ },
+ "black_climb_f1_d1_x1": {
+  "anchor_x": 37.0,
+  "anchor_y": 153.2,
+  "width": 73,
+  "height": 154
+ },
+ "black_climb_f1_d3_x2": {
+  "anchor_x": 76.0,
+  "anchor_y": 252.3,
+  "width": 141,
+  "height": 233
+ },
+ "black_climb_f1_d3_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 129.2,
+  "width": 76,
+  "height": 122
+ },
+ "black_climb_f1_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 239.3,
+  "width": 134,
+  "height": 235
+ },
+ "black_climb_f1_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 122.2,
+  "width": 73,
+  "height": 122
+ },
+ "black_climb_f1_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 304.3,
+  "width": 141,
+  "height": 314
+ },
+ "black_climb_f1_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 155.2,
+  "width": 76,
+  "height": 163
+ },
+ "black_climb_f2_d1_x2": {
+  "anchor_x": 73.0,
+  "anchor_y": 308.3,
+  "width": 139,
+  "height": 304
+ },
+ "black_climb_f2_d1_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 157.2,
+  "width": 75,
+  "height": 158
+ },
+ "black_climb_f2_d3_x2": {
+  "anchor_x": 72.0,
+  "anchor_y": 252.3,
+  "width": 136,
+  "height": 224
+ },
+ "black_climb_f2_d3_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 129.2,
+  "width": 74,
+  "height": 118
+ },
+ "black_climb_f2_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 247.3,
+  "width": 139,
+  "height": 219
+ },
+ "black_climb_f2_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 126.2,
+  "width": 75,
+  "height": 115
+ },
+ "black_climb_f2_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 313.3,
+  "width": 136,
+  "height": 295
+ },
+ "black_climb_f2_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 159.2,
+  "width": 74,
+  "height": 153
+ },
+ "black_climb_f3_d1_x2": {
+  "anchor_x": 77.0,
+  "anchor_y": 317.3,
+  "width": 143,
+  "height": 313
+ },
+ "black_climb_f3_d1_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 161.2,
+  "width": 77,
+  "height": 162
+ },
+ "black_climb_f3_d3_x2": {
+  "anchor_x": 67.0,
+  "anchor_y": 253.3,
+  "width": 132,
+  "height": 225
+ },
+ "black_climb_f3_d3_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 129.2,
+  "width": 71,
+  "height": 118
+ },
+ "black_climb_f3_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 271.3,
+  "width": 143,
+  "height": 229
+ },
+ "black_climb_f3_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 138.2,
+  "width": 77,
+  "height": 120
+ },
+ "black_climb_f3_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 321.3,
+  "width": 131,
+  "height": 302
+ },
+ "black_climb_f3_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 163.2,
+  "width": 71,
+  "height": 156
+ },
+ "black_climb_f4_d1_x2": {
+  "anchor_x": 81.0,
+  "anchor_y": 325.3,
+  "width": 147,
+  "height": 321
+ },
+ "black_climb_f4_d1_x1": {
+  "anchor_x": 43.0,
+  "anchor_y": 165.2,
+  "width": 79,
+  "height": 166
+ },
+ "black_climb_f4_d3_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 262.3,
+  "width": 126,
+  "height": 234
+ },
+ "black_climb_f4_d3_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 134.2,
+  "width": 69,
+  "height": 123
+ },
+ "black_climb_f4_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 286.3,
+  "width": 147,
+  "height": 244
+ },
+ "black_climb_f4_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 146.2,
+  "width": 79,
+  "height": 128
+ },
+ "black_climb_f4_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 330.3,
+  "width": 126,
+  "height": 311
+ },
+ "black_climb_f4_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 168.2,
+  "width": 69,
+  "height": 161
+ },
+ "black_climb_f5_d1_x2": {
+  "anchor_x": 76.0,
+  "anchor_y": 334.3,
+  "width": 142,
+  "height": 310
+ },
+ "black_climb_f5_d1_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 170.2,
+  "width": 77,
+  "height": 161
+ },
+ "black_climb_f5_d3_x2": {
+  "anchor_x": 68.0,
+  "anchor_y": 270.3,
+  "width": 133,
+  "height": 232
+ },
+ "black_climb_f5_d3_x1": {
+  "anchor_x": 37.0,
+  "anchor_y": 137.2,
+  "width": 72,
+  "height": 120
+ },
+ "black_climb_f5_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 286.3,
+  "width": 142,
+  "height": 233
+ },
+ "black_climb_f5_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 146.2,
+  "width": 77,
+  "height": 122
+ },
+ "black_climb_f5_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 338.3,
+  "width": 133,
+  "height": 300
+ },
+ "black_climb_f5_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 172.2,
+  "width": 72,
+  "height": 156
+ },
+ "black_climb_f6_d1_x2": {
+  "anchor_x": 72.0,
+  "anchor_y": 342.3,
+  "width": 138,
+  "height": 290
+ },
+ "black_climb_f6_d1_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 174.2,
+  "width": 75,
+  "height": 151
+ },
+ "black_climb_f6_d3_x2": {
+  "anchor_x": 73.0,
+  "anchor_y": 280.3,
+  "width": 137,
+  "height": 218
+ },
+ "black_climb_f6_d3_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 143.2,
+  "width": 74,
+  "height": 115
+ },
+ "black_climb_f6_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 286.3,
+  "width": 138,
+  "height": 224
+ },
+ "black_climb_f6_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 146.2,
+  "width": 75,
+  "height": 118
+ },
+ "black_climb_f6_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 347.3,
+  "width": 137,
+  "height": 309
+ },
+ "black_climb_f6_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 176.2,
+  "width": 74,
+  "height": 160
+ },
+ "black_climb_f7_d1_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 351.3,
+  "width": 132,
+  "height": 298
+ },
+ "black_climb_f7_d1_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 178.2,
+  "width": 72,
+  "height": 154
+ },
+ "black_climb_f7_d3_x2": {
+  "anchor_x": 77.0,
+  "anchor_y": 305.3,
+  "width": 142,
+  "height": 229
+ },
+ "black_climb_f7_d3_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 155.2,
+  "width": 76,
+  "height": 120
+ },
+ "black_climb_f7_d5_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 290.3,
+  "width": 132,
+  "height": 228
+ },
+ "black_climb_f7_d5_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 148.2,
+  "width": 72,
+  "height": 120
+ },
+ "black_climb_f7_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 355.3,
+  "width": 142,
+  "height": 317
+ },
+ "black_climb_f7_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 180.2,
+  "width": 76,
+  "height": 164
+ },
+ "green_climb_f0_d1_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 277.3,
+  "width": 124,
+  "height": 292
+ },
+ "green_climb_f0_d1_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 141.2,
+  "width": 68,
+  "height": 151
+ },
+ "green_climb_f0_d3_x2": {
+  "anchor_x": 81.0,
+  "anchor_y": 252.3,
+  "width": 145,
+  "height": 244
+ },
+ "green_climb_f0_d3_x1": {
+  "anchor_x": 43.0,
+  "anchor_y": 129.2,
+  "width": 78,
+  "height": 128
+ },
+ "green_climb_f0_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 228.3,
+  "width": 124,
+  "height": 234
+ },
+ "green_climb_f0_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 117.2,
+  "width": 68,
+  "height": 123
+ },
+ "green_climb_f0_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 282.3,
+  "width": 145,
+  "height": 312
+ },
+ "green_climb_f0_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 144.2,
+  "width": 78,
+  "height": 162
+ },
+ "green_climb_f1_d1_x2": {
+  "anchor_x": 68.0,
+  "anchor_y": 286.3,
+  "width": 130,
+  "height": 282
+ },
+ "green_climb_f1_d1_x1": {
+  "anchor_x": 37.0,
+  "anchor_y": 146.2,
+  "width": 71,
+  "height": 147
+ },
+ "green_climb_f1_d3_x2": {
+  "anchor_x": 76.0,
+  "anchor_y": 252.3,
+  "width": 141,
+  "height": 233
+ },
+ "green_climb_f1_d3_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 129.2,
+  "width": 76,
+  "height": 122
+ },
+ "green_climb_f1_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 236.3,
+  "width": 130,
+  "height": 232
+ },
+ "green_climb_f1_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 120.2,
+  "width": 71,
+  "height": 120
+ },
+ "green_climb_f1_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 290.3,
+  "width": 141,
+  "height": 300
+ },
+ "green_climb_f1_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 148.2,
+  "width": 76,
+  "height": 156
+ },
+ "green_climb_f2_d1_x2": {
+  "anchor_x": 73.0,
+  "anchor_y": 294.3,
+  "width": 135,
+  "height": 290
+ },
+ "green_climb_f2_d1_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 150.2,
+  "width": 73,
+  "height": 151
+ },
+ "green_climb_f2_d3_x2": {
+  "anchor_x": 72.0,
+  "anchor_y": 252.3,
+  "width": 136,
+  "height": 224
+ },
+ "green_climb_f2_d3_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 129.2,
+  "width": 74,
+  "height": 118
+ },
+ "green_climb_f2_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 246.3,
+  "width": 135,
+  "height": 218
+ },
+ "green_climb_f2_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 126.2,
+  "width": 73,
+  "height": 115
+ },
+ "green_climb_f2_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 299.3,
+  "width": 136,
+  "height": 281
+ },
+ "green_climb_f2_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 151.2,
+  "width": 74,
+  "height": 145
+ },
+ "green_climb_f3_d1_x2": {
+  "anchor_x": 77.0,
+  "anchor_y": 303.3,
+  "width": 139,
+  "height": 299
+ },
+ "green_climb_f3_d1_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 154.2,
+  "width": 75,
+  "height": 155
+ },
+ "green_climb_f3_d3_x2": {
+  "anchor_x": 67.0,
+  "anchor_y": 253.3,
+  "width": 132,
+  "height": 225
+ },
+ "green_climb_f3_d3_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 129.2,
+  "width": 71,
+  "height": 118
+ },
+ "green_climb_f3_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 271.3,
+  "width": 139,
+  "height": 229
+ },
+ "green_climb_f3_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 138.2,
+  "width": 75,
+  "height": 120
+ },
+ "green_climb_f3_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 307.3,
+  "width": 131,
+  "height": 288
+ },
+ "green_climb_f3_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 156.2,
+  "width": 71,
+  "height": 149
+ },
+ "green_climb_f4_d1_x2": {
+  "anchor_x": 81.0,
+  "anchor_y": 311.3,
+  "width": 143,
+  "height": 307
+ },
+ "green_climb_f4_d1_x1": {
+  "anchor_x": 43.0,
+  "anchor_y": 158.2,
+  "width": 77,
+  "height": 159
+ },
+ "green_climb_f4_d3_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 262.3,
+  "width": 126,
+  "height": 234
+ },
+ "green_climb_f4_d3_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 134.2,
+  "width": 69,
+  "height": 123
+ },
+ "green_climb_f4_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 286.3,
+  "width": 143,
+  "height": 244
+ },
+ "green_climb_f4_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 146.2,
+  "width": 77,
+  "height": 128
+ },
+ "green_climb_f4_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 316.3,
+  "width": 126,
+  "height": 297
+ },
+ "green_climb_f4_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 161.2,
+  "width": 69,
+  "height": 154
+ },
+ "green_climb_f5_d1_x2": {
+  "anchor_x": 76.0,
+  "anchor_y": 320.3,
+  "width": 138,
+  "height": 296
+ },
+ "green_climb_f5_d1_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 163.2,
+  "width": 75,
+  "height": 154
+ },
+ "green_climb_f5_d3_x2": {
+  "anchor_x": 68.0,
+  "anchor_y": 270.3,
+  "width": 133,
+  "height": 232
+ },
+ "green_climb_f5_d3_x1": {
+  "anchor_x": 37.0,
+  "anchor_y": 137.2,
+  "width": 72,
+  "height": 120
+ },
+ "green_climb_f5_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 286.3,
+  "width": 138,
+  "height": 233
+ },
+ "green_climb_f5_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 146.2,
+  "width": 75,
+  "height": 122
+ },
+ "green_climb_f5_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 324.3,
+  "width": 133,
+  "height": 286
+ },
+ "green_climb_f5_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 165.2,
+  "width": 72,
+  "height": 149
+ },
+ "green_climb_f6_d1_x2": {
+  "anchor_x": 72.0,
+  "anchor_y": 328.3,
+  "width": 134,
+  "height": 276
+ },
+ "green_climb_f6_d1_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 167.2,
+  "width": 73,
+  "height": 144
+ },
+ "green_climb_f6_d3_x2": {
+  "anchor_x": 73.0,
+  "anchor_y": 280.3,
+  "width": 137,
+  "height": 218
+ },
+ "green_climb_f6_d3_x1": {
+  "anchor_x": 39.0,
+  "anchor_y": 143.2,
+  "width": 74,
+  "height": 115
+ },
+ "green_climb_f6_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 286.3,
+  "width": 134,
+  "height": 224
+ },
+ "green_climb_f6_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 146.2,
+  "width": 73,
+  "height": 118
+ },
+ "green_climb_f6_d7_x2": {
+  "anchor_x": 64.0,
+  "anchor_y": 333.3,
+  "width": 137,
+  "height": 295
+ },
+ "green_climb_f6_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 169.2,
+  "width": 74,
+  "height": 153
+ },
+ "green_climb_f7_d1_x2": {
+  "anchor_x": 66.0,
+  "anchor_y": 337.3,
+  "width": 128,
+  "height": 284
+ },
+ "green_climb_f7_d1_x1": {
+  "anchor_x": 36.0,
+  "anchor_y": 171.2,
+  "width": 70,
+  "height": 147
+ },
+ "green_climb_f7_d3_x2": {
+  "anchor_x": 77.0,
+  "anchor_y": 305.3,
+  "width": 142,
+  "height": 229
+ },
+ "green_climb_f7_d3_x1": {
+  "anchor_x": 41.0,
+  "anchor_y": 155.2,
+  "width": 76,
+  "height": 120
+ },
+ "green_climb_f7_d5_x2": {
+  "anchor_x": 62.0,
+  "anchor_y": 287.3,
+  "width": 128,
+  "height": 225
+ },
+ "green_climb_f7_d5_x1": {
+  "anchor_x": 34.0,
+  "anchor_y": 146.2,
+  "width": 70,
+  "height": 118
+ },
+ "green_climb_f7_d7_x2": {
+  "anchor_x": 65.0,
+  "anchor_y": 341.3,
+  "width": 142,
+  "height": 303
+ },
+ "green_climb_f7_d7_x1": {
+  "anchor_x": 35.0,
+  "anchor_y": 173.2,
+  "width": 76,
+  "height": 157
+ },
+ "alien_climb_f0_d1_x2": {
+  "anchor_x": 68.5,
+  "anchor_y": 239.2,
+  "width": 157,
+  "height": 255
+ },
+ "alien_climb_f0_d1_x1": {
+  "anchor_x": 36.8,
+  "anchor_y": 121.6,
+  "width": 84,
+  "height": 131
+ },
+ "alien_climb_f0_d3_x2": {
+  "anchor_x": 83.5,
+  "anchor_y": 272.2,
+  "width": 141,
+  "height": 308
+ },
+ "alien_climb_f0_d3_x1": {
+  "anchor_x": 44.8,
+  "anchor_y": 137.6,
+  "width": 77,
+  "height": 158
+ },
+ "alien_climb_f0_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 260.2,
+  "width": 157,
+  "height": 278
+ },
+ "alien_climb_f0_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 131.6,
+  "width": 84,
+  "height": 143
+ },
+ "alien_climb_f0_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 226.2,
+  "width": 141,
+  "height": 258
+ },
+ "alien_climb_f0_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 115.6,
+  "width": 77,
+  "height": 132
+ },
+ "alien_climb_f1_d1_x2": {
+  "anchor_x": 72.5,
+  "anchor_y": 244.2,
+  "width": 161,
+  "height": 242
+ },
+ "alien_climb_f1_d1_x1": {
+  "anchor_x": 38.8,
+  "anchor_y": 123.6,
+  "width": 86,
+  "height": 124
+ },
+ "alien_climb_f1_d3_x2": {
+  "anchor_x": 74.5,
+  "anchor_y": 269.2,
+  "width": 132,
+  "height": 296
+ },
+ "alien_climb_f1_d3_x1": {
+  "anchor_x": 39.8,
+  "anchor_y": 135.6,
+  "width": 72,
+  "height": 152
+ },
+ "alien_climb_f1_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 260.2,
+  "width": 161,
+  "height": 269
+ },
+ "alien_climb_f1_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 131.6,
+  "width": 86,
+  "height": 139
+ },
+ "alien_climb_f1_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 235.2,
+  "width": 132,
+  "height": 247
+ },
+ "alien_climb_f1_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 119.6,
+  "width": 72,
+  "height": 127
+ },
+ "alien_climb_f2_d1_x2": {
+  "anchor_x": 76.5,
+  "anchor_y": 247.2,
+  "width": 165,
+  "height": 245
+ },
+ "alien_climb_f2_d1_x1": {
+  "anchor_x": 40.8,
+  "anchor_y": 125.6,
+  "width": 88,
+  "height": 126
+ },
+ "alien_climb_f2_d3_x2": {
+  "anchor_x": 65.5,
+  "anchor_y": 267.2,
+  "width": 123,
+  "height": 286
+ },
+ "alien_climb_f2_d3_x1": {
+  "anchor_x": 34.8,
+  "anchor_y": 135.6,
+  "width": 67,
+  "height": 147
+ },
+ "alien_climb_f2_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 262.2,
+  "width": 165,
+  "height": 263
+ },
+ "alien_climb_f2_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 132.6,
+  "width": 88,
+  "height": 135
+ },
+ "alien_climb_f2_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 254.2,
+  "width": 123,
+  "height": 238
+ },
+ "alien_climb_f2_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 129.6,
+  "width": 67,
+  "height": 123
+ },
+ "alien_climb_f3_d1_x2": {
+  "anchor_x": 80.5,
+  "anchor_y": 252.2,
+  "width": 169,
+  "height": 250
+ },
+ "alien_climb_f3_d1_x1": {
+  "anchor_x": 42.8,
+  "anchor_y": 128.6,
+  "width": 90,
+  "height": 129
+ },
+ "alien_climb_f3_d3_x2": {
+  "anchor_x": 63.5,
+  "anchor_y": 280.2,
+  "width": 121,
+  "height": 290
+ },
+ "alien_climb_f3_d3_x1": {
+  "anchor_x": 33.8,
+  "anchor_y": 141.6,
+  "width": 66,
+  "height": 148
+ },
+ "alien_climb_f3_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 291.2,
+  "width": 169,
+  "height": 283
+ },
+ "alien_climb_f3_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 146.6,
+  "width": 90,
+  "height": 145
+ },
+ "alien_climb_f3_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 269.2,
+  "width": 121,
+  "height": 251
+ },
+ "alien_climb_f3_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 136.6,
+  "width": 66,
+  "height": 129
+ },
+ "alien_climb_f4_d1_x2": {
+  "anchor_x": 83.5,
+  "anchor_y": 260.2,
+  "width": 172,
+  "height": 258
+ },
+ "alien_climb_f4_d1_x1": {
+  "anchor_x": 44.8,
+  "anchor_y": 132.6,
+  "width": 92,
+  "height": 133
+ },
+ "alien_climb_f4_d3_x2": {
+  "anchor_x": 68.5,
+  "anchor_y": 294.2,
+  "width": 126,
+  "height": 296
+ },
+ "alien_climb_f4_d3_x1": {
+  "anchor_x": 36.8,
+  "anchor_y": 148.6,
+  "width": 69,
+  "height": 152
+ },
+ "alien_climb_f4_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 306.2,
+  "width": 172,
+  "height": 290
+ },
+ "alien_climb_f4_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 154.6,
+  "width": 92,
+  "height": 149
+ },
+ "alien_climb_f4_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 273.2,
+  "width": 126,
+  "height": 255
+ },
+ "alien_climb_f4_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 138.6,
+  "width": 69,
+  "height": 131
+ },
+ "alien_climb_f5_d1_x2": {
+  "anchor_x": 74.5,
+  "anchor_y": 269.2,
+  "width": 163,
+  "height": 247
+ },
+ "alien_climb_f5_d1_x1": {
+  "anchor_x": 39.8,
+  "anchor_y": 136.6,
+  "width": 87,
+  "height": 127
+ },
+ "alien_climb_f5_d3_x2": {
+  "anchor_x": 72.5,
+  "anchor_y": 293.2,
+  "width": 132,
+  "height": 286
+ },
+ "alien_climb_f5_d3_x1": {
+  "anchor_x": 38.8,
+  "anchor_y": 148.6,
+  "width": 71,
+  "height": 148
+ },
+ "alien_climb_f5_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 303.2,
+  "width": 163,
+  "height": 278
+ },
+ "alien_climb_f5_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 152.6,
+  "width": 87,
+  "height": 143
+ },
+ "alien_climb_f5_d7_x2": {
+  "anchor_x": 59.5,
+  "anchor_y": 278.2,
+  "width": 132,
+  "height": 241
+ },
+ "alien_climb_f5_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 140.6,
+  "width": 71,
+  "height": 124
+ },
+ "alien_climb_f6_d1_x2": {
+  "anchor_x": 65.5,
+  "anchor_y": 288.2,
+  "width": 154,
+  "height": 238
+ },
+ "alien_climb_f6_d1_x1": {
+  "anchor_x": 34.8,
+  "anchor_y": 146.6,
+  "width": 82,
+  "height": 122
+ },
+ "alien_climb_f6_d3_x2": {
+  "anchor_x": 76.5,
+  "anchor_y": 296.2,
+  "width": 140,
+  "height": 281
+ },
+ "alien_climb_f6_d3_x1": {
+  "anchor_x": 40.8,
+  "anchor_y": 149.6,
+  "width": 75,
+  "height": 144
+ },
+ "alien_climb_f6_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 301.2,
+  "width": 154,
+  "height": 268
+ },
+ "alien_climb_f6_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 152.6,
+  "width": 82,
+  "height": 138
+ },
+ "alien_climb_f6_d7_x2": {
+  "anchor_x": 63.5,
+  "anchor_y": 281.2,
+  "width": 140,
+  "height": 244
+ },
+ "alien_climb_f6_d7_x1": {
+  "anchor_x": 34.8,
+  "anchor_y": 142.6,
+  "width": 76,
+  "height": 126
+ },
+ "alien_climb_f7_d1_x2": {
+  "anchor_x": 63.5,
+  "anchor_y": 303.2,
+  "width": 152,
+  "height": 251
+ },
+ "alien_climb_f7_d1_x1": {
+  "anchor_x": 33.8,
+  "anchor_y": 153.6,
+  "width": 81,
+  "height": 129
+ },
+ "alien_climb_f7_d3_x2": {
+  "anchor_x": 80.5,
+  "anchor_y": 325.2,
+  "width": 138,
+  "height": 301
+ },
+ "alien_climb_f7_d3_x1": {
+  "anchor_x": 42.8,
+  "anchor_y": 163.6,
+  "width": 75,
+  "height": 153
+ },
+ "alien_climb_f7_d5_x2": {
+  "anchor_x": 88.5,
+  "anchor_y": 313.2,
+  "width": 152,
+  "height": 271
+ },
+ "alien_climb_f7_d5_x1": {
+  "anchor_x": 46.8,
+  "anchor_y": 158.6,
+  "width": 81,
+  "height": 140
+ },
+ "alien_climb_f7_d7_x2": {
+  "anchor_x": 57.5,
+  "anchor_y": 286.2,
+  "width": 138,
+  "height": 249
+ },
+ "alien_climb_f7_d7_x1": {
+  "anchor_x": 31.8,
+  "anchor_y": 145.6,
+  "width": 75,
+  "height": 129
  }
 }

@@ -77,6 +77,33 @@ export function walkCycle(phase) {
   };
 }
 
+// лазание по приставной лестнице: phase 0..1 — подъём на CLIMB_STEP (две перекладины по 0.3 м).
+// Перекладины перед бойцом на z = 0.24, начало координат — уровень перекладины, с которой начат цикл.
+// Конечность переносится за половину цикла, остальное время держится за перекладину:
+// левая нога и правая рука в первой половине, правая нога и левая рука во второй.
+export const CLIMB_STEP = 0.6;
+export function climbCycle(phase) {
+  const rail = 0.24;
+  const smooth = (value) => value * value * (3 - 2 * value);
+  const move = (base, firstHalf) => {
+    const local = firstHalf ? phase / 0.5 : (phase - 0.5) / 0.5;
+    if (local < 0) return { lift: base, away: 0 };
+    if (local >= 1) return { lift: base + CLIMB_STEP, away: 0 };
+    const amount = smooth(local);
+    return { lift: base + CLIMB_STEP * amount, away: Math.sin(Math.PI * local) };
+  };
+  const leftFoot = move(0, true), rightFoot = move(0.3, false);
+  const rightHand = move(1.62, true), leftHand = move(1.92, false);
+  const foot = (side, step) => V(side * 0.13, step.lift + 0.11 + step.away * 0.06, rail - 0.1 - step.away * 0.12);
+  const hand = (side, step) => V(side * 0.21, step.lift, rail - 0.02 - step.away * 0.1);
+  return {
+    pelvis: V(0, 0.97 + CLIMB_STEP * phase, 0.0), lean: 0.1, twist: 0,
+    feet: [foot(-1, leftFoot), foot(1, rightFoot)], footPitch: [0, 0],
+    kneePole: [V(-0.25, 0, 1), V(0.25, 0, 1)], aimPitch: 0, ready: 'climb',
+    hands: [hand(-1, leftHand), hand(1, rightHand)],
+  };
+}
+
 export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false, goggles = false, scarf = false, pack = true, tanRifle = false, suppressor = false } = {}) {
   const spec = typeof pose === 'string' ? POSES[pose] : pose;
   const materials = materialsFor(camo);
@@ -126,7 +153,7 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
 
   // голова
   const neckBase = local(0, 0.58, 0.0);
-  const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.ready === 'aim' ? 0.15 : 0.05, -spec.twist * 0.85, spec.ready === 'aim' ? 0.12 : 0, 'YXZ'));
+  const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.ready === 'aim' ? 0.15 : spec.ready === 'climb' ? -0.3 : 0.05, -spec.twist * 0.85, spec.ready === 'aim' ? 0.12 : 0, 'YXZ'));
   const headCenter = neckBase.clone().add(V(0, 0.15, 0.02).applyQuaternion(headQuat));
   if (spec.ready === 'aim') headCenter.add(V(0.035, -0.02, 0.035));
   const headLocal = (x, y, z) => V(x, y, z).applyQuaternion(headQuat).add(headCenter);
@@ -163,14 +190,22 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
   // оружие
   const shoulders = [local(-0.24, 0.48, 0.0), local(0.24, 0.48, 0.0)];
   const rifle = buildRifle({ tanFurniture: tanRifle, suppressor });
-  rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, spec.ready === 'aim' ? 0 : -0.45, spec.ready === 'aim' ? -0.05 : 0, 'YXZ'));
-  rifle.position.copy(spec.ready === 'aim' ? shoulders[1].clone().add(V(-0.09, -0.03, 0.09)) : shoulders[1].clone().add(V(-0.06, -0.11, 0.12)));
+  const climbing = spec.ready === 'climb';
+  if (climbing) {
+    // карабин за спиной по диагонали, руки на перекладинах
+    rifle.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.15, Math.PI, 0.55, 'YXZ')));
+    rifle.position.copy(local(0.02, 0.22, -0.3));
+  } else {
+    rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, spec.ready === 'aim' ? 0 : -0.45, spec.ready === 'aim' ? -0.05 : 0, 'YXZ'));
+    rifle.position.copy(spec.ready === 'aim' ? shoulders[1].clone().add(V(-0.09, -0.03, 0.09)) : shoulders[1].clone().add(V(-0.06, -0.11, 0.12)));
+  }
   add(rifle);
   rifle.updateMatrixWorld(true);
-  const hands = [rifle.localToWorld(rifle.userData.support.clone()), rifle.localToWorld(rifle.userData.grip.clone())];
+  const hands = climbing ? [spec.hands[0].clone(), spec.hands[1].clone()] : [rifle.localToWorld(rifle.userData.support.clone()), rifle.localToWorld(rifle.userData.grip.clone())];
+  const gloveQuat = climbing ? torsoQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.3, 0, 0))) : rifle.quaternion;
 
   // руки
-  const elbowPoles = [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
+  const elbowPoles = climbing ? [V(-1, -0.7, -0.3), V(1, -0.7, -0.3)] : [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
   [0, 1].forEach((side) => {
     const shoulder = shoulders[side];
     const elbow = solveTwoBone(shoulder, hands[side], 0.29, 0.28, elbowPoles[side]);
@@ -185,7 +220,7 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
     const elbowPad = add(box(0.1, 0.1, 0.05, materials.plastic, 0.02));
     elbowPad.position.copy(elbow.clone().add(upperArm.clone().sub(forearm).normalize().multiplyScalar(0.06)));
     elbowPad.quaternion.setFromUnitVectors(V(0, 0, 1), upperArm.clone().sub(forearm).normalize());
-    placed(box(0.09, 0.065, 0.12, materials.glove, 0.025), hands[side], rifle.quaternion);
+    placed(box(0.09, 0.065, 0.12, materials.glove, 0.025), hands[side], gloveQuat);
     const pad = add(ball(shoulder.clone().add(V(side ? 0.035 : -0.035, 0.03, 0)), 0.09, materials.gearDark, [1, 0.55, 1.05]));
     pad.quaternion.copy(torsoQuat);
   });

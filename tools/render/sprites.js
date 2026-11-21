@@ -6,9 +6,9 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { toXZ } from './world.js';
-import { buildStockySoldier, walkCycle } from './soldier2.js';
+import { buildStockySoldier, walkCycle, climbCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
-import { buildReptileAlien, alienWalkCycle, setAlienFacing } from './alien3.js';
+import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
@@ -154,11 +154,12 @@ window.renderSprite = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
-  else if (options.alien) soldier = buildReptileAlien(options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
+  else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {
     const spriteOptions = { ...options };
     if (options.walkPhase !== undefined) spriteOptions.pose = walkCycle(options.walkPhase);
+    if (options.climbPhase !== undefined) spriteOptions.pose = climbCycle(options.climbPhase);
     soldier = buildStockySoldier(spriteOptions);
   }
   soldier.rotation.y = facingYaw(direction);
@@ -183,7 +184,7 @@ window.renderSprite = (options, direction) => {
   // 3. тень на земле (боец невидим для камеры, но отбрасывает тень)
   scene.background = null;
   renderer.setClearColor(0x000000, 0);
-  soldier.traverse((node) => { if (node.isMesh) node.material = invisible; });
+  soldier.traverse((node) => { if (node.isMesh) { node.material = invisible; if (options.noShadow) node.castShadow = false; } });
   camera.layers.enableAll();
   renderer.render(scene, camera);
   camera.layers.set(0);

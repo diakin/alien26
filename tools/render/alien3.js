@@ -404,8 +404,8 @@ export function buildParts(spec) {
   [-1, 1].forEach((side, sideIndex) => {
     const swing = spec.armSwing[sideIndex];
     const shoulder = torso.point(side * 0.22, 0.56, 0);
-    const hand = shoulder.clone().add(torso.direction(side * 0.08, -0.62, 0.06 + swing * 0.5));
-    const elbow = solveTwoBone(shoulder, hand, 0.36, 0.36, torso.direction(side * 0.3, 0, -1));
+    const hand = spec.hands ? spec.hands[sideIndex].clone() : shoulder.clone().add(torso.direction(side * 0.08, -0.62, 0.06 + swing * 0.5));
+    const elbow = solveTwoBone(shoulder, hand, 0.36, 0.36, spec.hands ? V(side, -0.6, -0.4) : torso.direction(side * 0.3, 0, -1));
     const upper = limbBone(shoulder, elbow, forward, V(side * 0.37, 0.11, 0.04));
     const upperLength = upper.length;
     field.cone(upper, shoulder, elbow, 0.085, 0.06, { k: 0.04, cell: 0.038 });
@@ -666,6 +666,28 @@ function getMaterials() {
 }
 
 const partsCache = new Map();
+// лазание по приставной лестнице: как у бойца (см. soldier2.js climbCycle), перекладины на z = 0.26
+export const ALIEN_CLIMB_STEP = 0.6;
+export function alienClimbCycle(phase) {
+  const rail = 0.26;
+  const smooth = (value) => value * value * (3 - 2 * value);
+  const move = (base, firstHalf) => {
+    const local = firstHalf ? phase / 0.5 : (phase - 0.5) / 0.5;
+    if (local < 0) return { lift: base, away: 0 };
+    if (local >= 1) return { lift: base + ALIEN_CLIMB_STEP, away: 0 };
+    return { lift: base + ALIEN_CLIMB_STEP * smooth(local), away: Math.sin(Math.PI * local) };
+  };
+  const leftFoot = move(0, true), rightFoot = move(0.3, false);
+  const rightHand = move(1.7, true), leftHand = move(2.0, false);
+  const toe = (side, step) => V(side * 0.14, step.lift + step.away * 0.06, rail - 0.04 - step.away * 0.12);
+  const hand = (side, step) => V(side * 0.22, step.lift, rail - 0.04 - step.away * 0.1);
+  return {
+    pelvis: V(0, 1.0 + ALIEN_CLIMB_STEP * phase, 0.0), lean: 0.12, twist: 0,
+    toes: [toe(-1, leftFoot), toe(1, rightFoot)], toePitch: [-0.25, -0.25], headTilt: -0.3, armSwing: [0, 0],
+    hands: [hand(-1, leftHand), hand(1, rightHand)],
+  };
+}
+
 export function buildReptileAlien(pose = 'idle') {
   const spec = typeof pose === 'string' ? ALIEN_POSES[pose] : pose;
   const key = JSON.stringify(spec);

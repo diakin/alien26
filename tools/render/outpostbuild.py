@@ -2,7 +2,8 @@
 
 python3 outpostbuild.py op_out game_dir
   - склеивает куски каждого варианта: цвет -> фон JPG (x1), ID -> куски (клетка, уровень, часть) и атлас их масок PNG
-  - пишет game/js/maps/outpost.js: проекция, клетки по уровням, стены, лестницы, варианты
+  - створки дверей: отдельный атлас RGBA на вариант (в фоне двери открыты, створку рисует игра)
+  - пишет game/js/maps/outpost.js: проекция, клетки по уровням, стены, двери, лестницы, варианты
 """
 import json, os, sys, glob
 import numpy as np
@@ -25,6 +26,63 @@ def stitch(variant_dir, prefix, chunks, mode):
         part = part.crop((margin * SS, margin * SS, (margin + size) * SS, (margin + size) * SS))
         canvas.paste(part, (x * SS, y * SS))
     return canvas
+
+
+# двери: грань (W/N) клетки с типом door
+DOORS = []
+for level in range(layout['LEVELS']):
+    for row in range(layout['TILES'] + 1):
+        for col in range(layout['TILES'] + 1):
+            for orient, grid in (('W', layout['wallW']), ('N', layout['wallN'])):
+                wall = grid[level][row][col]
+                if wall and wall['type'] == 'door':
+                    DOORS.append([col, row, level, 0 if orient == 'W' else 1])
+
+
+def door_atlas(variant_dir, meta, key):
+    """Створки: пиксели прохода со створками, где ID = створка этой двери; цвет и мягкий край, атлас RGBA."""
+    door_chunks = [chunk for chunk in meta['chunks'] if chunk.get('doors')]
+    if not door_chunks:
+        return None, []
+    color = np.asarray(stitch(variant_dir, 'd', door_chunks, 'RGB'), dtype=np.float32)
+    ids = np.asarray(stitch(variant_dir, 'j', door_chunks, 'RGB'), dtype=np.int32)
+    part = ids[:, :, 0] & 7
+    valid = (ids[:, :, 2] > 127) & ((part == 5) | (part == 6))
+    cols, rows, levels = ids[:, :, 0] >> 3, ids[:, :, 1] >> 3, ids[:, :, 1] & 7
+    crops = []
+    for index, (col, row, level, orient) in enumerate(DOORS):
+        mask = valid & (cols == col) & (rows == row) & (levels == level) & (part == 5 + orient)
+        ys, xs = np.nonzero(mask)
+        if not len(xs):
+            continue
+        left, top = xs.min() // SS, ys.min() // SS
+        right, bottom = xs.max() // SS + 1, ys.max() // SS + 1
+        region = mask[top * SS:bottom * SS, left * SS:right * SS].astype(np.float32)
+        pixels = color[top * SS:bottom * SS, left * SS:right * SS]
+        height, width = bottom - top, right - left
+        weight = region.reshape(height, SS, width, SS).sum(axis=(1, 3))
+        summed = (pixels * region[:, :, None]).reshape(height, SS, width, SS, 3).sum(axis=(1, 3))
+        rgb = summed / np.maximum(weight, 1)[:, :, None]
+        alpha = weight / (SS * SS)
+        crops.append((index, int(left), int(top), np.dstack([rgb, alpha * 255]).round().clip(0, 255).astype(np.uint8)))
+    ATLAS_W = 1024
+    placed, shelf_x, shelf_y, shelf_h = [], 0, 0, 0
+    for index, left, top, image in sorted(crops, key=lambda item: -item[3].shape[0]):
+        height, width = image.shape[:2]
+        if shelf_x + width > ATLAS_W:
+            shelf_x, shelf_y, shelf_h = 0, shelf_y + shelf_h + 1, 0
+        placed.append((index, left, top, image, shelf_x, shelf_y))
+        shelf_x += width + 1
+        shelf_h = max(shelf_h, height)
+    atlas = np.zeros((shelf_y + shelf_h + 1, ATLAS_W, 4), dtype=np.uint8)
+    entries = []
+    for index, left, top, image, atlas_x, atlas_y in placed:
+        height, width = image.shape[:2]
+        atlas[atlas_y:atlas_y + height, atlas_x:atlas_x + width] = image
+        entries.append([index, left, top, width, height, atlas_x, atlas_y])
+    path = f'{out_dir}/v{key}_doors.png'
+    Image.fromarray(atlas, 'RGBA').save(path, optimize=True)
+    return f'assets/maps/outpost/v{key}_doors.png', entries
 
 
 variants = {}
@@ -84,7 +142,11 @@ for variant_dir in sorted(glob.glob(f'{src}/v*')):
     atlas[:, :, 3] = alpha
     Image.fromarray(atlas, 'RGBA').save(f'{out_dir}/v{key}_mask.png', optimize=True)
     variants[key] = {'background': f'assets/maps/outpost/v{key}.jpg', 'mask': f'assets/maps/outpost/v{key}_mask.png', 'pieces': pieces}
-    print(key, 'pieces', count)
+    door_path, door_entries = door_atlas(variant_dir, meta, key)
+    if door_path:
+        variants[key]['doorAtlas'] = door_path
+        variants[key]['doors'] = door_entries
+    print(key, 'pieces', count, 'doors', len(door_entries))
 
 # ---------- клетки и правила ----------
 TILES, LEVELS = layout['TILES'], layout['LEVELS']
@@ -111,6 +173,7 @@ game_map = {
     'wallN': flat(layout['wallN'], TILES + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
     'indoor': flat(layout['indoor'], TILES),
     'blocked': blocked,
+    'doors': DOORS,
     'links': [{'from': link['from'], 'to': link['to'], 'cost': link['cost'], 'kind': link['kind']} for link in layout['links']],
     'spawns': layout['spawns'],
     'variants': variants,

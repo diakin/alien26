@@ -11,7 +11,10 @@
   var WALK_FRAMES = 16;
   var BOX_HEIGHT = 1.9;                       // высота рамки-курсора, м
   var MAX_STEP = 0.9;                         // наибольший перепад высоты за шаг (ступени), м
-  var CLIMB_SPEED = 1.1;                      // по приставной лестнице, м/с
+  var CLIMB_SPEED = 0.9;                      // по приставной лестнице, м/с
+  var CLIMB_STEP = 0.6, CLIMB_FRAMES = 8;     // цикл лазания: две перекладины, 8 кадров
+  var CLIMB_SHIFT = 0.15;                     // на лестнице фигура ближе к стене, клеток (перекладины в 0.44 м от центра клетки)
+  var DOOR_WIDTH = 0.92, DOOR_REACH = 1.3, DOOR_SPEED = 2.5;   // проём, м; кто ближе — дверь открыта; скорость открытия
   var WALL_BLOCKS = [false, true, true, false, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник
 
   // типы юнитов: шаг анимации (stride, м за 16 кадров) совпадает с рендером спрайтов
@@ -216,12 +219,13 @@
         var link = item.extra.link, bottom = link.from, top = link.to;
         var topElevation = elevationOf(top[0], top[1], top[2]);
         var face = Iso.directionOf(top[0] - bottom[0], top[1] - bottom[1]);
+        var climb = { face: face, faceCol: Math.sign(top[0] - bottom[0]), faceRow: Math.sign(top[1] - bottom[1]), base: elevationOf(bottom[0], bottom[1], bottom[2]) };
         if (item.extra.up) {
-          steps.push({ col: bottom[0], row: bottom[1], level: top[2], elevation: topElevation, climb: true, face: face, cost: item.cost });
+          steps.push({ col: bottom[0], row: bottom[1], level: top[2], elevation: topElevation, climb: climb, face: face, cost: item.cost });
           steps.push({ col: top[0], row: top[1], level: top[2], elevation: topElevation, cost: 0 });
         } else {
           steps.push({ col: bottom[0], row: bottom[1], level: top[2], elevation: topElevation, cost: 0, ladderTop: true });
-          steps.push({ col: bottom[0], row: bottom[1], level: bottom[2], elevation: elevationOf(bottom[0], bottom[1], bottom[2]), climb: true, face: face, cost: item.cost });
+          steps.push({ col: bottom[0], row: bottom[1], level: bottom[2], elevation: climb.base, climb: climb, face: face, cost: item.cost });
         }
         return;
       }
@@ -246,6 +250,23 @@
     var total = unit.kneeling ? COST.stand : 0;
     path.forEach(function (step) { total += step.cost; });
     return total;
+  }
+
+  // ---------------- двери ----------------
+  // в фоне проёмы открыты; створку рисуем поверх и сдвигаем в стену, когда рядом кто-то есть
+  var doors = (MAP.doors || []).map(function (door) {
+    return { col: door[0], row: door[1], level: door[2], orient: door[3] === 0 ? 'W' : 'N', open: 0,
+      centerX: door[3] === 0 ? door[0] : door[0] + 0.5, centerY: door[3] === 0 ? door[1] + 0.5 : door[1] };
+  });
+  function updateDoors(seconds) {
+    doors.forEach(function (door) {
+      var wanted = units.some(function (unit) {
+        if (unit.level !== door.level) return false;
+        var dx = unit.x - door.centerX, dy = unit.y - door.centerY;
+        return dx * dx + dy * dy < DOOR_REACH * DOOR_REACH;
+      }) ? 1 : 0;
+      door.open += Math.max(-DOOR_SPEED * seconds, Math.min(DOOR_SPEED * seconds, wanted - door.open));
+    });
   }
 
   // ---------------- уровни обзора и варианты картинки ----------------
@@ -276,6 +297,7 @@
       buildPieces(variant);
       variant.ready = true;
     }
+    if (data.doorAtlas) { variant.doorAtlas = new Image(); variant.doorAtlas.src = data.doorAtlas; }
     variant.background.onload = tryBuild;
     variant.background.src = data.background;
     if (variant.mask) { variant.mask.onload = tryBuild; variant.mask.src = data.mask; }
@@ -579,7 +601,21 @@
     }
   }
 
+  // кадр лазания: по высоте над основанием лестницы, цикл 0.6 м
+  function climbState(unit) {
+    var climb = unit.path.length && unit.path[0].climb;
+    if (!climb || unit.segmentLength === 0) return null;
+    var name = unit.spriteSet + '_climb_f0_d' + unit.direction;
+    if (!SPRITE_ANCHORS[name]) return null;
+    var height = unit.elevation - climb.base;
+    var cycles = Math.floor(height / CLIMB_STEP + 1e-6);
+    var frame = Math.min(CLIMB_FRAMES - 1, Math.floor((height - cycles * CLIMB_STEP) / (CLIMB_STEP / CLIMB_FRAMES) + 1e-6));
+    return { climb: climb, frame: frame, base: climb.base + cycles * CLIMB_STEP };
+  }
+
   function spriteName(unit) {
+    var climbing = climbState(unit);
+    if (climbing) return unit.spriteSet + '_climb_f' + climbing.frame + '_d' + unit.direction;
     var moving = unit.path.length && !unit.path[0].climb;
     if (moving) {
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
@@ -591,11 +627,18 @@
   // Фигура на экране сдвигается только при смене кадра: внутри кадра опорная нога
   // неподвижна относительно земли, поэтому ноги не скользят.
   function drawPosition(unit) {
+    // на лестнице: высота кратна циклу, подъём внутри цикла — в кадре (руки и ноги не скользят по перекладинам)
+    var climbing = climbState(unit);
+    if (climbing) return { x: unit.x + climbing.climb.faceCol * CLIMB_SHIFT, y: unit.y + climbing.climb.faceRow * CLIMB_SHIFT, elevation: climbing.base };
     if (!unit.path.length || unit.path[0].climb) return { x: unit.x, y: unit.y, elevation: unit.elevation };
     var lagTiles = (unit.walked - Math.floor(unit.walked / unit.frameMeters) * unit.frameMeters) / Iso.tileMeters;
     return { x: unit.x - unit.moveCol * lagTiles, y: unit.y - unit.moveRow * lagTiles, elevation: unit.elevation };
   }
-  function unitDepth(unit) { return depthKey(unit.col, unit.row, unit.level, 3.5) + (unit.size - 1) * 100; }
+  // на лестнице юнит стоит перед стеной: рисуется после всех кусков своей клетки (парапет, перекрытия)
+  function unitDepth(unit) {
+    var climbing = unit.path.length && unit.path[0].climb;
+    return depthKey(unit.col, unit.row, climbing ? LEVELS - 1 : unit.level, 3.5) + (unit.size - 1) * 100;
+  }
 
   // ---------------- отрисовка ----------------
   function line(first, second) {
@@ -705,6 +748,34 @@
     context.restore();
   }
 
+  function drawDoor(variant, entry) {
+    var door = doors[entry[0]];
+    if (!door || !variant.doorAtlas || !variant.doorAtlas.complete) return;
+    var tile = Iso.tileMeters;
+    var cut = variant.key.charAt(1) === 'c' && Number(variant.key.charAt(0)) === door.level;
+    var top = cut ? 0.8 : 2.12;
+    var base = door.level * LEVEL_H;
+    var left = (tile - DOOR_WIDTH) / 2 / tile - 0.02, right = (tile + DOOR_WIDTH) / 2 / tile + 0.02;
+    // точка в плоскости стены: along — доля клетки вдоль грани, across — сдвиг поперёк, height — м
+    function wallPoint(along, across, height) {
+      return door.orient === 'W' ? Iso.toScreen(door.col + across, door.row + along, base + height) : Iso.toScreen(door.col + along, door.row + across, base + height);
+    }
+    var slide = door.open * (DOOR_WIDTH + 0.04) / tile;
+    var start = wallPoint(0, 0, 0), shifted = wallPoint(slide, 0, 0);
+    context.save();
+    context.beginPath();
+    [-0.04, 0.04].forEach(function (across) {
+      var corners = [wallPoint(left, across, -0.03), wallPoint(right, across, -0.03), wallPoint(right, across, top), wallPoint(left, across, top)];
+      context.moveTo(corners[0].x - camera.x, corners[0].y - camera.y);
+      for (var index = 1; index < 4; index++) context.lineTo(corners[index].x - camera.x, corners[index].y - camera.y);
+      context.closePath();
+    });
+    context.clip();
+    context.drawImage(variant.doorAtlas, entry[5], entry[6], entry[3], entry[4],
+      Math.round(entry[1] + shifted.x - start.x - camera.x), Math.round(entry[2] + shifted.y - start.y - camera.y), entry[3], entry[4]);
+    context.restore();
+  }
+
   function overlaps(rect, piece) {
     return rect.x < piece.x + piece.width && rect.x + rect.width > piece.x && rect.y < piece.y + piece.height && rect.y + rect.height > piece.y;
   }
@@ -744,6 +815,13 @@
             return;
           }
         }
+      });
+    }
+    if (shownVariant && shownVariant.ready && shownVariant.data.doors) {
+      shownVariant.data.doors.forEach(function (entry) {
+        var door = doors[entry[0]];
+        if (!door || door.open > 0.995) return;
+        drawList.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), draw: function () { drawDoor(shownVariant, entry); } });
       });
     }
     drawList.sort(function (first, second) { return first.depth - second.depth; });
@@ -790,6 +868,7 @@
     clampCamera();
     var wasMoving = units.some(function (unit) { return unit.path.length > 0; });
     units.forEach(function (unit) { updateUnit(unit, seconds); });
+    updateDoors(seconds);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
     if (selected && selected.level !== followedLevel) viewFollow(selected);
     if (wasMoving) updateHover();
@@ -810,7 +889,7 @@
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
-    setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
+    doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, variantReady: function () { var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

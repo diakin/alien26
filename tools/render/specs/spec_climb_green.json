@@ -1,0 +1,170 @@
+[
+ {
+  "name": "green_climb_f0",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.0,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f1",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.125,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f2",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.25,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f3",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.375,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f4",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.5,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f5",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.625,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f6",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.75,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ },
+ {
+  "name": "green_climb_f7",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "climbPhase": 0.875,
+   "noShadow": true,
+   "frame": [
+    2.6,
+    3.6,
+    1.6
+   ]
+  },
+  "directions": [
+   1,
+   3,
+   5,
+   7
+  ]
+ }
+]

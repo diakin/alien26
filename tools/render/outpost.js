@@ -22,7 +22,7 @@ const SS = 2;                       // суперсэмплинг
 const SIZE = TILE * TILES;
 const CENTER = new THREE.Vector3(SIZE / 2, 0, SIZE / 2);
 const SLAB = 0.22, THICK = 0.18, PANEL_H = LEVEL_H - SLAB;
-const PART = { ground: 0, floor: 1, wallW: 2, wallN: 3, object: 4 };
+const PART = { ground: 0, floor: 1, wallW: 2, wallN: 3, object: 4, doorW: 5, doorN: 6 };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // ---------------- рендерер, свет ----------------
@@ -170,6 +170,7 @@ function buildWall(orient, col, row, level, wall, cut) {
       group.add(wallBox(orient, col, row, level, right, right + 0.06, 0, top, frame, THICK + 0.05));
       if (full > top + 0.01) group.add(wallBox(orient, col, row, level, left - 0.06, right + 0.06, top, top + 0.07, frame, THICK + 0.05));
       group.add(wallBox(orient, col, row, level, left, right, 0, 0.03, [MAT.darkSteel(), MAT.darkSteel(), MAT.darkSteel(), MAT.darkSteel(), MAT.darkSteel(), MAT.darkSteel()], THICK + 0.1));
+      doorLeaves.add(buildDoorLeaf(orient, col, row, level, left, right, top));
       // лампа над внешней дверью
       if (style !== 'inner' && !cut) {
         const outsideSign = isIndoor(level, col, row) ? -1 : 1;
@@ -220,6 +221,24 @@ function buildWall(orient, col, row, level, wall, cut) {
     group.add(stripe);
   }
   return tag(group, orient === 'W' ? PART.wallW : PART.wallN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
+}
+
+// створка раздвижной двери: панель в плоскости стены, полоса, окошко, ручка
+let doorLeaves = new THREE.Group();
+function buildDoorLeaf(orient, col, row, level, left, right, top) {
+  const group = new THREE.Group();
+  const leaf = Array(6).fill(MAT.wall('cabin', 0));
+  const height = top - 0.01;
+  group.add(wallBox(orient, col, row, level, left - 0.02, right + 0.02, 0.01, height, leaf, 0.06));
+  const orange = Array(6).fill(MAT.orange()), dark = Array(6).fill(MAT.darkSteel()), glass = Array(6).fill(MAT.glass());
+  if (height > 1.1) group.add(wallBox(orient, col, row, level, left, right, 0.98, 1.06, orange, 0.075));
+  if (height > 1.9) {
+    group.add(wallBox(orient, col, row, level, left + 0.36, left + 0.56, 1.3, 1.85, dark, 0.075));
+    group.add(wallBox(orient, col, row, level, left + 0.38, left + 0.54, 1.32, 1.83, glass, 0.08));
+  }
+  group.add(wallBox(orient, col, row, level, left + 0.06, left + 0.1, Math.min(0.85, height - 0.1), Math.min(1.15, height - 0.05), dark, 0.085));
+  group.userData.door = { orient, col, row, level };
+  return tag(group, orient === 'W' ? PART.doorW : PART.doorN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
 }
 
 // ---------------- полы и перекрытия ----------------
@@ -316,7 +335,7 @@ function buildLadder(item, maxTop) {
     from.y = to.y = height;
     group.add(tube(from, to, 0.016, MAT.steel()));
   }
-  return tag(group, PART.object, item.level, { auto: true });
+  return tag(group, PART.floor, item.level, { auto: true });
 }
 
 // ---------------- предметы ----------------
@@ -646,6 +665,7 @@ function buildGround() {
 // ---------------- сборка варианта ----------------
 function buildWorld(viewLevel, cut) {
   const world = new THREE.Group();
+  doorLeaves = new THREE.Group();
   world.add(buildGround());
   world.add(groundFloorPlates());
   for (let level = 0; level <= viewLevel; level++) {
@@ -669,6 +689,7 @@ function buildWorld(viewLevel, cut) {
   for (const building of layout.buildings) if (building.style === 'tower') world.add(buildTower(building, viewLevel));
   world.add(facadeDetails(viewLevel, cut));
   setEnvIntensity(world, 0.28);
+  setEnvIntensity(doorLeaves, 0.28);
   return world;
 }
 
@@ -734,6 +755,7 @@ function idMaterial(info) {
 }
 
 let world = null;
+let doorRects = [];
 let composer = null, composerSize = '';
 let idTarget = null;
 const idCanvas = document.createElement('canvas');
@@ -753,13 +775,22 @@ window.setupVariant = (viewLevel, cut) => {
   world = buildWorld(viewLevel, cut);
   scene.add(world);
   let meshes = 0;
-  world.traverse((node) => {
+  const prepare = (node) => {
     if (!node.isMesh) return;
     meshes++;
     const info = node.userData.id || { part: 0, level: 0, biasCol: 0, biasRow: 0, auto: false };
     if (!node.userData.idMaterial) node.userData.idMaterial = idMaterial(info);
+  };
+  world.traverse(prepare);
+  doorLeaves.traverse(prepare);
+  // прямоугольники створок в пикселях x1 — чтобы делать проход створок только там, где они есть
+  doorRects = doorLeaves.children.map((leaf) => {
+    const bounds = new THREE.Box3().setFromObject(leaf);
+    const points = [];
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) points.push(projectPixel(V(x, y, z)));
+    return [Math.min(...points.map((point) => point[0])), Math.min(...points.map((point) => point[1])), Math.max(...points.map((point) => point[0])), Math.max(...points.map((point) => point[1]))];
   });
-  return { meshes };
+  return { meshes, doors: doorLeaves.children.length };
 };
 
 window.outpostInfo = () => ({
@@ -789,6 +820,22 @@ window.renderChunk = (x, y, width, height, margin) => {
   }
   composer.render();
   const color = renderer.domElement.toDataURL('image/png');
+  const id = renderIdPass(pixelWidth, pixelHeight);
+  const result = { color, id };
+  // створки дверей: тот же кадр со створками; в фон они не входят
+  const overlapsDoor = doorRects.some((rect) => rect[0] < left + fullWidth && rect[2] > left && rect[1] < top + fullHeight && rect[3] > top);
+  if (overlapsDoor) {
+    world.add(doorLeaves);
+    composer.render();
+    result.doorColor = renderer.domElement.toDataURL('image/png');
+    result.doorId = renderIdPass(pixelWidth, pixelHeight);
+    world.remove(doorLeaves);
+  }
+  camera.clearViewOffset();
+  return result;
+};
+
+function renderIdPass(pixelWidth, pixelHeight) {
   // ID: подменить материалы, отрендерить в цель без сглаживания, прочитать
   const saved = [];
   world.traverse((node) => { if (node.isMesh) { saved.push([node, node.material]); node.material = node.userData.idMaterial; } });
@@ -811,10 +858,8 @@ window.renderChunk = (x, y, width, height, margin) => {
   }
   for (let index = 3; index < image.data.length; index += 4) image.data[index] = 255;
   context.putImageData(image, 0, 0);
-  const id = idCanvas.toDataURL('image/png');
-  camera.clearViewOffset();
-  return { color, id };
-};
+  return idCanvas.toDataURL('image/png');
+}
 
 // уменьшенный общий вид для проверки
 window.renderPreview = (width) => {
