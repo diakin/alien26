@@ -1,0 +1,1 @@
+[{"name": "rock0", "options": {"rock": {"seed": 3, "radius": 0.55}}, "directions": [0]}, {"name": "rock1", "options": {"rock": {"seed": 7, "radius": 0.45}}, "directions": [0]}, {"name": "rock2", "options": {"rock": {"seed": 11, "radius": 0.6}}, "directions": [0]}, {"name": "rock3", "options": {"rock": {"seed": 5, "radius": 0.4}}, "directions": [0]}]

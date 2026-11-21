@@ -1,0 +1,7 @@
+node_modules/
+tools/render/out_*/
+tools/render/raw_*/
+tools/render/sp_*/
+tools/render/sprites/
+tools/render/sprites_*/
+tools/render/field_out/

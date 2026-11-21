@@ -1,0 +1,4 @@
+[{"name": "black_idle", "options": {"camo": "black", "pose": "idle", "nvg": true, "scarf": true, "suppressor": true}},
+ {"name": "black_standAim", "options": {"camo": "black", "pose": "standAim", "nvg": true, "scarf": true, "suppressor": true}},
+ {"name": "black_kneelAim", "options": {"camo": "black", "pose": "kneelAim", "nvg": true, "scarf": true, "suppressor": true}},
+ {"name": "black_crouchAim", "options": {"camo": "black", "pose": "crouchAim"}}]
