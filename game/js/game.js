@@ -4,8 +4,9 @@
 
   var GRID = FIELD.tiles;
   var WALK_SPEED = 1.5;                       // м/с
-  var STRIDE = 1.32;                          // м на полный цикл ходьбы (8 кадров)
-  var WALK_FRAMES = 8;
+  var STRIDE = 1.32;                          // м на полный цикл ходьбы (два шага), как в рендере
+  var WALK_FRAMES = 16;
+  var FRAME_METERS = STRIDE / WALK_FRAMES;    // на столько смещается фигура при смене кадра
   var BOX_HEIGHT = 1.9;                       // высота рамки-курсора, м
 
   var canvas = document.getElementById('view');
@@ -36,7 +37,7 @@
 
   function makeUnit(name, camo, col, row, direction) {
     return { name: name, camo: camo, col: col, row: row, x: col + 0.5, y: row + 0.5, direction: direction,
-      path: [], walked: 0, timeUnits: 56, maxTimeUnits: 56 };
+      path: [], walked: 0, moveCol: 0, moveRow: 0, segmentLength: 0, timeUnits: 56, maxTimeUnits: 56 };
   }
   var units = [
     makeUnit('Андрей Волков', 'black', 3, 3, 0), makeUnit('Ирина Соколова', 'green', 5, 3, 0),
@@ -148,13 +149,22 @@
     updateHover();
   });
   window.addEventListener('mouseup', function (event) {
-    if (mouse.dragging && !mouse.moved && event.button === 2) { selected = null; updateHover(); }
+    if (mouse.dragging && !mouse.moved && event.button === 2) turnSelectedToMouse();
     mouse.dragging = false;
   });
+
+  // поворот выбранного бойца лицом к точке под курсором
+  function turnSelectedToMouse() {
+    if (!selected || selected.path.length) return;
+    var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y);
+    var direction = Iso.directionOf(grid.col - selected.x, grid.row - selected.y);
+    if (direction >= 0) selected.direction = direction;
+  }
 
   var keys = {};
   window.addEventListener('keydown', function (event) {
     keys[event.key] = true;
+    if (event.key === 'Escape') { selected = null; updateHover(); }
     if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') showGrid = !showGrid;
     if (event.key === ' ' || event.key === 'Tab') {
       event.preventDefault();
@@ -172,12 +182,19 @@
     var next = unit.path[0];
     // перед входом в новую клетку проверить, что она свободна
     if (unit.col !== next.col || unit.row !== next.row) {
-      if (unitAt(next.col, next.row, unit)) { unit.path = []; unit.x = unit.col + 0.5; unit.y = unit.row + 0.5; return; }
+      if (unitAt(next.col, next.row, unit)) { unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + 0.5; unit.y = unit.row + 0.5; return; }
     }
     var targetX = next.col + 0.5, targetY = next.row + 0.5;
     var deltaX = targetX - unit.x, deltaY = targetY - unit.y;
     var distanceTiles = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    unit.direction = Iso.directionOf(next.col - unit.col, next.row - unit.row);
+    if (unit.segmentLength === 0) {
+      // начало шага в следующую клетку: направление и длина считаются один раз
+      unit.segmentLength = distanceTiles;
+      unit.moveCol = deltaX / distanceTiles;
+      unit.moveRow = deltaY / distanceTiles;
+      var direction = Iso.directionOf(deltaX, deltaY);
+      if (direction >= 0) unit.direction = direction;
+    }
     var stepTiles = WALK_SPEED * seconds / Iso.tileMeters;
     // клетка считается занятой бойцом, как только он пересёк её половину
     if (distanceTiles <= stepTiles) {
@@ -185,21 +202,31 @@
       unit.walked += distanceTiles * Iso.tileMeters;
       unit.col = next.col; unit.row = next.row;
       unit.path.shift();
-      if (!unit.path.length) unit.walked = 0;
+      unit.segmentLength = 0;
+      if (!unit.path.length) unit.walked = 0;   // направление сохраняется: стоит лицом туда, куда шёл
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
       unit.y += deltaY / distanceTiles * stepTiles;
       unit.walked += stepTiles * Iso.tileMeters;
-      if (distanceTiles < 0.75) { unit.col = next.col; unit.row = next.row; }
+      // клетка считается занятой, как только боец прошёл половину шага
+      if (distanceTiles < unit.segmentLength / 2) { unit.col = next.col; unit.row = next.row; }
     }
   }
 
   function spriteName(unit) {
     if (unit.path.length) {
-      var frame = Math.floor(unit.walked / STRIDE * WALK_FRAMES) % WALK_FRAMES;
+      var frame = Math.floor(unit.walked / FRAME_METERS) % WALK_FRAMES;
       return unit.camo + '_walk_f' + frame + '_d' + unit.direction;
     }
     return unit.camo + '_idle_d' + unit.direction;
+  }
+
+  // Фигура на экране сдвигается только при смене кадра: внутри кадра опорная нога
+  // неподвижна относительно земли, поэтому ноги не скользят.
+  function drawPosition(unit) {
+    if (!unit.path.length) return { x: unit.x, y: unit.y };
+    var lagTiles = (unit.walked - Math.floor(unit.walked / FRAME_METERS) * FRAME_METERS) / Iso.tileMeters;
+    return { x: unit.x - unit.moveCol * lagTiles, y: unit.y - unit.moveRow * lagTiles };
   }
 
   // ---------------- отрисовка ----------------
@@ -296,7 +323,8 @@
   }
 
   function drawSelectionMarker(unit) {
-    var head = Iso.toScreen(unit.x, unit.y, 2.15);
+    var position = drawPosition(unit);
+    var head = Iso.toScreen(position.x, position.y, 2.15);
     var x = head.x - camera.x, y = head.y - camera.y + Math.sin(Date.now() / 220) * 2;
     context.save();
     context.fillStyle = '#ffd23a';
@@ -328,7 +356,10 @@
     // объекты по глубине: дальше от зрителя (меньше col + row) рисуются раньше
     var drawList = [];
     obstacles.forEach(function (rock) { drawList.push({ depth: rock.col + rock.row + 1, draw: function () { drawSprite(rock.sprite, rock.col + 0.5, rock.row + 0.5); } }); });
-    units.forEach(function (unit) { drawList.push({ depth: unit.x + unit.y, draw: function () { drawSprite(spriteName(unit), unit.x, unit.y); } }); });
+    units.forEach(function (unit) {
+      var position = drawPosition(unit);
+      drawList.push({ depth: position.x + position.y, draw: function () { drawSprite(spriteName(unit), position.x, position.y); } });
+    });
     drawList.sort(function (first, second) { return first.depth - second.depth; });
     drawList.forEach(function (item) { item.draw(); });
 
@@ -368,7 +399,7 @@
 
   // для автотеста
   window.__game = {
-    units: units, camera: camera, select: function (index) { selected = units[index]; },
+    units: units, camera: camera, select: function (index) { selected = units[index]; }, drawPosition: drawPosition,
     clickTile: function (col, row) {
       var point = Iso.toScreen(col + 0.5, row + 0.5);
       return { x: point.x - camera.x, y: point.y - camera.y };

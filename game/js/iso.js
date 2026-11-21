@@ -33,14 +33,15 @@ var Iso = (function () {
     ];
   }
 
-  // направление спрайта по шагу на сетке.
-  // 0 к зрителю, 1 вниз-влево, 2 влево, 3 вверх-влево, 4 от зрителя, 5 вверх-вправо, 6 вправо, 7 вниз-вправо
-  var DIRECTION_BY_STEP = {
-    '1,1': 0, '0,1': 1, '-1,1': 2, '-1,0': 3, '-1,-1': 4, '0,-1': 5, '1,-1': 6, '1,0': 7
-  };
-  function directionOf(stepCol, stepRow) {
-    var key = Math.sign(stepCol) + ',' + Math.sign(stepRow);
-    return DIRECTION_BY_STEP.hasOwnProperty(key) ? DIRECTION_BY_STEP[key] : 0;
+  // направление спрайта (одно из 8) по вектору на земле в координатах клеток.
+  // 0 к зрителю, 1 вниз-влево, 2 влево, 3 вверх-влево, 4 от зрителя, 5 вверх-вправо, 6 вправо, 7 вниз-вправо.
+  // Клетки повёрнуты на 45 градусов: экранное «вправо» = col - row, «к зрителю» = col + row.
+  // Возвращает -1 для нулевого вектора, чтобы вызывающий оставил прежнее направление.
+  function directionOf(deltaCol, deltaRow) {
+    var screenRight = deltaCol - deltaRow, towardViewer = deltaCol + deltaRow;
+    if (Math.abs(screenRight) < 1e-9 && Math.abs(towardViewer) < 1e-9) return -1;
+    var sector = Math.round(Math.atan2(-screenRight, towardViewer) / (Math.PI / 4));
+    return ((sector % 8) + 8) % 8;
   }
 
   return {

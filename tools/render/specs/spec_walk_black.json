@@ -1,1 +1,162 @@
-[{"name": "black_walk_f0", "options": {"camo": "black", "walkPhase": 0.0, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f1", "options": {"camo": "black", "walkPhase": 0.125, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f2", "options": {"camo": "black", "walkPhase": 0.25, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f3", "options": {"camo": "black", "walkPhase": 0.375, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f4", "options": {"camo": "black", "walkPhase": 0.5, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f5", "options": {"camo": "black", "walkPhase": 0.625, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f6", "options": {"camo": "black", "walkPhase": 0.75, "nvg": true, "scarf": true, "suppressor": true}}, {"name": "black_walk_f7", "options": {"camo": "black", "walkPhase": 0.875, "nvg": true, "scarf": true, "suppressor": true}}]
+[
+ {
+  "name": "black_walk_f0",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.0,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f1",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.0625,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f2",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.125,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f3",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.1875,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f4",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.25,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f5",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.3125,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f6",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.375,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f7",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.4375,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f8",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.5,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f9",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.5625,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f10",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.625,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f11",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.6875,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f12",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.75,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f13",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.8125,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f14",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.875,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ },
+ {
+  "name": "black_walk_f15",
+  "options": {
+   "camo": "black",
+   "walkPhase": 0.9375,
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true
+  }
+ }
+]
