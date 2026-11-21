@@ -554,9 +554,14 @@
     updateHover();
   });
   window.addEventListener('mouseup', function (event) {
-    if (mouse.dragging && !mouse.moved && event.button === 2) {
-      var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y + (selected ? selected.elevation : 0) * Iso.pixelsPerMeterUp);
-      turnSelectedTo(grid.col, grid.row);
+    if (mouse.dragging && !mouse.moved && event.button === 2 && selected) {
+      // поворот к центру рамки курсора: у робота рамка 2x2, и если она стоит на нём самом — не поворачиваться
+      var tile = tileUnderMouse();
+      if (tile) turnSelectedTo(tile.col + selected.size / 2, tile.row + selected.size / 2);
+      else {
+        var grid = Iso.toGrid(mouse.x + camera.x, mouse.y + camera.y + selected.elevation * Iso.pixelsPerMeterUp);
+        turnSelectedTo(grid.col, grid.row);
+      }
     }
     mouse.dragging = false;
   });
