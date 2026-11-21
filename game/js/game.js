@@ -289,7 +289,7 @@
 
   // ---------------- уровни обзора и варианты картинки ----------------
   var view = { level: 0, cut: false };
-  var followedLevel = -1;             // уровень выбранного юнита, под который подстроен обзор
+  var followedLevel = -1;             // уровень обзора, под который он подстроен по выбранному юниту (followLevel)
   var variants = {};
   var shownVariant = null;
 
@@ -494,10 +494,17 @@
     context.restore();
   }
   // уровень обзора по юниту: его этаж; стены срезаются, если он в помещении
+  // уровень обзора для юнита: его этаж, а на верхней ступени марша — этаж выше, куда ведёт следующий шаг.
+  // Тогда курсор сразу выбирает клетки верхнего этажа.
+  function followLevel(unit) {
+    var run = stairRun(unit.col, unit.row, unit.level);
+    if (run && unit.col === run.lastCol && unit.row === run.lastRow && unit.level + 1 < LEVELS) return unit.level + 1;
+    return unit.level;
+  }
   function viewFollow(unit) {
     if (!unit) return;
-    followedLevel = unit.level;
-    setView(unit.level, isIndoor(unit.col, unit.row, unit.level));
+    followedLevel = followLevel(unit);
+    setView(followedLevel, isIndoor(unit.col, unit.row, unit.level) || isIndoor(unit.col, unit.row, followedLevel));
   }
 
   // панель уровней в правом верхнем углу
@@ -1238,7 +1245,7 @@
     units.forEach(function (unit) { updateUnit(unit, seconds); });
     updateDoors(seconds);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
-    if (selected && selected.level !== followedLevel) viewFollow(selected);
+    if (selected && followLevel(selected) !== followedLevel) viewFollow(selected);
     if (wasMoving) updateHover();
     render();
     if (window.Panel) window.Panel.update();
