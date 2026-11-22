@@ -64,6 +64,8 @@ tileset['ground'] = cells(source["tileset"]["ground"])
 tileset['floor'] = [cells(layer) for layer in source['tileset']['floor']]
 tileset['wallW'] = [edges(layer, -1) for layer in source['tileset']['wallW']]
 tileset['wallN'] = [edges(layer, -1) for layer in source['tileset']['wallN']]
+game_map['solids'] = [[item[0], item[1] + dx, item[2] + dy, item[3] + dx, item[4] + dy, item[5] + dx, item[6] + dy, item[7], item[8]]
+                      for dx, dy in copies for item in source.get('solids', [])]
 tileset['objects'] = [[item[0], item[1] + dx, item[2] + dy, item[3]] for dx, dy in copies for item in source['tileset']['objects']]
 tileset['doors'] = [tile for _ in copies for tile in source['tileset']['doors']]
 game_map['tileset'] = tileset

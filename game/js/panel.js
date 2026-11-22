@@ -24,7 +24,7 @@ var Panel = (function () {
   var BUTTONS = [
     { id: 'step', label: 'ШАГ', key: '1' },
     { id: 'kneel', label: 'ПРИСЕСТЬ', key: '2' },
-    { id: 'aim', label: 'ПРИЦЕЛ', key: '3', disabled: 'Нет целей' },
+    { id: 'aim', label: 'ПРИЦЕЛ', key: '3' },
     { id: 'reload', label: 'ЗАРЯДИТЬ', key: '4' },
     { id: 'grenade', label: 'ГРАНАТА', key: '5', disabled: 'Пока не работает' },
     { id: 'gear', label: 'СНАРЯЖ.', key: '6', disabled: 'Пока не работает' },
@@ -54,7 +54,7 @@ var Panel = (function () {
     '<div class="stats"><div class="unit-name" id="unit-name"></div><div class="unit-sub" id="unit-sub"></div>' +
       bar('tu', 'ОЧКИ ДЕЙСТВИЯ') + bar('hp', 'ЗДОРОВЬЕ') + bar('st', 'ВЫНОСЛИВОСТЬ') + bar('mo', 'МОРАЛЬ') +
       '<div class="chips"><span class="chip" id="chip-stance"></span><span class="chip green" id="chip-optics"></span>' +
-      '<span class="chip">ПОДАВЛЕН: НЕТ</span></div></div>' +
+      '<span class="chip" id="chip-combat"></span></div></div>' +
     '<div class="actions"><div class="action-grid">' + buttonsHtml + '</div>' +
       '<div class="box firemodes"><div class="box-title">РЕЖИМ ОГНЯ</div><div id="modes"></div></div></div>' +
     '<div class="box weapon"><div class="weapon-name" id="weapon-name"></div><div class="weapon-note" id="weapon-note"></div>' +
@@ -206,27 +206,32 @@ var Panel = (function () {
     var standing = Game.atEase(unit) ? 'ВОЛЬНО' : 'СТОЯ';
     setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ИСПРАВНА' : 'СТОЙКА: ' + standing));
     setText('chip-optics', unit.optics);
+    setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН. ' + unit.accuracy : ''));
     setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
     setText('weapon-name', unit.weapon || (unit.kind === 'mech' ? 'ВООРУЖЕНИЕ' : 'ОРУЖИЕ'));
     setText('weapon-note', unit.weapon ? unit.weaponNote : (unit.kind === 'mech' ? 'НЕ УСТАНОВЛЕНО' : 'ТОЛЬКО ТЕЛО, БЕЗ СНАРЯЖЕНИЯ'));
     if (unit.weapon) {
       setText('ammo-reserve', 'ЗАПАС: ' + unit.reserve);
-      setHtml('ammo-count', unit.ammo + '<span>/' + Game.MAGAZINE + '</span>');
+      setHtml('ammo-count', unit.ammo + '<span>/' + unit.magazine + '</span>');
       var pips = '';
-      for (var index = 0; index < Game.MAGAZINE; index++) pips += '<i' + (index < unit.ammo ? ' class="on"' : '') + '></i>';
+      for (var index = 0; index < unit.magazine; index++) pips += '<i' + (index < unit.ammo ? ' class="on"' : '') + '></i>';
       setHtml('ammo-pips', pips);
     }
-    var modes = Game.FIRE_MODES.map(function (mode, index) {
+    // режимы огня оружия юнита; шанс — по цели под курсором в режиме прицела
+    var chances = Game.aimChances();
+    var modes = Game.modesOf(unit).map(function (mode, index) {
       var classes = 'mode' + (unit.weapon && index === unit.fireMode ? ' active' : '') + (!unit.weapon || mode.cost > unit.timeUnits ? ' short' : '');
       return '<div class="' + classes + '" data-mode="' + index + '"><span class="mode-name">' + mode.name + '</span>' +
-        '<span class="mode-cost">' + mode.cost + ' ОД</span><span class="mode-chance">—</span></div>';
+        '<span class="mode-cost">' + mode.cost + ' ОД</span><span class="mode-chance">' + (chances ? chances[index] + '%' : '—') + '</span></div>';
     }).join('');
     setHtml('modes', modes);
     // кнопки, на которые не хватает ОД
     var tu = unit.timeUnits;
     setClass(inner.querySelector('[data-action="kneel"]'), 'short', !unit.canKneel || (unit.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
-    setClass(inner.querySelector('[data-action="reload"]'), 'short', !unit.weapon || Game.COST.reload > tu || unit.ammo >= Game.MAGAZINE || unit.reserve <= 0);
-    setClass(inner.querySelector('[data-action="step"]'), 'active', true);
+    setClass(inner.querySelector('[data-action="reload"]'), 'short', !unit.weapon || Game.COST.reload > tu || unit.ammo >= unit.magazine || unit.reserve <= 0);
+    setClass(inner.querySelector('[data-action="aim"]'), 'short', !unit.weapon || unit.ammo <= 0 || Game.cheapestCost(unit) > tu);
+    setClass(inner.querySelector('[data-action="aim"]'), 'active', Game.aiming);
+    setClass(inner.querySelector('[data-action="step"]'), 'active', !Game.aiming);
     setClass(inner, 'busy', Game.busy);
   }
 

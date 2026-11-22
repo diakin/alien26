@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildStockySoldier } from './soldier2.js';
 import { buildRifle } from './actors.js';
 import { setEnvIntensity } from './lib.js';
-import { buildReptileAlien, setAlienFacing } from './alien3.js';
+import { buildReptileAlien, setAlienFacing, buildPlasmaPistol } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -72,13 +72,24 @@ window.renderWeapon = (camo) => {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.2));
   const light = new THREE.DirectionalLight(0xffffff, 2.5); light.position.set(1, 2, 3); scene.add(light);
   const loadout = LOADOUTS[camo];
-  const rifle = buildRifle({ suppressor: !!loadout.suppressor, tanFurniture: !!loadout.tanRifle });
-  setEnvIntensity(rifle, 0.8);
-  rifle.rotation.y = Math.PI / 2;
   const holder = new THREE.Group();
-  holder.add(rifle);
-  holder.rotation.z = 0.32;
-  holder.position.set(-0.5, -0.2, 0);
+  if (camo === 'alien') {
+    // плазменный пистолет пришельца: крупнее, чтобы занять ту же рамку, что и карабин
+    const pistol = buildPlasmaPistol();
+    setEnvIntensity(pistol, 0.8);
+    pistol.rotation.y = Math.PI / 2;
+    holder.add(pistol);
+    holder.scale.setScalar(2.4);
+    holder.rotation.z = 0.12;
+    holder.position.set(-0.32, -0.08, 0);
+  } else {
+    const rifle = buildRifle({ suppressor: !!loadout.suppressor, tanFurniture: !!loadout.tanRifle });
+    setEnvIntensity(rifle, 0.8);
+    rifle.rotation.y = Math.PI / 2;
+    holder.add(rifle);
+    holder.rotation.z = 0.32;
+    holder.position.set(-0.5, -0.2, 0);
+  }
   scene.add(holder);
   const camera = new THREE.OrthographicCamera(-0.62, 0.62, 0.5, -0.5, 0.1, 10);
   camera.position.set(0, 0, 3);

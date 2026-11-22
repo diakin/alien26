@@ -476,7 +476,29 @@ window.renderTile = (id) => {
   return result;
 };
 
+// Препятствия для пуль: рамки предметов по клеткам и уровням (без лестниц, вышки и мелочей фасада —
+// они тонкие или висят на стенах). [уровень, col, row, x0, z0, x1, z1, y0, y1]: x и z в клетках, y в метрах.
+function solidBoxes() {
+  const boxes = [];
+  for (const item of layout.objects) {
+    if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
+    const group = buildObject(item, LEVELS - 1);
+    if (!group) continue;
+    group.updateMatrixWorld(true);
+    for (const slice of touchedSlices(group, false, item.level)) {
+      const box = new THREE.Box3();
+      group.traverse((node) => { if (node.isMesh) box.union(new THREE.Box3().setFromObject(node)); });
+      box.intersect(new THREE.Box3(V(slice.col * TILE, -100, slice.row * TILE), V((slice.col + 1) * TILE, 100, (slice.row + 1) * TILE)));
+      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
+      const round = (value) => Math.round(value * 1000) / 1000;
+      boxes.push([slice.level, slice.col, slice.row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
+    }
+  }
+  return boxes;
+}
+
 window.tilesetPlan = () => ({
+  solids: solidBoxes(),
   jobs: jobs.map(({ id, signature, part, level, col, row, shadow, slice }) => ({ id, signature, part, level, col, row, shadow, slice })),
   plan,
   projection: { stepX: STEP_X, stepY: STEP_Y, pixelsPerMeter: PIXELS_PER_METER, upPixels: UP_PIXELS, elevation: ELEVATION, tile: TILE, levelHeight: LEVEL_H },

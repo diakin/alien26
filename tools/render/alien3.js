@@ -404,8 +404,10 @@ export function buildParts(spec) {
   [-1, 1].forEach((side, sideIndex) => {
     const swing = spec.armSwing[sideIndex];
     const shoulder = torso.point(side * 0.22, 0.56, 0);
-    const hand = spec.hands ? spec.hands[sideIndex].clone() : shoulder.clone().add(torso.direction(side * 0.08, -0.62, 0.06 + swing * 0.5));
-    const elbow = solveTwoBone(shoulder, hand, 0.36, 0.36, spec.hands ? V(side, -0.6, -0.4) : torso.direction(side * 0.3, 0, -1));
+    const custom = spec.hands && spec.hands[sideIndex];
+    const hand = custom ? custom.clone() : shoulder.clone().add(torso.direction(side * 0.08, -0.62, 0.06 + swing * 0.5));
+    const elbowPole = custom ? (spec.elbowPoles && spec.elbowPoles[sideIndex] ? spec.elbowPoles[sideIndex].clone() : V(side, -0.6, -0.4)) : torso.direction(side * 0.3, 0, -1);
+    const elbow = solveTwoBone(shoulder, hand, 0.36, 0.36, elbowPole);
     const upper = limbBone(shoulder, elbow, forward, V(side * 0.37, 0.11, 0.04));
     const upperLength = upper.length;
     field.cone(upper, shoulder, elbow, 0.085, 0.06, { k: 0.04, cell: 0.038 });
@@ -431,16 +433,18 @@ export function buildParts(spec) {
       const clawDirection = tip.clone().sub(middle).normalize();
       horns.push(hornGeometry(tip.clone().addScaledVector(clawDirection, -0.008), clawDirection, fore.direction(inward, 0, 0.3), thumb ? 0.035 : 0.048, 0.0085, BONE_DARK, BONE_TIP, 0.45));
     });
-    hands.push({ fore, foreLength, side, shoulder, upper });
+    hands.push({ fore, foreLength, side, shoulder, upper, hand: hand.clone(), elbow: elbow.clone() });
   });
 
   // ноги: бедро, голень, приподнятая плюсна, три пальца с когтями
+  const legs = [];
   [-1, 1].forEach((side, sideIndex) => {
     const hip = torso.point(side * 0.13, -0.04, 0);
     const toe = spec.toes[sideIndex].clone();
     const toeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.toePitch[sideIndex], 0, 0));
     const ankle = toe.clone().add(V(0, 0.27, -0.15).applyQuaternion(toeQuat));
     const knee = solveTwoBone(hip, ankle, 0.5, 0.46, V(0, 0, 1));
+    legs.push({ side, hip: hip.clone(), knee: knee.clone() });
     const outer = -side;
     const thigh = limbBone(hip, knee, forward, V(side * 0.29, 0.41, -0.17));
     const thighLength = thigh.length;
@@ -537,7 +541,122 @@ export function buildParts(spec) {
     horn: mergeGeometries(horns.map((part) => part.toNonIndexed())),
     eyes: mergeGeometries(eyes),
     head: head.point(0, 0.1, 0.02),
+    // опорные точки для снаряжения: корпус, руки, ноги
+    rig: { torso, forward, hands: hands.map(({ side, hand, elbow, shoulder, fore }) => ({ side, hand, elbow, shoulder, along: fore.direction(0, 1, 0) })), legs },
   };
+}
+
+// ---------- снаряжение: лёгкая разгрузка и плазменный пистолет ----------
+// Разгрузка: нагрудная пластина, плечевые ремни, пояс с подсумками энергоячеек, ранец-батарея на спине,
+// кобура на правом бедре. Пистолет в правой руке (сторона +x, как оружие у бойцов) или в кобуре.
+let gearMaterials = null;
+function getGearMaterials() {
+  if (gearMaterials) return gearMaterials;
+  gearMaterials = {
+    plate: new THREE.MeshStandardMaterial({ color: 0x5c656e, roughness: 0.5, metalness: 0.3 }),
+    strap: new THREE.MeshStandardMaterial({ color: 0x3b3428, roughness: 0.9, metalness: 0 }),
+    pouch: new THREE.MeshStandardMaterial({ color: 0x4a4536, roughness: 0.85, metalness: 0 }),
+    glow: new THREE.MeshStandardMaterial({ color: 0x1f7fa8, emissive: 0x1aa6e0, emissiveIntensity: 0.9, roughness: 0.3 }),
+    gun: new THREE.MeshStandardMaterial({ color: 0x6a737c, roughness: 0.4, metalness: 0.35 }),
+    gunDark: new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.5, metalness: 0.3 }),
+  };
+  return gearMaterials;
+}
+function gearBox(width, height, depth, material) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.castShadow = mesh.receiveShadow = true;
+  return mesh;
+}
+// ремень от точки к точке: плоская полоса шириной width, толщина 0.012
+function strap(from, to, width, normalHint, material) {
+  const length = from.distanceTo(to);
+  const mesh = gearBox(width, 0.012, length, material);
+  const along = new THREE.Vector3().subVectors(to, from).normalize();
+  const side = new THREE.Vector3().crossVectors(normalHint, along).normalize();
+  const normal = new THREE.Vector3().crossVectors(along, side).normalize();
+  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, normal, along));
+  mesh.position.copy(from).add(to).multiplyScalar(0.5);
+  return mesh;
+}
+// плазменный пистолет: начало координат — рукоятка в кисти, ствол вдоль +z над рукояткой
+export function buildPlasmaPistol() {
+  const materials = getGearMaterials();
+  const pistol = new THREE.Group();
+  const add = (mesh, x, y, z, rx = 0) => { mesh.position.set(x, y, z); mesh.rotation.x = rx; pistol.add(mesh); return mesh; };
+  add(gearBox(0.042, 0.1, 0.05, materials.gunDark), 0, -0.01, -0.005, -0.25);          // рукоятка
+  add(gearBox(0.05, 0.055, 0.2, materials.gun), 0, 0.065, 0.045);                       // корпус
+  add(gearBox(0.036, 0.03, 0.08, materials.glow), 0, 0.098, 0.0);                       // энергоячейка сверху
+  const barrel = add(new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.022, 0.1, 12).rotateX(Math.PI / 2), materials.gunDark), 0, 0.065, 0.19);
+  barrel.castShadow = true;
+  for (const z of [0.16, 0.2]) add(new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 14), materials.glow), 0, 0.065, z);   // кольца излучателя
+  add(gearBox(0.012, 0.035, 0.03, materials.gunDark), 0, 0.02, 0.06);                   // скоба
+  pistol.userData.muzzle = V(0, 0.065, 0.24);
+  pistol.scale.setScalar(1.2);            // крупнее на 20 %: на спрайте иначе теряется
+  return pistol;
+}
+function orientPistol(pistol, barrel, upHint) {
+  const forward = barrel.clone().normalize();
+  const side = new THREE.Vector3().crossVectors(upHint, forward);
+  if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+  side.normalize();
+  const up = new THREE.Vector3().crossVectors(forward, side).normalize();
+  pistol.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, forward));
+}
+export function buildAlienGear(rig, spec) {
+  const materials = getGearMaterials();
+  const gear = new THREE.Group();
+  const { torso } = rig;
+  const at = (mesh, x, y, z) => { mesh.position.copy(torso.point(x, y, z)); mesh.quaternion.copy(torso.quaternion); gear.add(mesh); return mesh; };
+  const up = torso.direction(0, 1, 0);
+  // нагрудная пластина со светящейся полосой
+  at(gearBox(0.24, 0.17, 0.035, materials.plate), 0, 0.46, 0.165).rotateX(-0.12);
+  at(gearBox(0.12, 0.012, 0.01, materials.glow), 0, 0.5, 0.186).rotateX(-0.12);
+  // плечевые ремни: спереди от пластины через плечо на спину к ранцу
+  for (const side of [-1, 1]) {
+    const front = torso.point(side * 0.09, 0.53, 0.165), top = torso.point(side * 0.12, 0.665, -0.01), back = torso.point(side * 0.09, 0.52, -0.175);
+    gear.add(strap(front, top, 0.045, torso.direction(0, 0.4, 1).normalize(), materials.strap));
+    gear.add(strap(top, back, 0.045, torso.direction(0, 0.4, -1).normalize(), materials.strap));
+    gear.add(strap(torso.point(side * 0.11, 0.39, 0.15), torso.point(side * 0.16, 0.12, 0.1), 0.035, torso.direction(side * 0.3, 0, 1).normalize(), materials.strap));
+  }
+  // ранец-батарея на спине
+  at(gearBox(0.2, 0.22, 0.07, materials.plate), 0, 0.42, -0.2);
+  at(gearBox(0.03, 0.16, 0.012, materials.glow), 0.06, 0.42, -0.237);
+  // пояс и подсумки
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(1, 0.11, 6, 28).rotateX(Math.PI / 2), materials.strap);
+  belt.scale.set(0.185, 0.22, 0.15);
+  belt.position.copy(torso.point(0, 0.1, 0));
+  belt.quaternion.copy(torso.quaternion);
+  belt.castShadow = true;
+  gear.add(belt);
+  for (const [x, z, angle] of [[-0.09, 0.14, 0.4], [0.0, 0.155, 0], [-0.17, 0.05, 1.2]]) {
+    at(gearBox(0.06, 0.075, 0.04, materials.pouch), x, 0.08, z).rotateY(angle);
+    at(gearBox(0.035, 0.012, 0.022, materials.glow), x, 0.123, z).rotateY(angle);
+  }
+  // кобура на правом бедре (сторона +x)
+  const leg = rig.legs.find((item) => item.side === 1);
+  const thigh = new THREE.Vector3().subVectors(leg.knee, leg.hip).normalize();
+  const outward = torso.direction(1, 0, 0);
+  const holsterCenter = leg.hip.clone().lerp(leg.knee, 0.38).addScaledVector(outward, 0.12);
+  const holster = gearBox(0.05, 0.17, 0.09, materials.pouch);
+  holster.position.copy(holsterCenter);
+  holster.quaternion.setFromUnitVectors(V(0, 1, 0), thigh.clone().negate());
+  gear.add(holster);
+  gear.add(strap(leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, 0.1), leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, -0.1), 0.03, thigh, materials.strap));
+  // пистолет: в руке или в кобуре
+  const pistol = buildPlasmaPistol();
+  if (spec.pistol === 'holster') {
+    orientPistol(pistol, thigh, rig.forward);
+    pistol.position.copy(holsterCenter).addScaledVector(thigh, -0.05).addScaledVector(outward, 0.035);
+  } else {
+    const hand = rig.hands.find((item) => item.side === 1);
+    // ствол по направлению предплечья, чуть вперёд: у опущенной руки — вниз-вперёд, у вытянутой — вперёд
+    const barrel = hand.along.clone().addScaledVector(rig.forward, spec.aim ? 0.15 : 0.9).normalize();
+    orientPistol(pistol, barrel, up);
+    pistol.position.copy(hand.hand).addScaledVector(hand.along, 0.075);
+  }
+  pistol.traverse((node) => { if (node.isMesh) node.castShadow = node.receiveShadow = true; });
+  gear.add(pistol);
+  return gear;
 }
 
 // ---------- материалы ----------
@@ -684,7 +803,7 @@ export function alienClimbCycle(phase) {
   return {
     pelvis: V(0, 1.0 + ALIEN_CLIMB_STEP * phase, 0.0), lean: 0.12, twist: 0,
     toes: [toe(-1, leftFoot), toe(1, rightFoot)], toePitch: [-0.25, -0.25], headTilt: -0.3, armSwing: [0, 0],
-    hands: [hand(-1, leftHand), hand(1, rightHand)],
+    hands: [hand(-1, leftHand), hand(1, rightHand)], pistol: 'holster',
   };
 }
 
@@ -701,6 +820,7 @@ export function buildReptileAlien(pose = 'idle') {
   alien.add(new THREE.Mesh(parts.body, skin));
   alien.add(new THREE.Mesh(parts.horn, horn));
   alien.add(new THREE.Mesh(parts.eyes, eye));
+  if (spec.gear !== false) alien.add(buildAlienGear(parts.rig, spec));
   setShadows(alien);
   alien.userData.head = parts.head.clone();
   return alien;

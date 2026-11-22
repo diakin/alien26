@@ -207,6 +207,8 @@ field = {
 game_map = {key: value for key, value in old_map.items() if key != 'variants'}
 game_map['minimap'] = 'assets/maps/outpost_tiles/minimap.jpg'
 game_map['combat'] = False            # своя база: мирная обстановка, бойцы стоят «вольно»
+# препятствия для пуль: рамки предметов [уровень, col, row, x0, z0, x1, z1, y0, y1] (x, z в клетках, y в метрах)
+game_map['solids'] = plan_data['solids']
 door_tiles = []
 for door in old_map['doors']:
     orient = 'W' if door[3] == 0 else 'N'
@@ -223,5 +225,11 @@ with open(os.path.join(GAME_DIR, 'js/maps/outpost_tiles.js'), 'w', encoding='utf
     output.write('// Сгенерировано tools/render/tilesetbuild.py: карта «База на плато», собирается из тайлов.\n')
     output.write('var FIELD = ' + json.dumps(field) + ';\n')
     output.write('var MAP = ' + json.dumps(game_map, separators=(',', ':')) + ';\n')
+
+# те же препятствия — в карту пререндера (outpost.js собирается outpostbuild.py без 3D-сцены)
+old_text = re.sub(r'"solids":\[\[.*?\]\],', '', old_text, count=1)
+old_text = old_text.replace('var MAP = {', 'var MAP = {"solids":' + json.dumps(plan_data['solids'], separators=(',', ':')) + ',', 1)
+with open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), 'w', encoding='utf-8') as output:
+    output.write(old_text)
 
 print('tiles', len(sprites), 'shadows', len(shadows), 'atlas', atlas.size, 'shadow atlas', shadow_atlas.size, 'map', (width, height))
