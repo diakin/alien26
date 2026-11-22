@@ -154,7 +154,7 @@ window.renderSprite = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
-  else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : 'idle');
+  else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : options.pose || 'idle');
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {
     const spriteOptions = { ...options };

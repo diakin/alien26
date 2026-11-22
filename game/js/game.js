@@ -289,6 +289,10 @@
 
   // ---------------- уровни обзора и варианты картинки ----------------
   var view = { level: 0, cut: false };
+  // Обстановка: мирная — бойцы на своей базе или на посту, стоящие юниты в стойке «вольно» (если у набора
+  // спрайтов она есть); боевая — стойка с оружием наготове. Задаётся картой (MAP.combat), по умолчанию боевая;
+  // переключается клавишей T.
+  var combat = MAP.combat !== false;
   var followedLevel = -1;             // уровень обзора, под который он подстроен по выбранному юниту (followLevel)
   var variants = {};
   var shownVariant = null;
@@ -730,6 +734,7 @@
     if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
     if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
+    if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') setCombat(!combat);
     if (event.key === ' ' || event.key === 'Tab') { event.preventDefault(); selectNext(); }
     if (ACTION_KEYS[event.key]) Game.action(ACTION_KEYS[event.key]);
   });
@@ -816,7 +821,20 @@
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
       return unit.spriteSet + '_walk_f' + frame + '_d' + unit.direction;
     }
-    return unit.spriteSet + (unit.kneeling ? '_kneelAim_d' : '_idle_d') + unit.direction;
+    if (unit.kneeling) return unit.spriteSet + '_kneelAim_d' + unit.direction;
+    if (atEase(unit)) return unit.spriteSet + '_ease_d' + unit.direction;
+    return unit.spriteSet + '_idle_d' + unit.direction;
+  }
+  // стоит ли юнит «вольно»: мирная обстановка, стоит на ногах и у его набора спрайтов есть такая стойка
+  function atEase(unit) {
+    return !combat && !unit.kneeling && !!SPRITE_ANCHORS[unit.spriteSet + '_ease_d0'];
+  }
+  function setCombat(value) {
+    combat = !!value;
+    var label = document.getElementById('situation');
+    if (label) label.textContent = combat ? 'ОБСТАНОВКА: БОЕВАЯ' : 'ОБСТАНОВКА: МИРНАЯ';
+    if (label) label.className = combat ? 'situation alert' : 'situation';
+    if (window.Panel && window.Game) window.Panel.update();
   }
 
   // Фигура на экране сдвигается только при смене кадра: внутри кадра опорная нога
@@ -1201,6 +1219,7 @@
   }
 
   // ---------------- связь с панелью ----------------
+  setCombat(combat);
   var Game = window.Game = {
     COST: COST, MAGAZINE: MAGAZINE, FIRE_MODES: FIRE_MODES, GRID: GRID,
     units: units, obstacles: obstacles, camera: camera, KINDS: KINDS,
@@ -1209,6 +1228,9 @@
     get message() { return Date.now() < message.until ? message.text : ''; },
     get busy() { return busy(); },
     get view() { return view; },
+    get combat() { return combat; },
+    setCombat: setCombat,
+    atEase: atEase,
     viewSize: function () { return { width: canvas.width, height: canvas.height }; },
     // замер отрисовки: средняя длительность кадра и число нарисованных кусков (для проверки карты из тайлов)
     benchmark: function (frames) {

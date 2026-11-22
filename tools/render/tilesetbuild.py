@@ -206,6 +206,7 @@ field = {
 }
 game_map = {key: value for key, value in old_map.items() if key != 'variants'}
 game_map['minimap'] = 'assets/maps/outpost_tiles/minimap.jpg'
+game_map['combat'] = False            # своя база: мирная обстановка, бойцы стоят «вольно»
 door_tiles = []
 for door in old_map['doors']:
     orient = 'W' if door[3] == 0 else 'N'

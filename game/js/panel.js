@@ -203,7 +203,8 @@ var Panel = (function () {
     setStat('hp', unit.health, unit.maxHealth);
     setStat('st', unit.stamina, unit.maxStamina);
     setStat('mo', unit.morale, 100);
-    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : 'СТОЯ') : (unit.kind === 'mech' ? 'ХОДОВАЯ: ИСПРАВНА' : 'СТОЙКА: СТОЯ'));
+    var standing = Game.atEase(unit) ? 'ВОЛЬНО' : 'СТОЯ';
+    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ИСПРАВНА' : 'СТОЙКА: ' + standing));
     setText('chip-optics', unit.optics);
     setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
     setText('weapon-name', unit.weapon || (unit.kind === 'mech' ? 'ВООРУЖЕНИЕ' : 'ОРУЖИЕ'));

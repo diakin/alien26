@@ -6,6 +6,13 @@
   }
  },
  {
+  "name": "alien_ease",
+  "options": {
+   "alien": true,
+   "pose": "ease"
+  }
+ },
+ {
   "name": "alien_walk_f0",
   "options": {
    "alien": true,

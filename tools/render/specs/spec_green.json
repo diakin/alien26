@@ -1,4 +1,5 @@
 [{"name": "green_idle", "options": {"camo": "green", "pose": "idle", "goggles": true, "tanRifle": true}},
+ {"name": "green_ease", "options": {"camo": "green", "pose": "ease", "goggles": true, "tanRifle": true}},
  {"name": "green_standAim", "options": {"camo": "green", "pose": "standAim", "goggles": true, "tanRifle": true}},
  {"name": "green_kneelAim", "options": {"camo": "green", "pose": "kneelAim", "goggles": true, "tanRifle": true}},
  {"name": "green_walk", "options": {"camo": "green", "pose": "walk", "goggles": true}}]

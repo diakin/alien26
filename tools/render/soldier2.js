@@ -51,6 +51,11 @@ export const POSES = {
   standAim: { pelvis: V(0, 0.93, 0), lean: 0.12, twist: 0.32, feet: [V(-0.16, 0.11, 0.26), V(0.18, 0.11, -0.2)], footPitch: [0, 0.15], kneePole: [V(0, 0, 1), V(0.2, 0, 1)], aimPitch: 0.02, ready: 'aim' },
   kneelAim: { pelvis: V(0.02, 0.6, -0.06), lean: 0.2, twist: 0.36, feet: [V(-0.16, 0.11, 0.38), V(0.18, 0.13, -0.5)], footPitch: [0, 1.0], kneePole: [V(0, 0.2, 1), V(0, -1, 0.5)], aimPitch: 0.05, ready: 'aim' },
   crouchAim: { pelvis: V(0, 0.58, -0.12), lean: 0.38, twist: 0.3, feet: [V(-0.17, 0.11, 0.24), V(0.19, 0.11, -0.12)], footPitch: [0, 0.35], kneePole: [V(-0.3, 0, 1), V(0.3, 0, 1)], aimPitch: 0.12, ready: 'aim' },
+  // «вольно»: ноги на ширине плеч, корпус прямо, оружие поперёк груди — приклад у правого плеча,
+  // ствол вниз-влево; правая рука на пистолетной рукоятке, левая на цевье
+  // Ноги прямые: таз поднят так, что от тазобедренного сустава до щиколотки почти полная длина ноги (0,9 м),
+  // колено согнуто на 6°
+  ease: { pelvis: V(0, 1.055, 0.01), lean: 0.03, twist: 0, feet: [V(-0.2, 0.11, 0.02), V(0.2, 0.11, 0.02)], footPitch: [0, 0], kneePole: [V(-0.1, 0, 1), V(0.1, 0, 1)], aimPitch: 0, ready: 'ease' },
   walk: { pelvis: V(0, 0.9, 0), lean: 0.16, twist: 0.22, feet: [V(-0.13, 0.11, 0.3), V(0.14, 0.18, -0.3)], footPitch: [-0.1, 0.55], kneePole: [V(0, 0, 1), V(0, 0, 1)], aimPitch: -0.5, ready: 'low' },
 };
 
@@ -195,6 +200,16 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
     // карабин за спиной по диагонали, руки на перекладинах
     rifle.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.15, Math.PI, 0.55, 'YXZ')));
     rifle.position.copy(local(0.02, 0.22, -0.3));
+  } else if (spec.ready === 'ease') {
+    // ствол по диагонали поперёк корпуса: вниз и к левому бедру; верх оружия смотрит вперёд-вверх
+    const forward = V(-0.72, -0.62, 0.3).normalize().applyQuaternion(torsoQuat);
+    const up = V(0, 0.55, 1).applyQuaternion(torsoQuat);
+    const side = new THREE.Vector3().crossVectors(up, forward).normalize();
+    up.crossVectors(forward, side).normalize();
+    rifle.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, forward));
+    // пистолетная рукоятка перед правой половиной груди, перед подсумками
+    const grip = local(0.13, 0.27, 0.33);
+    rifle.position.copy(grip.sub(rifle.userData.grip.clone().applyQuaternion(rifle.quaternion)));
   } else {
     rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, spec.ready === 'aim' ? 0 : -0.45, spec.ready === 'aim' ? -0.05 : 0, 'YXZ'));
     rifle.position.copy(spec.ready === 'aim' ? shoulders[1].clone().add(V(-0.09, -0.03, 0.09)) : shoulders[1].clone().add(V(-0.06, -0.11, 0.12)));
@@ -205,7 +220,9 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
   const gloveQuat = climbing ? torsoQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.3, 0, 0))) : rifle.quaternion;
 
   // руки
-  const elbowPoles = climbing ? [V(-1, -0.7, -0.3), V(1, -0.7, -0.3)] : [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
+  const elbowPoles = climbing ? [V(-1, -0.7, -0.3), V(1, -0.7, -0.3)]
+    : spec.ready === 'ease' ? [V(-1, -0.6, -0.2).applyQuaternion(torsoQuat), V(1, -0.8, -0.2).applyQuaternion(torsoQuat)]
+      : [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
   [0, 1].forEach((side) => {
     const shoulder = shoulders[side];
     const elbow = solveTwoBone(shoulder, hands[side], 0.29, 0.28, elbowPoles[side]);

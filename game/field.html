@@ -12,6 +12,8 @@
   .plate { position: absolute; background: rgba(12, 15, 17, 0.78); border: 1px solid #2f373c; color: #8a959c; }
   #turn { left: 16px; top: 14px; padding: 6px 12px; }
   #turn .big { color: #e4e8ea; font-size: 15px; font-weight: bold; letter-spacing: 1.5px; }
+  #turn .situation { margin-top: 3px; font-size: 10px; font-weight: bold; letter-spacing: 1.2px; color: #7fb069; }
+  #turn .situation.alert { color: #e05a3a; }
   #turn .phase { color: #e8a33a; font-size: 11px; font-weight: bold; letter-spacing: 1.2px; margin-left: 10px; }
   #turn .task { font-size: 11px; margin-top: 3px; }
   #help { right: 16px; top: 14px; padding: 6px 12px; font-size: 11px; line-height: 1.6; text-align: right; }
@@ -116,11 +118,12 @@
 <body>
 <canvas id="view"></canvas>
 <div id="turn" class="plate"><span class="big mono">ХОД <span id="turn-number">01</span></span><span class="phase">ФАЗА ОТРЯДА</span>
-  <div class="task" id="task">Тест: бойцы, пришельцы и робот K7</div></div>
+  <div class="task" id="task">Тест: бойцы, пришельцы и робот K7</div>
+  <div class="situation" id="situation"></div></div>
 <div id="help" class="plate">
   <b>ЛКМ</b> по бойцу — выбрать · <b>ЛКМ</b> по клетке — идти · <b>ПКМ</b> щелчком — повернуться (1 ОД за 45°)<br>
   <b>ПКМ / колесо</b> с протяжкой, <b>стрелки / WASD</b>, мини-карта — прокрутка<br>
-  <b>Пробел</b> — следующий боец · <b>Esc</b> — снять выбор · <b>G</b> — сетка · <b>1–0</b> — кнопки панели
+  <b>Пробел</b> — следующий боец · <b>Esc</b> — снять выбор · <b>G</b> — сетка · <b>T</b> — обстановка · <b>1–0</b> — кнопки панели
 </div>
 <div id="levelbar" class="plate">
   <div class="title">УРОВЕНЬ</div>

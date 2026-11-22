@@ -166,7 +166,7 @@ for item in layout['objects']:
             blocked[item['level']][row * TILES + col] = 1
 
 game_map = {
-    'name': 'База на плато', 'tiles': TILES, 'levels': LEVELS, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
+    'name': 'База на плато', 'combat': False, 'tiles': TILES, 'levels': LEVELS, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
     'floor': flat(layout['floor'], TILES),
     'offset': flat(layout['offset'], TILES, lambda value: round(value, 3)),
     'wallW': flat(layout['wallW'], TILES + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
