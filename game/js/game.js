@@ -760,7 +760,12 @@
     if (SPRITE_ANCHORS[unit.spriteSet + '_dead_d0']) {
       // падение: кадры *_fall_f0..f5, затем лежит (*_dead). Обломки робота занимают его площадку, над ними дым и искры
       var wreck = unit.kind === 'mech';
+      // падение начинается из обычной стойки. С колена (таз на 0,6 м) начинаем с третьего кадра — таз там на 0,69 м;
+      // стоя в прицеле таз на той же высоте, что в обычной стойке, отличаются только руки — пропускаем один кадр
+      var pose = spriteName(unit);
+      var skip = pose.indexOf('_kneelAim_') >= 0 ? 2 : pose.indexOf('_standAim_') >= 0 ? 1 : 0;
       corpses.push({
+        fallSkip: skip,
         name: unit.spriteSet + '_dead_d' + unit.direction, set: unit.spriteSet, direction: unit.direction,
         fallStart: performance.now(), fallFrames: SPRITE_ANCHORS[unit.spriteSet + '_fall_f0_d0'] ? FALL_FRAMES : 0,
         frameTime: wreck ? 120 : 85, wreck: wreck, size: unit.size, nextSparks: 0, nextSmoke: 0,
@@ -886,7 +891,7 @@
   // кадр падения или лежащего тела
   var FALL_FRAMES = 6;
   function corpseFrame(corpse, now) {
-    var frame = Math.floor((now - corpse.fallStart) / corpse.frameTime);
+    var frame = (corpse.fallSkip || 0) + Math.floor((now - corpse.fallStart) / corpse.frameTime);
     return frame < corpse.fallFrames ? frame : -1;
   }
   function corpseSprite(corpse, now) {
