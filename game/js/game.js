@@ -130,9 +130,10 @@
       maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       weapon: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', weaponNote: 'ЭНЕРГОЯЧЕЙКА', ammo: 20, reserve: 2 },
     { kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
-      side: 'squad', accuracy: 0, armor: 30,
+      side: 'squad', accuracy: 62, armor: 30, weaponType: 'autocannon',
+      weapon: 'АВТОПУШКА АП-30', weaponNote: 'КАЛИБР 30 ММ · ЛЕНТА', ammo: 40, reserve: 3,
       maxTimeUnits: 48, health: 180, maxHealth: 180, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
-      statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'], weapon: null }
+      statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'] }
   ];
   var units = PROFILES.map(function (profile, index) { return makeUnit(profile, MAP.spawns[index]); });
   var selected = units[0];
@@ -649,7 +650,8 @@
   var shots = [];                     // летящие пули и сгустки плазмы
   var flashes = [];                   // вспышки попаданий и цифры урона
   var phase = 'squad';                // чей ход: squad — отряд игрока, aliens — пришельцы (ИИ)
-  var SHOT_SPEED = { bullet: 90, plasma: 28 };   // м/с — для вида, не для расчёта
+  var SHOT_SPEED = { bullet: 90, plasma: 28, shell: 70 };   // м/с — для вида, не для расчёта
+  var corpses = [];                   // тела погибших: остаются на клетке, проходу и пулям не мешают
   var combatWorld = Combat.createWorld({
     map: MAP, units: units, unitBody: unitBody,
     doorOpen: function (col, row, level, orient) {
@@ -671,8 +673,8 @@
   // ствол: чуть впереди юнита в сторону цели, на высоте плеча
   function muzzleOf(unit, point) {
     var dx = point.x - unit.x, dy = point.y - unit.y, length = Math.sqrt(dx * dx + dy * dy) || 1;
-    var reach = (unit.size > 1 ? 1.1 : 0.32) / Iso.tileMeters;
-    var height = unit.kind === 'alien' ? 1.55 : unit.kneeling ? 1.0 : 1.45;
+    var reach = (unit.size > 1 ? 1.4 : 0.32) / Iso.tileMeters;
+    var height = unit.kind === 'mech' ? 2.15 : unit.kind === 'alien' ? 1.55 : unit.kneeling ? 1.0 : 1.45;
     return { x: unit.x + dx / length * reach, y: unit.y + dy / length * reach, h: unit.elevation + height };
   }
   function turnCostTo(unit, point) {
@@ -755,6 +757,9 @@
   }
   function kill(unit) {
     unit.dead = true;
+    if (SPRITE_ANCHORS[unit.spriteSet + '_dead_d0']) {
+      corpses.push({ name: unit.spriteSet + '_dead_d' + unit.direction, x: unit.x, y: unit.y, elevation: unit.elevation, col: unit.col, row: unit.row, level: unit.level });
+    }
     var index = units.indexOf(unit);
     if (index >= 0) units.splice(index, 1);
     say(unit.callsign + (unit.side === 'aliens' ? ' уничтожен' : ' выбыл'));
@@ -871,6 +876,17 @@
     aiWaitUntil = now + 350;
   }
 
+  // тело погибшего: рисуется по глубине как подсветка пола своей клетки
+  function corpseItems() {
+    return corpses.filter(function (corpse) { return corpse.level <= view.level; }).map(function (corpse) {
+      var image = images[corpse.name], anchor = SPRITE_ANCHORS[corpse.name];
+      var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
+      var rect = image && image.naturalWidth ? { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight }
+        : { x: foot.x - 40, y: foot.y - 30, width: 80, height: 40 };
+      return { depth: depthKey(corpse.col, corpse.row, corpse.level, 1.3), rect: rect, draw: function () { drawSprite(corpse.name, corpse.x, corpse.y, corpse.elevation); } };
+    });
+  }
+
   // ---------------- отрисовка стрельбы ----------------
   function screenOf(point) { var screen = Iso.toScreen(point.x, point.y, point.h); return { x: screen.x - camera.x, y: screen.y - camera.y }; }
   function lerpPoint(first, second, amount) { return { x: first.x + (second.x - first.x) * amount, y: first.y + (second.y - first.y) * amount, h: first.h + (second.h - first.h) * amount }; }
@@ -882,12 +898,12 @@
       if (!shot.result || now < shot.start) return;
       var progress = Math.min(1, (now - shot.start) / shot.duration);
       var length = Combat.distanceMeters(combatWorld, shot.from, shot.result.point) || 1;
-      var tail = Math.max(0, progress - (shot.weapon.projectile === 'plasma' ? 0.6 : 1.6) / length);
+      var tail = Math.max(0, progress - (shot.weapon.projectile === 'plasma' ? 0.6 : shot.weapon.projectile === 'shell' ? 2.4 : 1.6) / length);
       var head = screenOf(lerpPoint(shot.from, shot.result.point, progress)), back = screenOf(lerpPoint(shot.from, shot.result.point, tail));
       if (now - shot.start < 70) {                      // вспышка у ствола
         var muzzle = screenOf(shot.from);
         context.fillStyle = shot.weapon.projectile === 'plasma' ? 'rgba(120, 220, 255, 0.9)' : 'rgba(255, 220, 120, 0.95)';
-        context.beginPath(); context.arc(muzzle.x, muzzle.y, 6, 0, Math.PI * 2); context.fill();
+        context.beginPath(); context.arc(muzzle.x, muzzle.y, shot.weapon.projectile === 'shell' ? 11 : 6, 0, Math.PI * 2); context.fill();
       }
       if (shot.weapon.projectile === 'plasma') {
         context.strokeStyle = 'rgba(80, 200, 255, 0.5)'; context.lineWidth = 6;
@@ -896,6 +912,11 @@
         context.shadowColor = '#4fd2ff'; context.shadowBlur = 14;
         context.beginPath(); context.arc(head.x, head.y, 4.5, 0, Math.PI * 2); context.fill();
         context.shadowBlur = 0;
+      } else if (shot.weapon.projectile === 'shell') {
+        context.strokeStyle = 'rgba(255, 150, 60, 0.95)'; context.lineWidth = 4;
+        context.beginPath(); context.moveTo(back.x, back.y); context.lineTo(head.x, head.y); context.stroke();
+        context.fillStyle = '#fff2c8';
+        context.beginPath(); context.arc(head.x, head.y, 3, 0, Math.PI * 2); context.fill();
       } else {
         context.strokeStyle = 'rgba(255, 230, 150, 0.95)'; context.lineWidth = 2;
         context.beginPath(); context.moveTo(back.x, back.y); context.lineTo(head.x, head.y); context.stroke();
@@ -913,7 +934,8 @@
         return;
       }
       context.fillStyle = flash.kind === 'plasma' ? 'rgba(110, 215, 255, ' + (0.85 * (1 - age)) + ')' : 'rgba(255, 210, 110, ' + (0.85 * (1 - age)) + ')';
-      context.beginPath(); context.arc(screen.x, screen.y, 4 + age * 12, 0, Math.PI * 2); context.fill();
+      var size = flash.kind === 'shell' ? 2 : 1;
+      context.beginPath(); context.arc(screen.x, screen.y, (4 + age * 12) * size, 0, Math.PI * 2); context.fill();
     });
     context.restore();
   }
@@ -1462,6 +1484,7 @@
     var rects = [];
     staticOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     floorOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
+    corpseItems().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     if (hoverTile) drawList.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
     drawList.push({ depth: -1, draw: drawPath });
     units.forEach(function (unit) {
@@ -1511,7 +1534,7 @@
     var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
     var boxSize = selected ? selected.size : 1;
 
-    var dynamic = floorOverlays();
+    var dynamic = floorOverlays().concat(corpseItems());
     if (hoverTile) {
       var base = elevationOf(hoverTile.col, hoverTile.row, hoverTile.level), boxHeight = boxSize > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
       var boxCorners = Iso.tileCorners(hoverTile.col, hoverTile.row, base, boxSize).concat(Iso.tileCorners(hoverTile.col, hoverTile.row, base + boxHeight, boxSize));
@@ -1656,7 +1679,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses,
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };

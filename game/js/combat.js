@@ -14,6 +14,14 @@ var Combat = (function () {
         { name: 'Очередь', cost: 28, accuracy: 0.4, shots: 3 }
       ]
     },
+    autocannon: {
+      damage: 55, range: 70, magazine: 40, projectile: 'shell',
+      modes: [
+        { name: 'Прицельный', cost: 20, accuracy: 1.05, shots: 1 },
+        { name: 'Одиночный', cost: 12, accuracy: 0.65, shots: 1 },
+        { name: 'Очередь', cost: 26, accuracy: 0.4, shots: 3 }
+      ]
+    },
     plasmaPistol: {
       damage: 40, range: 45, magazine: 20, projectile: 'plasma',
       modes: [

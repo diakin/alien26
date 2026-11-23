@@ -18,8 +18,9 @@ function solveLeg(forward, down) {
 }
 
 // phase === null: стойка
-export function buildMechPosed(phase) {
-  const mech = buildMech();
+// автопушка на борту — у игровых спрайтов (сцена и Quake III собирают робота без неё)
+export function buildMechPosed(phase, options = { autocannon: true }) {
+  const mech = buildMech(options);
   const { pelvis, body, legs } = mech;
   const half = 2.0 / 4,   // в единицах модели, до масштаба
     smooth = (value) => value * value * (3 - 2 * value);

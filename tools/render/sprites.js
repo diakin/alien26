@@ -8,7 +8,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { toXZ } from './world.js';
 import { buildStockySoldier, walkCycle, climbCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
-import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } from './alien3.js';
+import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing, buildPlasmaPistol } from './alien3.js';
+import { buildRifle } from './actors.js';
 import { buildMechPosed } from './mechpose.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
@@ -150,10 +151,35 @@ function buildRockObject(seed, radius) {
   return group;
 }
 
+// Погибший: модель в позе dead укладывается на землю (боец — на спину, пришелец — на бок),
+// тело центрируется на клетке, оружие лежит рядом. Поворот на направление — у внешней группы.
+function buildDead(options) {
+  const alien = !!options.alien;
+  const model = alien ? buildReptileAlien('dead') : buildStockySoldier({ ...options, pose: 'dead' });
+  const lying = new THREE.Group();
+  lying.add(model);
+  if (alien) model.rotation.z = Math.PI / 2;          // на левый бок: правая сторона сверху, хвост вдоль земли
+  else model.rotation.x = -Math.PI / 2;               // на спину: голова назад, лицо вверх
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.set(-center.x, -box.min.y, -center.z);
+  // оружие на земле у правой руки
+  const weapon = alien ? buildPlasmaPistol() : buildRifle({ tanFurniture: !!options.tanRifle, suppressor: !!options.suppressor });
+  weapon.rotation.set(0, alien ? 2.2 : 0.5, Math.PI / 2);
+  weapon.position.set(alien ? 0.35 : 0.62, alien ? 0.03 : 0.035, alien ? 0.55 : -0.25);
+  weapon.traverse((node) => { if (node.isMesh) node.castShadow = node.receiveShadow = true; });
+  lying.add(weapon);
+  const outer = new THREE.Group();
+  outer.add(lying);
+  return outer;
+}
+
 window.renderSprite = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
+  else if (options.dead) soldier = buildDead(options);
   else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : options.pose || 'idle');
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {

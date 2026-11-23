@@ -642,7 +642,8 @@ export function buildAlienGear(rig, spec) {
   holster.quaternion.setFromUnitVectors(V(0, 1, 0), thigh.clone().negate());
   gear.add(holster);
   gear.add(strap(leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, 0.1), leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, -0.1), 0.03, thigh, materials.strap));
-  // пистолет: в руке или в кобуре
+  // пистолет: в руке, в кобуре или выпал (погибший — пистолет кладёт рядом sprites.js)
+  if (spec.pistol === 'none') return gear;
   const pistol = buildPlasmaPistol();
   if (spec.pistol === 'holster') {
     orientPistol(pistol, thigh, rig.forward);

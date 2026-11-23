@@ -6,6 +6,7 @@ import { buildRifle } from './actors.js';
 import { setEnvIntensity } from './lib.js';
 import { buildReptileAlien, setAlienFacing, buildPlasmaPistol } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
+import { buildAutocannonModel } from './mech.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
@@ -73,7 +74,16 @@ window.renderWeapon = (camo) => {
   const light = new THREE.DirectionalLight(0xffffff, 2.5); light.position.set(1, 2, 3); scene.add(light);
   const loadout = LOADOUTS[camo];
   const holder = new THREE.Group();
-  if (camo === 'alien') {
+  if (camo === 'mech') {
+    // автопушка K7: ствол вдоль экрана, слегка вверх
+    const cannon = buildAutocannonModel();
+    setEnvIntensity(cannon, 0.8);
+    cannon.rotation.y = Math.PI / 2;
+    holder.add(cannon);
+    holder.scale.setScalar(0.28);
+    holder.rotation.z = 0.12;
+    holder.position.set(-0.1, -0.06, 0);
+  } else if (camo === 'alien') {
     // плазменный пистолет пришельца: крупнее, чтобы занять ту же рамку, что и карабин
     const pistol = buildPlasmaPistol();
     setEnvIntensity(pistol, 0.8);

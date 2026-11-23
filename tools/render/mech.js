@@ -398,6 +398,43 @@ function buildBody(materials) {
   return body;
 }
 
+// ---------- автопушка ----------
+// На левом борту (+X, сторона оружия, как у бойцов): кронштейн к ящику с люком, ствольная коробка,
+// ствол с кожухом и дульным тормозом, патронный короб позади и рукав подачи.
+const AUTOCANNON_PIVOT = new THREE.Vector3(1.2, -0.04, 0.02), AUTOCANNON_SCALE = 1.35;  // крепление и масштаб: на спрайте пушка должна читаться
+function addAutocannon(body, materials) {
+  const gun = new THREE.Group();
+  gun.name = 'autocannon';
+  body.add(gun);
+  addMesh(gun, roundedBox(0.24, 0.22, 0.46, 0.05), materials.darkMetal, [1.2, -0.04, 0.02]);            // кронштейн
+  addMesh(gun, cylinderX(0.09, 0.2), materials.metal, [1.24, -0.04, 0.02]);                               // ось
+  addMesh(gun, roundedBox(0.26, 0.3, 0.86, 0.06), materials.camoDark, [1.36, -0.05, 0.08]);              // ствольная коробка
+  addMesh(gun, roundedBox(0.27, 0.05, 0.6, 0.02), materials.darkMetal, [1.36, 0.12, 0.05]);
+  addMesh(gun, roundedBox(0.03, 0.03, 0.7, 0.012), materials.yellow, [1.495, 0.02, 0.08]);
+  addMesh(gun, cylinderZ(0.088, 0.55), materials.darkMetal, [1.36, -0.05, 0.75]);                        // кожух ствола
+  for (let ring = 0; ring < 4; ring++) addMesh(gun, torus(0.09, 0.012, 8, 24), materials.black, [1.36, -0.05, 0.56 + ring * 0.13]);
+  addMesh(gun, cylinderZ(0.052, 0.75), materials.metal, [1.36, -0.05, 1.3]);                             // ствол
+  addMesh(gun, roundedBox(0.15, 0.12, 0.2, 0.03), materials.darkMetal, [1.36, -0.05, 1.66]);            // дульный тормоз
+  for (const side of [-1, 1]) addMesh(gun, roundedBox(0.02, 0.06, 0.12, 0.008), materials.black, [1.36 + side * 0.076, -0.05, 1.66]);
+  addMesh(gun, roundedBox(0.3, 0.36, 0.46, 0.06), materials.camo, [1.37, 0.06, -0.6]);                  // патронный короб
+  addMesh(gun, roundedBox(0.31, 0.04, 0.47, 0.015), materials.orange, [1.37, 0.25, -0.6]);
+  addMesh(gun, roundedTube([[1.37, 0.12, -0.36], [1.42, 0.2, -0.2], [1.4, 0.13, -0.12]], 0.05, 0.05), materials.darkMetal);   // рукав подачи
+  addMesh(gun, roundedBox(0.06, 0.06, 0.06, 0.02), materials.glowCyan, [1.36, 0.14, -0.22]);             // индикатор
+  // детали заданы в координатах корпуса; масштаб — вокруг точки крепления
+  gun.children.forEach((child) => child.position.sub(AUTOCANNON_PIVOT));
+  gun.position.copy(AUTOCANNON_PIVOT);
+  gun.scale.setScalar(AUTOCANNON_SCALE);
+  return gun;
+}
+
+// автопушка отдельно (картинка оружия для панели): крепление в начале координат
+export function buildAutocannonModel() {
+  const holder = new THREE.Group();
+  const gun = addAutocannon(holder, createMaterials());
+  gun.position.set(0, 0, 0);
+  return holder;
+}
+
 // ---------- таз и ноги ----------
 
 function buildLeg(materials, side) {
@@ -461,7 +498,7 @@ function buildLeg(materials, side) {
 
 export const REST_POSE = { hip: -0.45, knee: 0.9 };
 
-export function buildMech() {
+export function buildMech(options = {}) {
   const materials = createMaterials();
   const root = new THREE.Group();
   root.name = 'Walker_K7';
@@ -481,6 +518,7 @@ export function buildMech() {
   const body = buildBody(materials);
   body.position.set(0, 0.68, 0);
   pelvis.add(body);
+  if (options.autocannon) addAutocannon(body, materials);
 
   const legs = [buildLeg(materials, 1), buildLeg(materials, -1)];
   for (const leg of legs) pelvis.add(leg.hip);

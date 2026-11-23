@@ -2,4 +2,5 @@
  {"name": "green_ease", "options": {"camo": "green", "pose": "ease", "goggles": true, "tanRifle": true}},
  {"name": "green_standAim", "options": {"camo": "green", "pose": "standAim", "goggles": true, "tanRifle": true}},
  {"name": "green_kneelAim", "options": {"camo": "green", "pose": "kneelAim", "goggles": true, "tanRifle": true}},
- {"name": "green_walk", "options": {"camo": "green", "pose": "walk", "goggles": true}}]
+ {"name": "green_walk", "options": {"camo": "green", "pose": "walk", "goggles": true}},
+ {"name": "green_dead", "options": {"camo": "green", "goggles": true, "tanRifle": true, "dead": true, "frame": [4.2, 2.8, 0.5]}}]

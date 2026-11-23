@@ -56,6 +56,12 @@ export const POSES = {
   // Ноги прямые: таз поднят так, что от тазобедренного сустава до щиколотки почти полная длина ноги (0,9 м),
   // колено согнуто на 6°
   ease: { pelvis: V(0, 1.055, 0.01), lean: 0.03, twist: 0, feet: [V(-0.2, 0.11, 0.02), V(0.2, 0.11, 0.02)], footPitch: [0, 0], kneePole: [V(-0.1, 0, 1), V(0.1, 0, 1)], aimPitch: 0, ready: 'ease' },
+  // погибший: поза до укладки на спину — руки раскинуты, ноги чуть согнуты и разведены, голова набок
+  dead: {
+    pelvis: V(0, 0.93, 0), lean: 0, twist: 0.1, feet: [V(-0.22, 0.11, 0.08), V(0.26, 0.12, -0.04)], footPitch: [0.3, 0.5],
+    kneePole: [V(-0.4, 0, 1), V(0.5, 0, 1)], aimPitch: 0, ready: 'dead',
+    hands: [V(-0.6, 1.08, 0.06), V(0.6, 1.25, 0.12)],
+  },
   walk: { pelvis: V(0, 0.9, 0), lean: 0.16, twist: 0.22, feet: [V(-0.13, 0.11, 0.3), V(0.14, 0.18, -0.3)], footPitch: [-0.1, 0.55], kneePole: [V(0, 0, 1), V(0, 0, 1)], aimPitch: -0.5, ready: 'low' },
 };
 
@@ -158,7 +164,8 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
 
   // голова
   const neckBase = local(0, 0.58, 0.0);
-  const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.ready === 'aim' ? 0.15 : spec.ready === 'climb' ? -0.3 : 0.05, -spec.twist * 0.85, spec.ready === 'aim' ? 0.12 : 0, 'YXZ'));
+  const headQuat = spec.ready === 'dead' ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0.15, 0.6, 0.25, 'YXZ'))
+    : new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.ready === 'aim' ? 0.15 : spec.ready === 'climb' ? -0.3 : 0.05, -spec.twist * 0.85, spec.ready === 'aim' ? 0.12 : 0, 'YXZ'));
   const headCenter = neckBase.clone().add(V(0, 0.15, 0.02).applyQuaternion(headQuat));
   if (spec.ready === 'aim') headCenter.add(V(0.035, -0.02, 0.035));
   const headLocal = (x, y, z) => V(x, y, z).applyQuaternion(headQuat).add(headCenter);
@@ -196,6 +203,7 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
   const shoulders = [local(-0.24, 0.48, 0.0), local(0.24, 0.48, 0.0)];
   const rifle = buildRifle({ tanFurniture: tanRifle, suppressor });
   const climbing = spec.ready === 'climb';
+  const limp = spec.ready === 'dead';           // погибший: кисти по spec.hands, оружие лежит рядом (добавляет sprites.js)
   if (climbing) {
     // карабин за спиной по диагонали, руки на перекладинах
     rifle.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.15, Math.PI, 0.55, 'YXZ')));
@@ -214,13 +222,15 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
     rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, spec.ready === 'aim' ? 0 : -0.45, spec.ready === 'aim' ? -0.05 : 0, 'YXZ'));
     rifle.position.copy(spec.ready === 'aim' ? shoulders[1].clone().add(V(-0.09, -0.03, 0.09)) : shoulders[1].clone().add(V(-0.06, -0.11, 0.12)));
   }
-  add(rifle);
+  if (!limp) add(rifle);
   rifle.updateMatrixWorld(true);
-  const hands = climbing ? [spec.hands[0].clone(), spec.hands[1].clone()] : [rifle.localToWorld(rifle.userData.support.clone()), rifle.localToWorld(rifle.userData.grip.clone())];
-  const gloveQuat = climbing ? torsoQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.3, 0, 0))) : rifle.quaternion;
+  const hands = climbing || limp ? [spec.hands[0].clone(), spec.hands[1].clone()] : [rifle.localToWorld(rifle.userData.support.clone()), rifle.localToWorld(rifle.userData.grip.clone())];
+  const gloveQuat = climbing ? torsoQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.3, 0, 0)))
+    : limp ? torsoQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 1.2))) : rifle.quaternion;
 
   // руки
   const elbowPoles = climbing ? [V(-1, -0.7, -0.3), V(1, -0.7, -0.3)]
+    : limp ? [V(-0.3, -1, 0.6), V(0.3, -1, 0.6)]
     : spec.ready === 'ease' ? [V(-1, -0.6, -0.2).applyQuaternion(torsoQuat), V(1, -0.8, -0.2).applyQuaternion(torsoQuat)]
       : [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
   [0, 1].forEach((side) => {

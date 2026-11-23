@@ -10,7 +10,7 @@ await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/portrait.html`);
 await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
 const only = process.argv[3] ? process.argv[3].split(',') : ['black', 'green', 'alien', 'mech'];
 for (const camo of only) {
-  for (const kind of camo === 'mech' ? ['Portrait'] : ['Portrait', 'Weapon']) {
+  for (const kind of ['Portrait', 'Weapon']) {
     const url = await page.evaluate(([fn, c]) => window['render' + fn](c), [kind, camo]);
     fs.writeFileSync(`${outDir}/${kind.toLowerCase()}_${camo}.png`, Buffer.from(url.split(',')[1], 'base64'));
   }
