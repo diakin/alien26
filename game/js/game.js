@@ -1120,6 +1120,8 @@
     shot.from = from;
     shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter);
     shot.duration = Math.max(60, Combat.distanceMeters(combatWorld, from, shot.result.point) / SHOT_SPEED[shot.weapon.projectile] * 1000);
+    // показ выстрела пришельца: пуля долетает, когда камера уже перешла к месту попадания
+    if (shot.arriveNotBefore) shot.duration = Math.max(shot.duration, shot.arriveNotBefore - shot.start);
     Sound.play(shot.weapon.projectile, screenDistance(shot.shooter));
   }
   function updateShots(now) {
@@ -1136,11 +1138,12 @@
     flashes.push({ point: result.point, kind: shot.weapon.projectile, start: now, until: now + 320 });
     Sound.play('impact', screenDistance(result.point));
     if (result.kind !== 'unit' || result.unit.dead) return;
+    if (shot.view) shot.view.hit = true;
     var target = result.unit;
     var amount = Combat.damage(shot.weapon, target.armor, Math.random);
     target.health = Math.max(0, target.health - amount);
     flashes.push({ text: amount ? '−' + amount : 'БРОНЯ', point: { x: target.x, y: target.y, h: target.elevation + target.height + 0.2 }, start: now, until: now + 1300 });
-    if (target.health <= 0) kill(target);
+    if (target.health <= 0) { kill(target); if (shot.view) shot.view.killed = target; }
     else say(target.callsign + ': попадание, урон ' + amount);
   }
   function kill(unit) {
@@ -1172,7 +1175,12 @@
     say(unit.callsign + (unit.side === 'aliens' ? ' уничтожен' : ' выбыл'));
     if (aimTarget === unit) aimTarget = null;
     if (inspected === unit) inspected = null;
-    if (selected === unit) { selected = null; aiming = false; aimTarget = null; selectNext(); }
+    if (selected === unit) {
+      selected = null; aiming = false; aimTarget = null;
+      // в ход пришельцев выбор переходит к следующему бойцу без переноса камеры — она показывает падение
+      if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad'; })[0] || null;
+      else selectNext();
+    }
     if (!units.some(function (other) { return other.side === 'aliens'; })) say('Пришельцы уничтожены');
     else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) say('Отряд погиб');
   }
@@ -1300,19 +1308,26 @@
   // но сдвигается так, чтобы враг (от ног до головы) остался в кадре с отступами. На дальней дистанции
   // боец и враг вместе не помещаются — тогда в кадре враг, а боец у края или за ним (вернуть — «К БОЙЦУ», C).
   function showTarget(unit) {
-    var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
-    var headPixels = (unit.height || 2) * Iso.pixelsPerMeterUp;
-    // сверху — блок хода и подсказка (до ~120 px) плюс метка шанса над головой; справа — колонка меток
-    var marginLeft = 160, marginRight = 200, marginBottom = 80;
-    var marginTop = Math.min(headPixels + 200, viewHeight * 0.6);
-    var screenX = foot.x - camera.x, screenY = foot.y - camera.y;
-    if (screenX >= marginLeft && screenX <= viewWidth - marginRight && screenY >= marginTop && screenY <= viewHeight - marginBottom) return;
+    var frame = frameFor(unit.x, unit.y, unit.elevation, unit.height || 2);
+    if (frame.inside) return;
     var middle = Iso.toScreen((selected.x + unit.x) / 2, (selected.y + unit.y) / 2, (selected.elevation + unit.elevation) / 2);
-    var cameraX = middle.x - viewWidth / 2, cameraY = middle.y - viewHeight / 2;
-    cameraX = Math.max(foot.x - (viewWidth - marginRight), Math.min(foot.x - marginLeft, cameraX));
-    cameraY = Math.max(foot.y - (viewHeight - marginBottom), Math.min(foot.y - marginTop, cameraY));
-    camera.x = cameraX; camera.y = cameraY;
+    camera.x = Math.max(frame.minX, Math.min(frame.maxX, middle.x - viewWidth / 2));
+    camera.y = Math.max(frame.minY, Math.min(frame.maxY, middle.y - viewHeight / 2));
     clampCamera();
+  }
+  // Кадр для фигуры высотой heightMeters, стоящей в точке (col, row, elevation): виден ли он сейчас целиком
+  // с отступами от краёв и блоков интерфейса (сверху — блок хода и подсказка, до ~120 px, и метка шанса над головой;
+  // справа — колонка меток), и в каких пределах может стоять камера, чтобы он был виден.
+  function frameFor(col, row, elevation, heightMeters) {
+    var foot = Iso.toScreen(col, row, elevation);
+    var marginLeft = 160, marginRight = 200, marginBottom = 80;
+    var marginTop = Math.min(heightMeters * Iso.pixelsPerMeterUp + 200, viewHeight * 0.6);
+    var screenX = foot.x - camera.x, screenY = foot.y - camera.y;
+    return {
+      inside: screenX >= marginLeft && screenX <= viewWidth - marginRight && screenY >= marginTop && screenY <= viewHeight - marginBottom,
+      minX: foot.x - (viewWidth - marginRight), maxX: foot.x - marginLeft,
+      minY: foot.y - (viewHeight - marginBottom), maxY: foot.y - marginTop
+    };
   }
   function drawMarkedEnemy() {
     if (!markedEnemy || markedEnemy.dead) return;
@@ -1548,8 +1563,77 @@
     });
     return moveTo(choiceItem, hurt ? 'отход' : choiceItem && choiceItem.shootable.length ? 'позиция' : 'подход');
   }
+  // ---- показ выстрела пришельца в его ход (при настройке «Камера следит за пришельцами») ----
+  // 1) камера на стрелявшем: видны поворот, вспышка у ствола и вылет пули;
+  // 2) если место попадания не видно в этом кадре — камера переходит к нему; пули очереди долетают уже при новом кадре
+  //    (их полёт для вида растягивается до момента перехода, на расчёт попадания это не влияет);
+  // 3) после последней пули — пауза: на цифру урона, промах, а если боец убит — на всё падение;
+  // 4) камера возвращается на стрелявшего, и он продолжает ход.
+  // Если стрелок и цель видны в одном кадре, камера не двигается, остаётся только пауза из п. 3.
+  var shotView = null;
+  var SHOT_VIEW_MS = { shooter: 450, arrive: 250, hit: 900, miss: 600, afterFall: 700 };
+  function startShotView(shooter, target) {
+    if (!Settings.values.followAliens) return;
+    var volley = shots.filter(function (shot) { return shot.shooter === shooter && !shot.result; });
+    if (!volley.length) return;
+    var speed = Settings.values.aiSpeed;
+    var view = { shooter: shooter, target: target.unit || null, point: target.point, volley: volley, stage: 'shooter', hit: false, killed: null };
+    var targetHeight = target.unit ? target.unit.height : 1;
+    var targetFoot = target.unit ? { x: target.unit.x, y: target.unit.y, h: target.unit.elevation } : target.point;
+    view.cut = !frameFor(targetFoot.x, targetFoot.y, targetFoot.h, targetHeight).inside;
+    if (view.cut) {
+      view.switchAt = volley[0].start + SHOT_VIEW_MS.shooter / speed;
+      volley.forEach(function (shot, index) { shot.arriveNotBefore = view.switchAt + (SHOT_VIEW_MS.arrive + index * 120) / speed; });
+    }
+    volley.forEach(function (shot) { shot.view = view; });
+    shotView = view;
+  }
+  // куда смотреть после выстрела: на цель, а если пуля остановилась на укрытии ближе цели — на место попадания
+  function lookAtImpact(view) {
+    var first = view.volley[0], target = view.target;
+    var stoppedShort = false;
+    if (first.result && first.result.kind !== 'unit' && target) {
+      var shooterX = view.shooter.x, shooterY = view.shooter.y;
+      var toImpact = Math.hypot(first.result.point.x - shooterX, first.result.point.y - shooterY);
+      var toTarget = Math.hypot(target.x - shooterX, target.y - shooterY);
+      stoppedShort = toImpact < toTarget - 1;
+    }
+    if (target && !stoppedShort) {
+      centerOn(target.x, target.y, target.elevation + target.height / 2);
+      var level = followLevel(target);
+      setView(level, isIndoor(target.col, target.row, target.level) || isIndoor(target.col, target.row, level));
+    } else {
+      var point = first.result ? first.result.point : view.point;
+      centerOn(point.x, point.y, point.h);
+    }
+  }
+  function fallTime(unit) {
+    var corpse = corpses.filter(function (item) { return item.x === unit.x && item.y === unit.y; }).pop();
+    return corpse ? Math.max(0, (corpse.fallFrames - (corpse.fallSkip || 0)) * corpse.frameTime) : 0;
+  }
+  function updateShotView(now) {
+    var view = shotView;
+    if (!view) return;
+    var speed = Settings.values.aiSpeed;
+    if (view.stage === 'shooter') {
+      if (view.cut && now < view.switchAt) return;
+      if (view.cut) lookAtImpact(view);
+      view.stage = 'impact';
+    }
+    if (view.stage === 'impact') {
+      if (view.volley.some(function (shot) { return !shot.done; })) return;
+      var hold = view.killed ? fallTime(view.killed) + SHOT_VIEW_MS.afterFall : view.hit ? SHOT_VIEW_MS.hit : SHOT_VIEW_MS.miss;
+      view.until = now + hold / speed;
+      view.stage = 'hold';
+    }
+    if (view.stage === 'hold' && now >= view.until) {
+      shotView = null;
+      if (view.cut && !view.shooter.dead && units.indexOf(view.shooter) >= 0) watchUnit(view.shooter);
+      aiWaitUntil = Math.max(aiWaitUntil, now + 250 / speed);
+    }
+  }
   function updateAI(now) {
-    if (phase !== 'aliens' || now < aiWaitUntil || shots.length) return;
+    if (phase !== 'aliens' || now < aiWaitUntil || shots.length || shotView) return;
     if (units.some(function (unit) { return unit.path.length > 0; })) return;
     if (!combat) { finishAlienPhase(); return; }
     while (aiQueue.length && (aiQueue[0].dead || units.indexOf(aiQueue[0]) < 0)) aiQueue.shift();
@@ -1559,7 +1643,7 @@
     var decision = aiDecide(alien);
     if (decision && decision.fire) {
       watchUnit(alien);
-      fire(alien, decision.fire, decision.mode);
+      if (fire(alien, decision.fire, decision.mode)) startShotView(alien, decision.fire);
       alien.aiShots = (alien.aiShots || 0) + 1;
       aiWaitUntil = now + 450 / Settings.values.aiSpeed;
       return;
@@ -2758,6 +2842,7 @@
     updateShots(now);
     updateThrows(now);
     updateWrecks(now);
+    updateShotView(now);
     updateAI(now);
     updateMusic(now);
     updateSpotted(now);
