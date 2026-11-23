@@ -27,7 +27,7 @@ var Panel = (function () {
     { id: 'aim', label: 'ПРИЦЕЛ', key: '3' },
     { id: 'reload', label: 'ЗАРЯДИТЬ', key: '4' },
     { id: 'grenade', label: 'ГРАНАТА', key: '5', disabled: 'Пока не работает' },
-    { id: 'gear', label: 'СНАРЯЖ.', key: '6', disabled: 'Пока не работает' },
+    { id: 'gear', label: 'СНАРЯЖ.', key: '6' },
     { id: 'next', label: 'ДАЛЕЕ', key: '7' },
     { id: 'up', label: 'ВЫШЕ', key: '8', disabled: 'На карте один уровень' },
     { id: 'down', label: 'НИЖЕ', key: '9', disabled: 'На карте один уровень' },
@@ -73,6 +73,11 @@ var Panel = (function () {
       if (action !== 'step') Game.action(action);
     });
   });
+
+  // щелчок по портрету — экран снаряжения
+  element('portrait').parentNode.addEventListener('click', function () { Game.action('gear'); });
+  element('portrait').parentNode.style.cursor = 'pointer';
+  element('portrait').parentNode.title = 'Снаряжение (6, I)';
 
   var modesElement = element('modes');   // строки режимов заполняет update()
 
@@ -193,7 +198,7 @@ var Panel = (function () {
     }
     setImage('portrait', 'assets/ui/portrait_' + unit.portrait + '.png');
     setClass(inner, 'unarmed', !unit.weapon);
-    if (unit.weapon) setImage('weapon-image', 'assets/ui/weapon_' + unit.camo + '.png');
+    if (unit.weapon) setImage('weapon-image', unit.weaponImage || 'assets/ui/weapon_' + unit.camo + '.png');
     setText('callsign', unit.callsign);
     setText('rank', unit.rank);
     setText('unit-name', unit.name);

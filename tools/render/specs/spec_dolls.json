@@ -1,0 +1,3 @@
+[{"name": "doll_black", "directions": [0], "options": {"camo": "black", "pose": "doll", "nvg": true, "scarf": true, "suppressor": true}},
+ {"name": "doll_green", "directions": [0], "options": {"camo": "green", "pose": "doll", "goggles": true, "tanRifle": true}},
+ {"name": "doll_alien", "directions": [0], "options": {"alien": true, "pose": "doll"}}]
