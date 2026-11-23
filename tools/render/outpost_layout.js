@@ -145,7 +145,7 @@ export function buildLayout() {
   // ---------------- двор ----------------
   object('container', 0, 13, 13, 2, 4, { color: 'orange' });
   object('container', 0, 1, 12, 2, 4, { color: 'blue' });
-  object('rover', 0, 8, 13, 2, 3);
+  object('truck', 0, 8, 12, 2, 5);                 // армейский грузовик 6×6 с кунгом (vehicles.js)
   object('tank', 0, 21, 4, 2, 3);
   object('generator', 0, 12, 1, 2, 2);
   for (const [col, row] of [[13, 9], [14, 10], [13, 10], [2, 10], [12, 7], [11, 12], [6, 12]]) object('crate', 0, col, row);

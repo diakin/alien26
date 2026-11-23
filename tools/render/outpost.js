@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { toXZ } from './world.js';
-import { TILE, LEVEL_H } from './outpost_layout.js';
+import { TILE, TILES, LEVELS, LEVEL_H } from './outpost_layout.js';
 import { layout, PPM, SS, SIZE, CENTER, V, renderer, scene, buildWorld, getDoorLeaves, getGroundGroup } from './outpost_scene.js';
 
 // ---------------- камера и кадр ----------------

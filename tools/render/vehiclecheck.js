@@ -1,0 +1,45 @@
+// Проверка моделей машин (vehicles.js): изометрическая камера под 35°, четыре стороны, солнце как на карте.
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import * as vehicles from './vehicles.js';
+const VIEW = 480;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(VIEW * 2, VIEW * 2);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setScissorTest(true);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc9b48e);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.25;
+scene.add(new THREE.HemisphereLight(0xc8dcff, 0x46502c, 0.7));
+const sun = new THREE.DirectionalLight(0xfff4e0, 4.2);
+sun.position.set(-8, 11, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 40 });
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xc9b48e, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+window.check = (name, lengthKey) => {
+  const model = vehicles[name]();
+  const length = vehicles[lengthKey].length;
+  model.position.z = -length / 2;
+  const holder = new THREE.Group(); holder.add(model); scene.add(holder);
+  const angle = 35 * Math.PI / 180;
+  [0.785, 2.356, 3.927, 5.498].forEach((yaw, index) => {
+    holder.rotation.y = yaw;
+    const camera = new THREE.OrthographicCamera(-4.2, 4.2, 4.2, -4.2, 0.1, 100);
+    camera.position.set(Math.cos(angle) * 30 * Math.sin(0), Math.sin(angle) * 30 + 1.2, Math.cos(angle) * 30);
+    camera.lookAt(0, 1.2, 0);
+    renderer.setViewport((index % 2) * VIEW, (1 - Math.floor(index / 2)) * VIEW, VIEW, VIEW);
+    renderer.setScissor((index % 2) * VIEW, (1 - Math.floor(index / 2)) * VIEW, VIEW, VIEW);
+    renderer.render(scene, camera);
+  });
+  scene.remove(holder);
+  return renderer.domElement.toDataURL('image/png');
+};
+window.ready = true;

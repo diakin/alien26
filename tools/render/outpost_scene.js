@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mulberry32, rockTextures, rockGeometry, screenTexture, setEnvIntensity } from './lib.js';
 import { toXZ, bladeGeometry, grassMaterial } from './world.js';
 import { buildLayout, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES } from './outpost_layout.js';
+import { buildArmyTruck, ARMY_TRUCK } from './vehicles.js';
 import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
   concreteTextures, groundBumpTexture, groundTexture,
@@ -459,6 +460,13 @@ export function buildObject(item, viewLevel) {
       void body;
       for (const x of [0.12, width - 0.12]) for (const z of [0.12, depth - 0.12]) for (const y of [0.1, 2.4]) add(box(0.18, 0.2, 0.18, MAT.darkSteel(), x, y, z));
       for (const x of [cx - 0.35, cx + 0.35]) add(box(0.04, 2.3, 0.04, MAT.steel(), x, 1.25, depth - 0.06));
+      break;
+    }
+    case 'truck': {
+      // армейский грузовик 6×6 с кунгом (vehicles.js): вдоль рядов, перед в сторону больших рядов
+      const truck = buildArmyTruck();
+      truck.position.set(cx, 0, (depth - ARMY_TRUCK.length) / 2);
+      add(truck);
       break;
     }
     case 'rover': {
