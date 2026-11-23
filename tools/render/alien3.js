@@ -347,14 +347,19 @@ export function buildParts(spec) {
       return point;
     });
   const tailRadii = [0.075, 0.058, 0.042, 0.029, 0.018, 0.009];
-  tailPoints.forEach((point, index) => { point.y = Math.max(point.y, tailRadii[index] + 0.004); });
+  // у лежащего на боку хвост ложится на землю: высота после укладки — координата x, земля на spec.tailLevel
+  if (spec.tailLevel !== undefined) {
+    tailPoints.forEach((point, index) => { point.x += (spec.tailLevel + tailRadii[index] - point.x) * Math.min(1, index / 2); });
+  } else {
+    tailPoints.forEach((point, index) => { point.y = Math.max(point.y, tailRadii[index] + 0.004); });
+  }
   for (let index = 0; index < tailPoints.length - 1; index++) {
     field.cone(tail, tailPoints[index], tailPoints[index + 1], tailRadii[index], tailRadii[index + 1], { k: 0.04, cell: 0.036 - index * 0.003 });
   }
 
   // шея и голова: голова выдвинута вперёд, шея толстая, переходит в трапеции
   const neckBase = torso.point(0, 0.6, 0.02);
-  const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.headTilt, -spec.twist * 0.6, 0, 'YXZ'));
+  const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.headTilt, -spec.twist * 0.6, spec.headRoll || 0, 'YXZ'));
   const headBase = neckBase.clone().add(V(0, 0.17, 0.08).applyQuaternion(headQuat));
   const head = new Bone(headBase, headQuat, V(-0.31, 0.77, 0.13));
   const neck = limbBone(neckBase, headBase, forward, V(0.22, -0.44, 0.61));
@@ -443,8 +448,8 @@ export function buildParts(spec) {
     const toe = spec.toes[sideIndex].clone();
     const toeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.toePitch[sideIndex], 0, 0));
     const ankle = toe.clone().add(V(0, 0.27, -0.15).applyQuaternion(toeQuat));
-    const knee = solveTwoBone(hip, ankle, 0.5, 0.46, V(0, 0, 1));
-    legs.push({ side, hip: hip.clone(), knee: knee.clone() });
+    const knee = solveTwoBone(hip, ankle, 0.5, 0.46, spec.kneePoles ? spec.kneePoles[sideIndex].clone() : V(0, 0, 1));
+    legs.push({ side, hip: hip.clone(), knee: knee.clone(), ankle: ankle.clone(), toe: toe.clone() });
     const outer = -side;
     const thigh = limbBone(hip, knee, forward, V(side * 0.29, 0.41, -0.17));
     const thighLength = thigh.length;
@@ -542,7 +547,7 @@ export function buildParts(spec) {
     eyes: mergeGeometries(eyes),
     head: head.point(0, 0.1, 0.02),
     // опорные точки для снаряжения: корпус, руки, ноги
-    rig: { torso, forward, hands: hands.map(({ side, hand, elbow, shoulder, fore }) => ({ side, hand, elbow, shoulder, along: fore.direction(0, 1, 0) })), legs },
+    rig: { torso, forward, tail: tailPoints.map((point) => point.clone()), hands: hands.map(({ side, hand, elbow, shoulder, fore }) => ({ side, hand, elbow, shoulder, along: fore.direction(0, 1, 0) })), legs },
   };
 }
 
@@ -824,5 +829,6 @@ export function buildReptileAlien(pose = 'idle') {
   if (spec.gear !== false) alien.add(buildAlienGear(parts.rig, spec));
   setShadows(alien);
   alien.userData.head = parts.head.clone();
+  alien.userData.rig = parts.rig;
   return alien;
 }
