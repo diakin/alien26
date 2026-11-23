@@ -48,151 +48,207 @@ function tubeMesh(group, points, radius, material) {
   group.add(shadowed(new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 8, radius, 8), material)));
 }
 
-// колесо повышенной проходимости: шина с грунтозацепами «ёлочкой», диск со ступицей и болтами
+// Деталь по боковому профилю: контур в плоскости (z, y), вытянут поперёк машины на width, кромки скруглены.
+function sideExtrude(group, points, width, material, x, bevel = 0.025) {
+  const shape = new THREE.Shape();
+  points.forEach(([z, y], index) => { if (index === 0) shape.moveTo(-z, y); else shape.lineTo(-z, y); });
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: width - bevel * 2, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 4 });
+  geometry.rotateY(Math.PI / 2);                 // x контура (−z) → z, вытяжка — вдоль x
+  const mesh = shadowed(new THREE.Mesh(geometry, material));
+  mesh.position.x = x - width / 2 + bevel;
+  group.add(mesh);
+  return mesh;
+}
+// Деталь по поперечному сечению: контур в плоскости (x, y), вытянут вдоль машины от z0 до z1;
+// shape(t) может сужать сечение к переду (t — доля длины от z0).
+function crossExtrude(group, outline, z0, z1, material, taper = () => ({ scale: 1, drop: 0 }), bevel = 0.02) {
+  const shape = new THREE.Shape();
+  outline.forEach(([x, y], index) => { if (index === 0) shape.moveTo(x, y); else shape.lineTo(x, y); });
+  const length = z1 - z0;
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: length - bevel * 2, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, steps: 8, curveSegments: 6 });
+  const position = geometry.attributes.position;
+  for (let index = 0; index < position.count; index++) {
+    const t = Math.min(1, Math.max(0, (position.getZ(index) + bevel) / length));
+    const { scale, drop } = taper(t);
+    position.setX(index, position.getX(index) * scale);
+    position.setY(index, position.getY(index) - drop * Math.max(0, position.getY(index)));
+  }
+  geometry.computeVertexNormals();
+  const mesh = shadowed(new THREE.Mesh(geometry, material));
+  mesh.position.z = z0 + bevel;
+  group.add(mesh);
+  return mesh;
+}
+// скруглённый прямоугольник: контур (x, y) с центром в 0
+function roundedOutline(width, height, radiusTop, radiusBottom = 0.03, y0 = 0) {
+  const points = [], halfWidth = width / 2;
+  const arc = (cx, cy, radius, from, to) => { for (let step = 0; step <= 6; step++) { const angle = from + (to - from) * step / 6; points.push([cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius]); } };
+  arc(halfWidth - radiusBottom, y0 + radiusBottom, radiusBottom, -Math.PI / 2, 0);
+  arc(halfWidth - radiusTop, y0 + height - radiusTop, radiusTop, 0, Math.PI / 2);
+  arc(-halfWidth + radiusTop, y0 + height - radiusTop, radiusTop, Math.PI / 2, Math.PI);
+  arc(-halfWidth + radiusBottom, y0 + radiusBottom, radiusBottom, Math.PI, Math.PI * 1.5);
+  return points;
+}
+
+// то же сечение, уменьшенное на скругление кромок вытяжки (оно наращивает контур наружу)
+function section(width, height, radiusTop, radiusBottom, y0, bevel) {
+  return roundedOutline(width - bevel * 2, height - bevel * 2, Math.max(0.01, radiusTop - bevel), Math.max(0.01, radiusBottom - bevel), y0 + bevel);
+}
+
+// колесо повышенной проходимости: шина с округлым профилем и грунтозацепами «ёлочкой», диск со ступицей и болтами
 function wheel(group, x, y, z, radius, width, outward) {
   const material = getMaterials();
-  const tire = cylinderMesh(group, radius, width, material.rubber, x, y, z, 'x', 32);
-  void tire;
-  // боковина чуть светлее от пыли
-  cylinderMesh(group, radius * 0.92, width + 0.01, material.rubberDusty, x, y, z, 'x', 32);
-  // грунтозацепы: по кругу, наклон чередуется
-  const lugs = 22;
+  const inner = radius * 0.58, shoulder = 0.09, half = width / 2;
+  const profile = [new THREE.Vector2(inner, -half)];
+  for (let step = 0; step <= 6; step++) { const angle = -Math.PI / 2 + step / 6 * Math.PI / 2; profile.push(new THREE.Vector2(radius - shoulder + Math.cos(angle) * shoulder, -half + shoulder + Math.sin(angle) * shoulder)); }
+  for (let step = 0; step <= 6; step++) { const angle = step / 6 * Math.PI / 2; profile.push(new THREE.Vector2(radius - shoulder + Math.cos(angle) * shoulder, half - shoulder + Math.sin(angle) * shoulder)); }
+  profile.push(new THREE.Vector2(inner, half));
+  const tire = shadowed(new THREE.Mesh(new THREE.LatheGeometry(profile, 36), material.rubber));
+  tire.rotation.z = Math.PI / 2;
+  tire.position.set(x, y, z);
+  group.add(tire);
+  // грунтозацепы: по кругу, «ёлочкой» к середине протектора
+  const lugs = 20;
   for (let index = 0; index < lugs; index++) {
     const angle = index / lugs * Math.PI * 2;
-    for (const half of [-1, 1]) {
-      const lug = boxMesh(group, width * 0.42, 0.045, 0.07, material.rubber,
-        x + half * width * 0.22, y + Math.cos(angle) * radius, z + Math.sin(angle) * radius);
-      lug.rotation.set(angle, half * 0.45 * (index % 2 ? 1 : -1), 0);
+    for (const side of [-1, 1]) {
+      const lug = boxMesh(group, width * 0.36, 0.04, 0.075, material.rubber, x + side * width * 0.2, y + Math.cos(angle) * (radius + 0.005), z + Math.sin(angle) * (radius + 0.005), 0.015);
+      lug.rotation.set(angle, side * 0.5, 0);
     }
   }
-  // диск и ступица с внешней стороны
-  const face = x + outward * (width / 2 + 0.005);
-  cylinderMesh(group, radius * 0.56, 0.03, material.hub, face, y, z, 'x', 24);
-  cylinderMesh(group, radius * 0.2, 0.09, material.hub, face + outward * 0.03, y, z, 'x', 16);
+  // диск, ступица и болты — с внешней стороны
+  const face = x + outward * (half - 0.03);
+  cylinderMesh(group, inner, 0.05, material.hub, face, y, z, 'x', 28);
+  cylinderMesh(group, radius * 0.24, 0.08, material.hub, face + outward * 0.04, y, z, 'x', 18);
+  cylinderMesh(group, radius * 0.12, 0.05, material.frame, face + outward * 0.08, y, z, 'x', 12);
   for (let index = 0; index < 8; index++) {
     const angle = index / 8 * Math.PI * 2;
-    cylinderMesh(group, 0.018, 0.04, material.steel, face + outward * 0.02, y + Math.cos(angle) * radius * 0.36, z + Math.sin(angle) * radius * 0.36, 'x', 6);
+    cylinderMesh(group, 0.018, 0.04, material.steel, face + outward * 0.03, y + Math.cos(angle) * radius * 0.36, z + Math.sin(angle) * radius * 0.36, 'x', 6);
   }
 }
 
-// Армейский грузовик 6×6 с капотной кабиной и кузовом-фургоном (кунгом). Длина около 6,1 м, ширина 2,35 м,
-// высота по кунгу 3,2 м. Передняя ось под капотом, задние — сдвоенной тележкой под кунгом.
+// Армейский грузовик 6×6 с капотной кабиной и кузовом-фургоном (кунгом), по типу советских машин 1960-х—70-х:
+// скруглённый капот, сужающийся к носу, крылья с плавной аркой, переходящие в подножку, кабина и кунг со скруглёнными
+// гранями. Длина около 6,15 м, ширина 2,35 м, высота по кунгу 3,2 м.
 export const ARMY_TRUCK = { length: 6.15, width: 2.35 };
 export function buildArmyTruck() {
   const material = getMaterials();
   const truck = new THREE.Group();
-  const wheelRadius = 0.53, wheelWidth = 0.32, track = 0.95;
-  const axles = [1.0, 2.25, 5.0];
-  const frameTop = 0.98;
-  // колёса
+  const wheelRadius = 0.5, wheelWidth = 0.34, track = 0.95;
+  const frontAxle = 5.1, axles = [1.12, 2.3, frontAxle];
+  const frameTop = 0.95;
   for (const z of axles) for (const side of [-1, 1]) wheel(truck, side * track, wheelRadius, z, wheelRadius, wheelWidth, side);
-  // рама, мосты
-  for (const side of [-1, 1]) boxMesh(truck, 0.12, 0.24, 5.7, material.frame, side * 0.46, frameTop - 0.12, 3.05);
+  // рама и мосты
+  for (const side of [-1, 1]) boxMesh(truck, 0.12, 0.22, 5.75, material.frame, side * 0.45, frameTop - 0.11, 3.1);
   for (const z of axles) {
-    cylinderMesh(truck, 0.07, track * 2 - 0.2, material.frame, 0, wheelRadius, z, 'x', 12);
-    boxMesh(truck, 0.36, 0.3, 0.34, material.frame, 0, wheelRadius, z, 0.08);          // картер моста
+    cylinderMesh(truck, 0.065, track * 2 - 0.25, material.frame, 0, wheelRadius, z, 'x', 12);
+    const housing = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10), material.frame);
+    housing.scale.set(1.1, 0.9, 0.9); housing.position.set(0, wheelRadius, z);
+    truck.add(shadowed(housing));
   }
-  // передний бампер с буксирными крюками и лебёдкой
-  boxMesh(truck, 2.3, 0.22, 0.2, material.oliveDark, 0, 0.82, 6.05, 0.03);
+  // бампер: швеллер со скруглёнными концами, крюки, лебёдка за ним
+  boxMesh(truck, 2.25, 0.2, 0.16, material.oliveDark, 0, 0.8, 6.06, 0.06);
   for (const side of [-1, 1]) {
-    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 6, 12, Math.PI * 1.4), material.frame);
-    hook.position.set(side * 0.62, 0.74, 6.17); hook.rotation.set(0, Math.PI / 2, Math.PI * 0.8);
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.018, 6, 12, Math.PI * 1.4), material.frame);
+    hook.position.set(side * 0.6, 0.72, 6.16); hook.rotation.set(0, Math.PI / 2, Math.PI * 0.8);
     truck.add(shadowed(hook));
   }
-  boxMesh(truck, 0.62, 0.26, 0.26, material.frame, 0, 0.84, 5.84, 0.04);
-  cylinderMesh(truck, 0.1, 0.5, material.steel, 0, 0.88, 5.84, 'x', 14);
-  // капот: моторный отсек с покатой крышкой, решётка радиатора из вертикальных планок
-  boxMesh(truck, 1.16, 0.78, 1.32, material.olive, 0, 1.43, 5.33, 0.1);
-  const lid = boxMesh(truck, 1.1, 0.12, 1.3, material.olive, 0, 1.84, 5.31, 0.05);
-  lid.rotation.x = 0.06;
-  boxMesh(truck, 1.0, 0.66, 0.06, material.frame, 0, 1.42, 6.0, 0.02);
-  for (let slat = -3; slat <= 3; slat++) boxMesh(truck, 0.07, 0.6, 0.04, material.oliveDark, slat * 0.13, 1.42, 6.04, 0.015);
-  for (const side of [-1, 1]) for (let vent = 0; vent < 5; vent++) boxMesh(truck, 0.02, 0.18, 0.08, material.frame, side * 0.585, 1.5, 4.95 + vent * 0.14);
-  // крылья: плоские, над передними колёсами, с покатым передом и подножкой; фары на крыльях в решётчатой защите
+  boxMesh(truck, 0.6, 0.24, 0.24, material.frame, 0, 0.84, 5.86, 0.06);
+  cylinderMesh(truck, 0.1, 0.48, material.steel, 0, 0.88, 5.86, 'x', 14);
+  // капот: сечение со скруглённым верхом, к носу сужается и опускается
+  const hoodRear = 4.72, hoodFront = 6.0;
+  crossExtrude(truck, section(1.14, 0.78, 0.24, 0.02, 0.98, 0.03), hoodRear, hoodFront, material.olive,
+    (t) => ({ scale: 1 - 0.1 * t, drop: 0.045 * t * t }), 0.03);
+  // продольный шов капота и жалюзи по бокам
+  boxMesh(truck, 0.03, 0.02, hoodFront - hoodRear - 0.1, material.oliveDark, 0, 1.755, (hoodRear + hoodFront) / 2);
+  for (const side of [-1, 1]) for (let vent = 0; vent < 6; vent++) {
+    const louver = boxMesh(truck, 0.02, 0.2, 0.05, material.frame, side * 0.552, 1.38, 4.95 + vent * 0.11, 0.008);
+    louver.rotation.y = side * 0.15;
+  }
+  // облицовка радиатора: рамка со скруглёнными углами, вертикальные прорези
+  crossExtrude(truck, section(1.0, 0.68, 0.12, 0.04, 1.02, 0.012), hoodFront - 0.02, hoodFront + 0.05, material.olive, undefined, 0.012);
+  for (let slot = -4; slot <= 4; slot++) boxMesh(truck, 0.045, 0.5, 0.04, material.frame, slot * 0.09, 1.34, hoodFront + 0.045, 0.012);
+  // крылья: арка над колесом плавно переходит назад в подножку под дверью
+  const fenderOutline = [];
+  const ellipse = (radiusZ, radiusY, from, to, reverse) => {
+    const result = [];
+    for (let step = 0; step <= 20; step++) { const angle = from + (to - from) * step / 20; result.push([frontAxle + Math.cos(angle) * radiusZ, wheelRadius + Math.sin(angle) * radiusY]); }
+    return reverse ? result.reverse() : result;
+  };
+  fenderOutline.push(...ellipse(0.98, 0.72, 0.2, 2.75, false));            // наружная кромка: от переда через верх к заду
+  fenderOutline.push([3.62, 0.78], [3.62, 0.72]);                          // подножка до задней стенки кабины
+  fenderOutline.push(...ellipse(0.92, 0.66, 0.2, 2.75, true).slice(0, -1)); // внутренняя кромка обратно
+  // соединяем: внутренняя кромка заканчивается спереди, контур замкнётся сам
+  const step = [[frontAxle + Math.cos(2.75) * 0.92, wheelRadius + Math.sin(2.75) * 0.66]];
+  void step;
   for (const side of [-1, 1]) {
-    // арка крыла над колесом: профиль в плоскости (z, y), вытянут поперёк машины
-    const arch = new THREE.Shape(), center = { z: 5.0, y: wheelRadius }, inner = 0.66, outer = 0.71, from = 0.12, to = Math.PI - 0.25;
-    for (let step = 0; step <= 16; step++) {
-      const angle = from + (to - from) * step / 16;
-      const z = center.z + Math.cos(angle) * outer, y = center.y + Math.sin(angle) * outer;
-      if (step === 0) arch.moveTo(-z, y); else arch.lineTo(-z, y);
-    }
-    for (let step = 16; step >= 0; step--) {
-      const angle = from + (to - from) * step / 16;
-      arch.lineTo(-(center.z + Math.cos(angle) * inner), center.y + Math.sin(angle) * inner);
-    }
-    const archGeometry = new THREE.ExtrudeGeometry(arch, { depth: 0.46, bevelEnabled: false });
-    archGeometry.rotateY(Math.PI / 2);             // x профиля (−z) → z, вытяжка вдоль x
-    const archMesh = shadowed(new THREE.Mesh(archGeometry, material.olive));
-    archMesh.position.x = side * 0.95 - 0.23;
-    truck.add(archMesh);
-    boxMesh(truck, 0.46, 0.05, 0.5, material.olive, side * 0.95, center.y + outer * Math.sin(to) + 0.02 - 0.0, center.z + Math.cos(to) * outer - 0.25);
-    boxMesh(truck, 0.06, 0.55, 1.25, material.oliveDark, side * 0.72, 1.0, 5.1);          // внутренний щиток
-    cylinderMesh(truck, 0.11, 0.12, material.oliveDark, side * 0.86, 1.4, 5.74, 'z', 18);
-    cylinderMesh(truck, 0.085, 0.02, material.lens, side * 0.86, 1.4, 5.81, 'z', 18);
-    for (const bar of [-0.06, 0, 0.06]) boxMesh(truck, 0.012, 0.22, 0.012, material.frame, side * 0.86 + bar, 1.4, 5.84);
-    boxMesh(truck, 0.06, 0.04, 0.04, material.amber, side * 1.08, 1.32, 5.7);
+    sideExtrude(truck, fenderOutline, 0.44, material.olive, side * 0.93, 0.03);
+    // внутренний щиток между крылом и капотом
+    boxMesh(truck, 0.05, 0.45, 1.05, material.oliveDark, side * 0.7, 1.0, frontAxle + 0.05);
+    // фара в округлом корпусе на передке крыла, подфарник, решётка защиты
+    const housing = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), material.olive);
+    housing.scale.set(1, 1, 0.75); housing.position.set(side * 0.83, 1.13, 5.86);
+    truck.add(shadowed(housing));
+    cylinderMesh(truck, 0.09, 0.02, material.lens, side * 0.83, 1.13, 5.95, 'z', 18);
+    for (const bar of [-0.05, 0, 0.05]) boxMesh(truck, 0.012, 0.2, 0.012, material.frame, side * 0.83 + bar, 1.13, 5.99);
+    boxMesh(truck, 0.07, 0.045, 0.04, material.amber, side * 1.0, 1.2, 5.7, 0.01);
     // брызговик за передним колесом
-    boxMesh(truck, 0.36, 0.42, 0.02, material.rubber, side * 0.95, 0.62, 4.36);
+    boxMesh(truck, 0.36, 0.4, 0.02, material.rubber, side * 0.93, 0.55, frontAxle - 0.82);
   }
-  // кабина: прямоугольная, со скруглённой крышей; лобовое стекло из двух половин, боковые окна, двери
-  const cabFront = 4.72, cabRear = 3.6, cabZ = (cabFront + cabRear) / 2, cabLength = cabFront - cabRear;
-  boxMesh(truck, 1.3, 0.3, cabLength - 0.1, material.frame, 0, 1.1, cabZ);                         // подрамник кабины
-  boxMesh(truck, 2.2, 0.95, cabLength, material.olive, 0, 1.72, cabZ, 0.08);
-  boxMesh(truck, 2.14, 0.5, cabLength - 0.06, material.olive, 0, 2.38, cabZ - 0.03, 0.12);
+  // кабина: нижняя часть и верх со скруглённой крышей; лобовое стекло из двух половин, двери с окнами
+  const cabFront = 4.74, cabRear = 3.62, cabZ = (cabFront + cabRear) / 2, cabLength = cabFront - cabRear;
+  boxMesh(truck, 1.3, 0.24, cabLength - 0.1, material.frame, 0, 1.06, cabZ);
+  crossExtrude(truck, section(2.18, 0.98, 0.1, 0.05, 1.0, 0.05), cabRear, cabFront, material.olive, undefined, 0.05);
+  crossExtrude(truck, section(2.08, 0.6, 0.3, 0.02, 1.95, 0.06), cabRear + 0.04, cabFront - 0.1, material.olive,
+    (t) => ({ scale: 1, drop: 0.02 * t }), 0.06);
   for (const side of [-1, 1]) {
-    const pane = boxMesh(truck, 0.92, 0.4, 0.03, material.glass, side * 0.5, 2.4, cabFront + 0.01);
-    pane.rotation.x = -0.12;
-    boxMesh(truck, 0.03, 0.34, 0.62, material.glass, side * 1.105, 2.38, cabZ + 0.12);          // окно двери
-    boxMesh(truck, 0.03, 0.85, 0.02, material.oliveDark, side * 1.105, 1.85, cabZ - 0.3);        // шов двери
-    boxMesh(truck, 0.03, 0.03, 0.12, material.steel, side * 1.11, 2.02, cabZ - 0.18);             // ручка
-    // зеркало на кронштейне
-    tubeMesh(truck, [[side * 1.1, 2.15, cabFront - 0.05], [side * 1.32, 2.3, cabFront + 0.05], [side * 1.34, 2.5, cabFront + 0.05]], 0.014, material.frame);
-    boxMesh(truck, 0.04, 0.26, 0.16, material.frame, side * 1.35, 2.52, cabFront + 0.05);
-    // подножка и топливный бак / ящик АКБ под кабиной
-    boxMesh(truck, 0.32, 0.04, 0.45, material.frame, side * 0.95, 0.92, cabZ);
+    const pane = boxMesh(truck, 0.86, 0.4, 0.03, material.glass, side * 0.49, 2.24, cabFront - 0.07, 0.02);
+    pane.rotation.x = -0.18;
+    boxMesh(truck, 0.03, 0.36, 0.6, material.glass, side * 1.042, 2.2, cabZ + 0.14, 0.02);     // окно двери
+    boxMesh(truck, 0.03, 0.85, 0.02, material.oliveDark, side * 1.1, 1.55, cabZ - 0.28);       // шов двери
+    boxMesh(truck, 0.03, 0.03, 0.12, material.steel, side * 1.105, 1.8, cabZ - 0.16);           // ручка
+    tubeMesh(truck, [[side * 1.05, 2.0, cabFront - 0.1], [side * 1.28, 2.12, cabFront], [side * 1.31, 2.34, cabFront]], 0.014, material.frame);
+    boxMesh(truck, 0.04, 0.26, 0.16, material.frame, side * 1.32, 2.36, cabFront, 0.015);
   }
-  boxMesh(truck, 0.05, 0.4, 0.04, material.oliveDark, 0, 2.4, cabFront + 0.03);                     // стойка между стёклами
-  for (const x of [-0.25, 0, 0.25]) boxMesh(truck, 0.07, 0.04, 0.05, material.amber, x, 2.63, cabFront - 0.04);   // фонари на крыше
-  cylinderMesh(truck, 0.28, 0.85, material.oliveDark, 0.92, 0.82, 3.05, 'z', 20);                  // топливный бак
-  for (const z of [2.75, 3.35]) boxMesh(truck, 0.04, 0.62, 0.05, material.frame, 0.92, 0.82, z);
-  boxMesh(truck, 0.5, 0.42, 0.6, material.oliveDark, -0.9, 0.86, 3.05, 0.04);                      // ящик АКБ
-  // выхлоп за кабиной
-  tubeMesh(truck, [[0.55, 1.05, cabRear - 0.02], [0.75, 1.3, cabRear - 0.08], [0.78, 2.7, cabRear - 0.08]], 0.045, material.frame);
-  // кунг: короб на раме, окна с рамками, дверь сзади, лестница, багажник на крыше, отопитель спереди
-  const bodyFront = 3.48, bodyRear = 0.1, bodyLength = bodyFront - bodyRear, bodyZ = (bodyFront + bodyRear) / 2;
-  const bodyBottom = 1.14, bodyHeight = 2.05;
+  boxMesh(truck, 0.06, 0.42, 0.04, material.oliveDark, 0, 2.24, cabFront - 0.06);
+  boxMesh(truck, 1.1, 0.28, 0.03, material.glass, 0, 2.22, cabRear + 0.03, 0.02);                 // заднее окно
+  for (const x of [-0.25, 0, 0.25]) boxMesh(truck, 0.07, 0.04, 0.05, material.amber, x, 2.55, cabFront - 0.18, 0.01);
+  // под кабиной: топливный бак, ящик аккумуляторов; выхлоп за кабиной
+  cylinderMesh(truck, 0.26, 0.85, material.oliveDark, 0.88, 0.78, 3.05, 'z', 20);
+  for (const z of [2.75, 3.35]) boxMesh(truck, 0.04, 0.58, 0.05, material.frame, 0.88, 0.78, z);
+  boxMesh(truck, 0.5, 0.4, 0.62, material.oliveDark, -0.88, 0.82, 3.05, 0.05);
+  tubeMesh(truck, [[0.55, 1.0, cabRear - 0.02], [0.75, 1.25, cabRear - 0.08], [0.78, 2.65, cabRear - 0.08]], 0.045, material.frame);
+  // кунг: короб со скруглёнными гранями, окна в рамках, рёбра, дверь сзади с лестницей, багажник, отопитель
+  const bodyFront = 3.5, bodyRear = 0.12, bodyLength = bodyFront - bodyRear, bodyZ = (bodyFront + bodyRear) / 2;
+  const bodyBottom = 1.1, bodyHeight = 2.08;
   boxMesh(truck, 2.08, 0.12, bodyLength, material.frame, 0, bodyBottom - 0.06, bodyZ);
-  boxMesh(truck, 2.35, bodyHeight, bodyLength, material.olive, 0, bodyBottom + bodyHeight / 2, bodyZ, 0.06);
+  crossExtrude(truck, section(2.35, bodyHeight, 0.2, 0.05, bodyBottom, 0.08), bodyRear, bodyFront, material.olive, undefined, 0.08);
   for (const side of [-1, 1]) {
-    for (const z of [0.85, 1.75, 2.65]) {
-      boxMesh(truck, 0.03, 0.42, 0.6, material.oliveDark, side * 1.177, bodyBottom + 1.45, z, 0.02);
-      boxMesh(truck, 0.03, 0.34, 0.52, material.glass, side * 1.185, bodyBottom + 1.45, z);
+    for (const z of [0.88, 1.78, 2.68]) {
+      boxMesh(truck, 0.03, 0.44, 0.62, material.oliveDark, side * 1.177, bodyBottom + 1.45, z, 0.03);
+      boxMesh(truck, 0.03, 0.34, 0.52, material.glass, side * 1.186, bodyBottom + 1.45, z, 0.02);
     }
-    for (const y of [bodyBottom + 0.35, bodyBottom + 1.0]) boxMesh(truck, 0.02, 0.03, bodyLength - 0.2, material.oliveDark, side * 1.18, y, bodyZ);   // рёбра жёсткости
-    boxMesh(truck, 0.32, 0.38, 0.5, material.oliveDark, side * 1.03, bodyBottom - 0.25, 1.62, 0.04);               // инструментальные ящики
+    for (const y of [bodyBottom + 0.38, bodyBottom + 1.02]) boxMesh(truck, 0.02, 0.03, bodyLength - 0.3, material.oliveDark, side * 1.178, y, bodyZ);
+    boxMesh(truck, 0.3, 0.36, 0.5, material.oliveDark, side * 1.0, bodyBottom - 0.24, 1.71, 0.05);
   }
-  // задняя дверь и лестница
-  boxMesh(truck, 0.86, 1.75, 0.03, material.oliveDark, -0.45, bodyBottom + 0.9, bodyRear - 0.01, 0.02);
-  boxMesh(truck, 0.3, 0.26, 0.03, material.glass, -0.45, bodyBottom + 1.45, bodyRear - 0.03);
+  boxMesh(truck, 0.86, 1.75, 0.03, material.oliveDark, -0.45, bodyBottom + 0.92, bodyRear - 0.01, 0.03);
+  boxMesh(truck, 0.3, 0.26, 0.03, material.glass, -0.45, bodyBottom + 1.45, bodyRear - 0.03, 0.02);
   boxMesh(truck, 0.03, 0.03, 0.14, material.steel, -0.1, bodyBottom + 0.9, bodyRear - 0.05);
   for (const x of [-0.75, -0.15]) boxMesh(truck, 0.03, 0.9, 0.03, material.frame, x, bodyBottom - 0.3, bodyRear - 0.12);
-  for (let step = 0; step < 4; step++) boxMesh(truck, 0.6, 0.025, 0.03, material.frame, -0.45, bodyBottom - 0.65 + step * 0.22, bodyRear - 0.12);
+  for (let rung = 0; rung < 4; rung++) boxMesh(truck, 0.6, 0.025, 0.03, material.frame, -0.45, bodyBottom - 0.65 + rung * 0.22, bodyRear - 0.12);
   for (const side of [-1, 1]) {
-    boxMesh(truck, 0.14, 0.08, 0.04, material.red, side * 0.95, 0.95, bodyRear - 0.02);
-    boxMesh(truck, 0.42, 0.42, 0.02, material.rubber, side * 0.95, 0.62, 0.38);                // задние брызговики
+    boxMesh(truck, 0.14, 0.08, 0.04, material.red, side * 0.95, 0.92, bodyRear - 0.02, 0.02);
+    boxMesh(truck, 0.4, 0.4, 0.02, material.rubber, side * 0.95, 0.58, 0.45);
   }
-  // багажник на крыше
   const roof = bodyBottom + bodyHeight;
-  for (const side of [-1, 1]) tubeMesh(truck, [[side * 1.02, roof, 0.3], [side * 1.02, roof + 0.16, 0.45], [side * 1.02, roof + 0.16, 3.05], [side * 1.02, roof, 3.2]], 0.02, material.frame);
-  for (const z of [0.6, 1.4, 2.2, 3.0]) boxMesh(truck, 2.04, 0.025, 0.025, material.frame, 0, roof + 0.16, z);
-  boxMesh(truck, 1.2, 0.18, 0.9, material.canvas, -0.2, roof + 0.1, 1.2, 0.06);                  // свёрнутый тент
-  // отопитель-вентиляция на передней стенке кунга, над кабиной
-  boxMesh(truck, 0.62, 0.55, 0.32, material.oliveDark, 0.55, roof - 0.35, bodyFront + 0.17, 0.05);
-  cylinderMesh(truck, 0.12, 0.42, material.frame, 0.55, roof + 0.15, bodyFront + 0.17, 'y', 16);
-  cylinderMesh(truck, 0.16, 0.04, material.oliveDark, 0.55, roof + 0.37, bodyFront + 0.17, 'y', 16);
-  cylinderMesh(truck, 0.04, 0.9, material.frame, -0.7, roof + 0.4, bodyFront - 0.2, 'y', 8);         // мачта антенны
-  // пыль снизу: тонкий слой на кунге и кабине у земли
-  boxMesh(truck, 2.37, 0.18, bodyLength + 0.01, material.dusty, 0, bodyBottom + 0.09, bodyZ, 0.04);
+  for (const side of [-1, 1]) tubeMesh(truck, [[side * 0.98, roof - 0.02, 0.35], [side * 0.98, roof + 0.14, 0.5], [side * 0.98, roof + 0.14, 3.05], [side * 0.98, roof - 0.02, 3.2]], 0.02, material.frame);
+  for (const z of [0.65, 1.45, 2.25, 3.0]) boxMesh(truck, 1.96, 0.025, 0.025, material.frame, 0, roof + 0.14, z);
+  boxMesh(truck, 1.2, 0.18, 0.9, material.canvas, -0.2, roof + 0.08, 1.25, 0.08);
+  boxMesh(truck, 0.6, 0.55, 0.3, material.oliveDark, 0.55, roof - 0.38, bodyFront + 0.16, 0.08);
+  cylinderMesh(truck, 0.12, 0.42, material.frame, 0.55, roof + 0.12, bodyFront + 0.16, 'y', 16);
+  cylinderMesh(truck, 0.16, 0.04, material.oliveDark, 0.55, roof + 0.34, bodyFront + 0.16, 'y', 16);
+  cylinderMesh(truck, 0.035, 0.9, material.frame, -0.7, roof + 0.38, bodyFront - 0.2, 'y', 8);
+  // пыль у низа кунга
+  crossExtrude(truck, section(2.37, 0.16, 0.02, 0.05, bodyBottom - 0.005, 0.01), bodyRear + 0.01, bodyFront - 0.01, material.dusty, undefined, 0.01);
   return truck;
 }
