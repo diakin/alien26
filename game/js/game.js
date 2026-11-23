@@ -116,10 +116,14 @@
       var spot = Items.freeSpot(unit.inventory, entry[1], item);
       if (spot) unit.inventory.push({ item: item, slot: entry[1], x: spot.x, y: spot.y });
     });
+    // оружие — из руки, выбранной в меню режима огня (unit.activeHand), иначе из правой, иначе из левой
     var weaponEntry = function () {
-      for (var index = 0; index < unit.inventory.length; index++) {
-        var entry = unit.inventory[index];
-        if ((entry.slot === 'rightHand' || entry.slot === 'leftHand') && Items.info(entry.item).weapon && (entry.slot === 'rightHand' || !unit.inventory.some(function (other) { return other.slot === 'rightHand' && Items.info(other.item).weapon; }))) return entry;
+      var order = unit.activeHand === 'leftHand' ? ['leftHand', 'rightHand'] : ['rightHand', 'leftHand'];
+      for (var orderIndex = 0; orderIndex < order.length; orderIndex++) {
+        for (var index = 0; index < unit.inventory.length; index++) {
+          var entry = unit.inventory[index];
+          if (entry.slot === order[orderIndex] && Items.info(entry.item).weapon) return entry;
+        }
       }
       return null;
     };
@@ -187,31 +191,31 @@
   }
   var PROFILES = [
     { name: 'Андрей Волков', callsign: 'ВОРОН-1', rank: 'ст. сержант', role: 'ШТУРМОВИК', missions: 14, camo: 'black',
-      side: 'squad', accuracy: 64, reactions: 55, strength: 38, armor: 10,
+      side: 'squad', accuracy: 64, reactions: 55, strength: 38, bravery: 50, throwing: 58, armor: 10,
       maxTimeUnits: 56, health: 38, maxHealth: 45, stamina: 61, maxStamina: 70, morale: 88, optics: 'ПНВ',
       loadout: [['carbine', 'rightHand', 28], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'],
         ['grenade', 'rightShoulder'], ['grenade', 'rightShoulder'], ['medkit', 'backpack']] },
     { name: 'Ирина Соколова', callsign: 'ВОРОН-2', rank: 'сержант', role: 'СТРЕЛОК', missions: 9, camo: 'green',
-      side: 'squad', accuracy: 72, reactions: 64, strength: 32, armor: 8,
+      side: 'squad', accuracy: 72, reactions: 64, strength: 32, bravery: 60, throwing: 64, armor: 8,
       maxTimeUnits: 60, health: 41, maxHealth: 41, stamina: 66, maxStamina: 66, morale: 92, optics: 'ОЧКИ',
       loadout: [['carbineM', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'],
         ['carbineMag', 'leftLeg'], ['grenade', 'leftShoulder']] },
     { name: 'Тимур Ахметов', callsign: 'ВОРОН-3', rank: 'мл. сержант', role: 'ПУЛЕМЁТЧИК', missions: 11, camo: 'green',
-      side: 'squad', accuracy: 58, reactions: 46, strength: 46, armor: 12,
+      side: 'squad', accuracy: 58, reactions: 46, strength: 46, bravery: 70, throwing: 52, armor: 12,
       maxTimeUnits: 52, health: 50, maxHealth: 52, stamina: 74, maxStamina: 80, morale: 79, optics: 'ОЧКИ',
       loadout: [['carbineM', 'rightHand', 17], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'],
         ['medkit', 'backpack'], ['grenade', 'backpack'], ['grenade', 'backpack']] },
     { name: 'Олег Ржевский', callsign: 'ВОРОН-4', rank: 'ефрейтор', role: 'РАЗВЕДЧИК', missions: 6, camo: 'black',
-      side: 'squad', accuracy: 66, reactions: 72, strength: 30, armor: 8,
+      side: 'squad', accuracy: 66, reactions: 72, strength: 30, bravery: 40, throwing: 70, armor: 8,
       maxTimeUnits: 62, health: 33, maxHealth: 40, stamina: 58, maxStamina: 64, morale: 71, optics: 'ПНВ',
       loadout: [['carbine', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['grenade', 'rightShoulder']] },
     // пришельцы: ходят и стреляют сами (простой ИИ в фазе пришельцев)
     { kind: 'alien', name: 'Страж, особь 1', callsign: 'ЦЕЛЬ-1', rank: 'страж', subtitle: 'ПРИШЕЛЕЦ · УПРАВЛЯЕТ ИИ', camo: 'alien',
-      side: 'aliens', accuracy: 60, reactions: 50, strength: 50, armor: 6,
+      side: 'aliens', accuracy: 60, reactions: 50, strength: 50, bravery: 80, throwing: 50, armor: 6,
       maxTimeUnits: 64, health: 58, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] },
     { kind: 'alien', name: 'Страж, особь 2', callsign: 'ЦЕЛЬ-2', rank: 'страж', subtitle: 'ПРИШЕЛЕЦ · УПРАВЛЯЕТ ИИ', camo: 'alien',
-      side: 'aliens', accuracy: 60, reactions: 50, strength: 50, armor: 6,
+      side: 'aliens', accuracy: 60, reactions: 50, strength: 50, bravery: 80, throwing: 50, armor: 6,
       maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] },
     { kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
@@ -404,6 +408,7 @@
   // спрайтов она есть); боевая — стойка с оружием наготове. Задаётся картой (MAP.combat), по умолчанию боевая;
   // переключается клавишей T.
   var combat = MAP.combat !== false;
+  var indoorWatch = { unit: null, state: '' };   // помещение выбранного бойца: смена — срез стен
   var followedLevel = -1;             // уровень обзора, под который он подстроен по выбранному юниту (followLevel)
   var variants = {};
   var shownVariant = null;
@@ -663,7 +668,7 @@
   window.addEventListener('resize', resize);
 
   // ---------------- действия ----------------
-  function busy() { return !selected || selected.path.length > 0 || shots.length > 0 || phase !== 'squad'; }
+  function busy() { return !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
 
   function moveSelectedTo(tile) {
     if (busy() || !tile) return;
@@ -730,6 +735,167 @@
     say('Перезарядка: ' + cost + ' ОД');
   }
 
+  // ---------------- руки: предмет, меню действий (режимы огня, бросок) ----------------
+  function handEntry(unit, slot) {
+    if (!unit || !unit.inventory) return null;
+    for (var index = 0; index < unit.inventory.length; index++) if (unit.inventory[index].slot === slot) return unit.inventory[index];
+    return null;
+  }
+  // что показать в ячейке руки на панели. У K7 — автопушка в «правой руке».
+  function handView(unit, slot) {
+    if (!unit) return null;
+    if (!unit.inventory) {
+      if (slot !== 'rightHand' || !unit.weaponType) return null;
+      return { key: 'mech:' + unit.ammo + ':' + unit.reserve, name: unit.weapon, note: unit.weaponNote, rounds: unit.ammo, capacity: unit.magazine, reserve: unit.reserve,
+        draw: function (context, x, y, width, height) { Items.drawImage(context, 'assets/ui/weapon_mech.png', [57, 138, 303, 53], x, y, width, height); } };
+    }
+    var entry = handEntry(unit, slot);
+    if (!entry) return null;
+    var info = Items.info(entry.item), weapon = !!info.weapon;
+    var reserve = weapon ? unit.inventory.filter(function (other) { return other.item.type === info.ammo; }).length : null;
+    return { key: entry.item.id + ':' + entry.item.rounds + ':' + reserve, name: info.name, note: info.note, rounds: entry.item.rounds, capacity: weapon ? Items.capacity(entry.item) : null, reserve: reserve,
+      draw: function (context, x, y, width, height) { Items.drawItem(context, entry.item, x, y, width, height); } };
+  }
+  function throwCost(unit) { return Math.round(unit.maxTimeUnits * 0.25); }
+  function throwRange(unit) { return 6 + (unit.strength || 30) / 3; }            // метры
+  function throwChance(unit, distance) { return Math.max(5, Math.min(95, Math.round((unit.throwing || 50) - Math.max(0, distance - 8) * 1.5))); }
+  // пункты меню для руки: режимы огня оружия (шанс — без учёта дальности) или бросок гранаты
+  function handActions(unit, slot) {
+    if (!unit) return [];
+    var weapon = null, rounds = 0, entry = handEntry(unit, slot);
+    if (!unit.inventory) { if (slot === 'rightHand') { weapon = weaponOf(unit); rounds = unit.ammo; } }
+    else if (entry && Items.info(entry.item).weapon) { weapon = Combat.WEAPONS[Items.info(entry.item).weapon]; rounds = entry.item.rounds; }
+    if (weapon) {
+      return weapon.modes.map(function (mode, index) {
+        return { label: mode.name, chance: Combat.hitChance(unit, mode, 0), cost: mode.cost, disabled: rounds <= 0 ? 'магазин пуст' : mode.cost > unit.timeUnits ? 'мало ОД' : '', kind: 'fire', mode: index };
+      });
+    }
+    if (entry && entry.item.type === 'grenade') {
+      var cost = throwCost(unit);
+      return [{ label: 'Бросить', chance: unit.throwing || 50, cost: cost, disabled: cost > unit.timeUnits ? 'мало ОД' : '', kind: 'throw' }];
+    }
+    return [];
+  }
+  function handAction(unit, slot, index) {
+    var action = handActions(unit, slot)[index];
+    if (!action || action.disabled || unit !== selected || busy()) return false;
+    if (action.kind === 'fire') {
+      if (unit.inventory) unit.activeHand = slot;
+      unit.fireMode = action.mode;
+      throwing = null;
+      aiming = true;
+      say(action.label + ': выберите цель');
+    } else if (action.kind === 'throw') {
+      aiming = false; aimTarget = null;
+      throwing = { slot: slot };
+      say('Бросок гранаты: выберите клетку');
+    }
+    updateHover();
+    return true;
+  }
+
+  // ---------------- бросок гранаты ----------------
+  // Граната летит по дуге в выбранную клетку; промах по броску точности — отклонение тем больше, чем дальше бросок.
+  // Взрыв при падении: радиус 3 м, урон 60 в центре и до 30 на краю минус броня, стены и предметы закрывают.
+  var throwing = null;                // режим броска: { slot } — рука с гранатой
+  var throws = [];                    // летящие гранаты
+  var GRENADE = { radius: 3, damage: 60 };
+  function throwTarget() {
+    var tile = tileUnderMouse();
+    if (!tile) return null;
+    var point = { x: tile.col + 0.5, y: tile.row + 0.5, h: elevationOf(tile.col, tile.row, tile.level) };
+    var from = { x: selected.x, y: selected.y, h: selected.elevation + 1.6 };
+    var distance = Combat.distanceMeters(combatWorld, from, point);
+    return { tile: tile, point: point, distance: distance, chance: throwChance(selected, distance), cost: throwCost(selected) + turnCostTo(selected, point), far: distance > throwRange(selected) };
+  }
+  function throwGrenade(target) {
+    var entry = throwing && handEntry(selected, throwing.slot);
+    if (!entry || entry.item.type !== 'grenade') { throwing = null; return; }
+    if (target.far) { say('Слишком далеко: бросок до ' + Math.round(throwRange(selected)) + ' м'); return; }
+    if (target.cost > selected.timeUnits) { say('Не хватает очков действия'); return; }
+    selected.timeUnits -= target.cost;
+    var direction = Iso.directionOf(target.point.x - selected.x, target.point.y - selected.y);
+    if (direction >= 0) selected.direction = direction;
+    selected.inventory.splice(selected.inventory.indexOf(entry), 1);
+    if (!combat) setCombat(true);
+    var landing = { x: target.point.x, y: target.point.y, h: target.point.h, level: target.tile.level };
+    if (Math.random() * 100 >= target.chance) {        // промах: отклонение
+      var angle = Math.random() * Math.PI * 2, spread = (0.6 + Math.random() * (0.5 + target.distance / 6)) / Iso.tileMeters;
+      var col = Math.floor(landing.x + Math.cos(angle) * spread), row = Math.floor(landing.y + Math.sin(angle) * spread);
+      if (inside(col, row) && floorAt(col, row, landing.level) > 0) { landing.x = col + 0.5; landing.y = row + 0.5; landing.h = elevationOf(col, row, landing.level); }
+    }
+    var now = performance.now();
+    var from = { x: selected.x, y: selected.y, h: selected.elevation + 1.6 };
+    throws.push({ from: from, to: landing, start: now + 200, duration: 450 + Combat.distanceMeters(combatWorld, from, landing) * 45, thrower: selected });
+    selected.firingUntil = now + 600;
+    throwing = null;
+    say('Граната брошена');
+  }
+  function updateThrows(now) {
+    throws = throws.filter(function (flight) {
+      if (now < flight.start + flight.duration) return true;
+      explode(flight.to, now);
+      return false;
+    });
+  }
+  function explode(point, now) {
+    var anchor = { x: point.x, y: point.y, elevation: point.h, level: point.level };
+    particles.push({ kind: 'blast', corpse: anchor, x: 0, y: -6, born: now, life: 420 });
+    emitSparks(anchor, now, [0, -8], 26, false);
+    for (var puff = 0; puff < 9; puff++) emitSmoke(anchor, now + puff * 40, [(Math.random() - 0.5) * 30, -6 - Math.random() * 10], true);
+    for (var flame = 0; flame < 10; flame++) emitFlame(anchor, now, [(Math.random() - 0.5) * 24, -4]);
+    var center = { x: point.x, y: point.y, h: point.h + 0.4 };
+    units.slice().forEach(function (unit) {
+      var body = targetPointOf(unit);
+      var distance = Combat.distanceMeters(combatWorld, center, body);
+      if (distance > GRENADE.radius + (unit.size > 1 ? 1 : 0)) return;
+      var line = Combat.trace(combatWorld, center, body, distance + 0.3, null);
+      if (line.kind !== 'unit' || line.unit !== unit) return;          // закрыт стеной или предметом
+      var base = GRENADE.damage * (1 - 0.5 * Math.min(1, distance / GRENADE.radius));
+      var amount = Combat.damage({ damage: base }, unit.armor, Math.random);
+      unit.health = Math.max(0, unit.health - amount);
+      flashes.push({ text: amount ? '−' + amount : 'БРОНЯ', point: { x: unit.x, y: unit.y, h: unit.elevation + unit.height + 0.2 }, start: now, until: now + 1300 });
+      if (unit.health <= 0) kill(unit);
+    });
+  }
+  function drawThrows() {
+    var now = performance.now();
+    context.save();
+    throws.forEach(function (flight) {
+      if (now < flight.start) return;
+      var part = Math.min(1, (now - flight.start) / flight.duration);
+      var point = lerpPoint(flight.from, flight.to, part);
+      point.h += Math.sin(part * Math.PI) * (1 + Combat.distanceMeters(combatWorld, flight.from, flight.to) * 0.18);
+      var screen = screenOf(point);
+      context.fillStyle = '#3c4428'; context.strokeStyle = '#151810'; context.lineWidth = 1.2;
+      context.beginPath(); context.arc(screen.x, screen.y, 4, 0, Math.PI * 2); context.fill(); context.stroke();
+    });
+    // в режиме броска: круг поражения на клетке под курсором и подпись
+    if (throwing && selected && !busy()) {
+      var target = throwTarget();
+      if (target) {
+        var center = screenOf(target.point), radius = GRENADE.radius / Iso.tileMeters;
+        context.strokeStyle = target.far ? 'rgba(255, 106, 80, 0.9)' : 'rgba(255, 210, 60, 0.9)';
+        context.fillStyle = target.far ? 'rgba(255, 106, 80, 0.1)' : 'rgba(255, 210, 60, 0.1)';
+        context.lineWidth = 2;
+        context.beginPath();
+        for (var step = 0; step <= 32; step++) {
+          var angle = step / 32 * Math.PI * 2;
+          var edge = screenOf({ x: target.point.x + Math.cos(angle) * radius, y: target.point.y + Math.sin(angle) * radius, h: target.point.h });
+          if (step === 0) context.moveTo(edge.x, edge.y); else context.lineTo(edge.x, edge.y);
+        }
+        context.fill(); context.stroke();
+        var text = target.far ? 'СЛИШКОМ ДАЛЕКО' : target.chance + '%  ·  ' + target.cost + ' ОД';
+        context.font = 'bold 13px Arial, sans-serif'; context.textAlign = 'center';
+        var width = context.measureText(text).width + 14;
+        context.fillStyle = 'rgba(0, 0, 0, 0.65)'; context.fillRect(center.x - width / 2, center.y - 46, width, 17);
+        context.fillStyle = target.far || target.cost > selected.timeUnits ? '#ff8a6a' : '#bff4ff';
+        context.fillText(text, center.x, center.y - 33);
+      }
+    }
+    context.restore();
+  }
+
   // экран снаряжения выбранного бойца (js/inventory.js)
   function openInventory() {
     if (!selected) { say('Выберите бойца'); return; }
@@ -746,7 +912,7 @@
 
   function selectUnit(unit, center) {
     if (unit && unit.side !== 'squad') return;
-    if (unit !== selected) { aiming = false; aimTarget = null; }
+    if (unit !== selected) { aiming = false; aimTarget = null; throwing = null; }
     selected = unit;
     if (unit) viewFollow(unit);
     if (unit && center) centerOn(unit.x, unit.y, unit.elevation);
@@ -760,7 +926,7 @@
   }
 
   function setFireMode(index) { if (selected) selected.fireMode = index; }
-  function cancelAim() { aiming = false; aimTarget = null; updateHover(); }
+  function cancelAim() { aiming = false; aimTarget = null; throwing = null; updateHover(); }
   function toggleAim() {
     if (aiming) { cancelAim(); return; }
     if (busy()) return;
@@ -1273,7 +1439,15 @@
       if (!origin || particle.kind === 'smoke' || particle.kind === 'flame') return;
       var age = (now - particle.born) / 1000, part = partOf(particle);
       var baseX = origin.x + particle.x, baseY = origin.y + particle.y;
-      if (particle.kind === 'glow' || particle.kind === 'arc') {
+      if (particle.kind === 'blast') {
+        var blastRadius = 20 + 70 * Math.sqrt(part);
+        var blast = context.createRadialGradient(baseX, baseY, 0, baseX, baseY, blastRadius);
+        blast.addColorStop(0, 'rgba(255, 245, 210, ' + (1 - part).toFixed(3) + ')');
+        blast.addColorStop(0.4, 'rgba(255, 170, 60, ' + (0.8 * (1 - part)).toFixed(3) + ')');
+        blast.addColorStop(1, 'rgba(255, 80, 10, 0)');
+        context.fillStyle = blast;
+        context.fillRect(baseX - blastRadius, baseY - blastRadius, blastRadius * 2, blastRadius * 2);
+      } else if (particle.kind === 'glow' || particle.kind === 'arc') {
         var electric = particle.kind === 'arc', radius = electric ? 26 : 30;
         var glow = context.createRadialGradient(baseX, baseY, 0, baseX, baseY, radius);
         glow.addColorStop(0, electric ? 'rgba(200, 230, 255, ' + (0.9 * (1 - part)).toFixed(3) + ')' : 'rgba(255, 220, 140, ' + (0.85 * (1 - part)).toFixed(3) + ')');
@@ -1473,7 +1647,7 @@
   }
 
   function updateHover() {
-    hoverTile = aiming || phase !== 'squad' ? null : tileUnderMouse();
+    hoverTile = aiming || throwing || phase !== 'squad' ? null : tileUnderMouse();
     hoverPath = null;
     hoverAffordable = 0;
     if (hoverTile && !busy() && !unitAt(hoverTile.col, hoverTile.row, hoverTile.level)) {
@@ -1492,6 +1666,11 @@
       return;
     }
     if (event.button !== 0 || phase !== 'squad') return;
+    if (throwing) {
+      var throwAt = !busy() && throwTarget();
+      if (throwAt) throwGrenade(throwAt);
+      return;
+    }
     if (aiming) {
       // выстрел по юниту, по взятому в прицел врагу или по точке над клеткой; враг остаётся в прицеле
       var target = aimTargetUnderMouse();
@@ -1524,7 +1703,7 @@
     updateHover();
   });
   window.addEventListener('mouseup', function (event) {
-    if (mouse.dragging && !mouse.moved && event.button === 2 && aiming) { mouse.dragging = false; cancelAim(); return; }
+    if (mouse.dragging && !mouse.moved && event.button === 2 && (aiming || throwing)) { mouse.dragging = false; throwing = null; cancelAim(); return; }
     if (mouse.dragging && !mouse.moved && event.button === 2 && selected && phase === 'squad') {
       // поворот к центру рамки курсора: у робота рамка 2x2, и если она стоит на нём самом — не поворачиваться
       var tile = tileUnderMouse();
@@ -1538,12 +1717,12 @@
   });
 
   var keys = {};
-  var ACTION_KEYS = { '2': 'kneel', '3': 'aim', '4': 'reload', '6': 'gear', '7': 'next', '0': 'endTurn' };
+  var ACTION_KEYS = { '2': 'kneel', '3': 'aim', '4': 'reload', '6': 'gear', '7': 'next', '8': 'up', '9': 'down', '0': 'endTurn' };
   window.addEventListener('keydown', function (event) {
     if (window.Inventory && Inventory.isOpen()) return;          // окно снаряжения обрабатывает клавиши само
     keys[event.key] = true;
     if (event.key === 'i' || event.key === 'I' || event.key === 'ш' || event.key === 'Ш') { openInventory(); if (window.Inventory && Inventory.isOpen()) event.stopImmediatePropagation(); return; }
-    if (event.key === 'Escape') { if (aiming) cancelAim(); else selectUnit(null); }
+    if (event.key === 'Escape') { if (window.Panel && Panel.closeMenu()) return; if (throwing) { throwing = null; updateHover(); } else if (aiming) cancelAim(); else selectUnit(null); }
     if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') showGrid = !showGrid;
     if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
@@ -1986,6 +2165,7 @@
     if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
     drawAimMarker();
     drawParticles();
+    drawThrows();
     drawCombatEffects();
   }
 
@@ -2062,6 +2242,7 @@
     if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
     drawAimMarker();
     drawParticles();
+    drawThrows();
     drawCombatEffects();
   }
 
@@ -2097,6 +2278,12 @@
       return { entries: unit.inventory || [], ground: unit.inventory ? groundAt(unit.col, unit.row, unit.level) : [], weight: weight,
         strength: unit.strength || 0, overload: overload(unit), timeUnits: unit.timeUnits, maxTimeUnits: unit.maxTimeUnits, canAct: inventoryActive(unit) };
     },
+    LEVELS: LEVELS,
+    handView: handView,
+    handActions: handActions,
+    handAction: handAction,
+    get throwing() { return !!throwing; },
+    statsOf: function (unit) { return { weight: carriedWeight(unit), overload: overload(unit) }; },
     inventoryCost: function (unit, itemId, toSlot) { var found = findItem(unit, itemId); return found ? Items.moveCost(found.entry.slot, toSlot) : null; },
     inventoryMove: function (unit, itemId, toSlot, x, y) { return moveItem(unit, itemId, toSlot, x, y); },
     viewSize: function () { return { width: canvas.width, height: canvas.height }; },
@@ -2117,6 +2304,8 @@
       else if (name === 'next') selectNext();
       else if (name === 'endTurn') endTurn();
       else if (name === 'gear') openInventory();
+      else if (name === 'up') { if (view.level < LEVELS - 1) setView(view.level + 1, view.cut); }
+      else if (name === 'down') { if (view.level > 0) setView(view.level - 1, view.cut); }
       else say('Пока не работает');
       updateHover();
     }
@@ -2137,10 +2326,17 @@
     units.forEach(function (unit) { updateUnit(unit, seconds); });
     updateDoors(seconds);
     updateShots(now);
+    updateThrows(now);
     updateWrecks(now);
     updateAI(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
     if (phase === 'squad' && selected && followLevel(selected) !== followedLevel) viewFollow(selected);
+    // боец вошёл в помещение или вышел из него — стены срезаются или восстанавливаются
+    if (phase === 'squad' && selected) {
+      var indoorKey = (selected === indoorWatch.unit ? '' : 'new') + (isIndoor(selected.col, selected.row, selected.level) ? 'in' : 'out');
+      if (selected === indoorWatch.unit && indoorKey !== indoorWatch.state) viewFollow(selected);
+      indoorWatch.unit = selected; indoorWatch.state = indoorKey.replace('new', '');
+    }
     if (wasMoving) updateHover();
     render();
     if (window.Panel) window.Panel.update();

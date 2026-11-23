@@ -75,22 +75,25 @@ var Items = (function () {
     var type = TYPES[item.type];
     context.save();
     if (type.image) {
-      var image = imageOf(type.image);
-      if (image.complete && image.naturalWidth) {
-        // crop — рамка оружия в картинке 380×300; вертикальный предмет — поворот на −90°.
-        // По короткой стороне допускается небольшой выход за рамку (приклад и магазин), чтобы оружие не было мелким.
-        var source = { x: type.crop[0], y: type.crop[1], width: type.crop[2], height: type.crop[3] };
-        var vertical = height > width;
-        var boxWidth = vertical ? height : width, boxHeight = vertical ? width : height;
-        var scale = Math.min(boxWidth / source.width, boxHeight * 1.3 / source.height);
-        context.translate(x + width / 2, y + height / 2);
-        if (vertical) context.rotate(-Math.PI / 2);
-        context.drawImage(image, source.x, source.y, source.width, source.height, -source.width * scale / 2, -source.height * scale / 2, source.width * scale, source.height * scale);
-      }
+      drawImage(context, type.image, type.crop, x, y, width, height);
     } else if (type.draw) {
       context.translate(x, y);
       type.draw(context, width, height);
     }
+    context.restore();
+  }
+  // картинка оружия (горизонтальная, crop — рамка оружия в ней) в прямоугольник; в вертикальный — с поворотом на −90°.
+  // По короткой стороне допускается небольшой выход за рамку (приклад и магазин), чтобы оружие не было мелким.
+  function drawImage(context, path, crop, x, y, width, height) {
+    var image = imageOf(path);
+    if (!image.complete || !image.naturalWidth) return;
+    var vertical = height > width;
+    var boxWidth = vertical ? height : width, boxHeight = vertical ? width : height;
+    var scale = Math.min(boxWidth / crop[2], boxHeight * 1.3 / crop[3]);
+    context.save();
+    context.translate(x + width / 2, y + height / 2);
+    if (vertical) context.rotate(-Math.PI / 2);
+    context.drawImage(image, crop[0], crop[1], crop[2], crop[3], -crop[2] * scale / 2, -crop[3] * scale / 2, crop[2] * scale, crop[3] * scale);
     context.restore();
   }
   function drawMagazine(context, width, height) {
@@ -144,6 +147,6 @@ var Items = (function () {
   return {
     CELL: CELL, TYPES: TYPES, SLOTS: SLOTS, RELOAD_ORDER: RELOAD_ORDER,
     make: make, info: info, capacity: capacity, weightOf: weightOf, fits: fits, freeSpot: freeSpot, moveCost: moveCost,
-    drawItem: drawItem
+    drawItem: drawItem, drawImage: drawImage, imageOf: imageOf
   };
 })();

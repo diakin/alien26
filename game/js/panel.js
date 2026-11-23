@@ -24,13 +24,11 @@ var Panel = (function () {
   var BUTTONS = [
     { id: 'step', label: 'ШАГ', key: '1' },
     { id: 'kneel', label: 'ПРИСЕСТЬ', key: '2' },
-    { id: 'aim', label: 'ПРИЦЕЛ', key: '3' },
     { id: 'reload', label: 'ЗАРЯДИТЬ', key: '4' },
-    { id: 'grenade', label: 'ГРАНАТА', key: '5', disabled: 'Пока не работает' },
     { id: 'gear', label: 'СНАРЯЖ.', key: '6' },
     { id: 'next', label: 'ДАЛЕЕ', key: '7' },
-    { id: 'up', label: 'ВЫШЕ', key: '8', disabled: 'На карте один уровень' },
-    { id: 'down', label: 'НИЖЕ', key: '9', disabled: 'На карте один уровень' },
+    { id: 'up', label: 'ВЫШЕ', key: '8' },
+    { id: 'down', label: 'НИЖЕ', key: '9' },
     { id: 'endTurn', label: 'КОНЕЦ ХОДА', key: '0' }
   ];
 
@@ -47,21 +45,81 @@ var Panel = (function () {
       '<div class="action-label" id="label-' + button.id + '">' + button.label + '</div></div>';
   }).join('');
 
+  // Вёрстка: мини-карта · левая рука · портрет · правая рука · характеристики · кнопки.
+  // Ячейки рук — как в UFO: щелчок по оружию открывает меню режима огня, по гранате — бросок.
+  var style = document.createElement('style');
+  style.textContent = [
+    '.panel-inner .portrait { left: 380px; width: 168px; cursor: pointer; }',
+    '.panel-inner .hand { position: absolute; top: 18px; width: 124px; height: 224px; cursor: pointer; }',
+    '.panel-inner .hand.left { left: 248px; } .panel-inner .hand.right { left: 556px; }',
+    '.panel-inner .hand:hover { border-color: #8a959c; }',
+    '.panel-inner .hand.open { border-color: #e8a33a; }',
+    '.hand-title { position: absolute; left: 8px; top: 7px; font-size: 9px; font-weight: bold; letter-spacing: 1px; color: #8fd18a; }',
+    '.hand-name { position: absolute; left: 8px; right: 6px; top: 20px; font-size: 9px; font-weight: bold; letter-spacing: 0.5px; color: #e4e8ea; line-height: 11px; }',
+    '.hand canvas { position: absolute; left: 12px; top: 46px; width: 100px; height: 132px; }',
+    '.hand-empty { position: absolute; left: 0; right: 0; top: 100px; text-align: center; color: #56636a; font-size: 11px; font-weight: bold; letter-spacing: 2px; }',
+    '.hand-ammo { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; justify-content: space-between; align-items: flex-end; }',
+    '.hand-rounds { font: bold 20px Consolas, "DejaVu Sans Mono", monospace; }',
+    '.hand-rounds span { font-size: 12px; color: #5f6b72; }',
+    '.hand-reserve { font: 9px Consolas, "DejaVu Sans Mono", monospace; color: #8a959c; margin-bottom: 3px; }',
+    '.panel-inner .stats { left: 694px; top: 18px; width: 320px; cursor: pointer; }',
+    '.panel-inner .stats:hover .unit-name { color: #ffd28a; }',
+    '.panel-inner .actions { left: 1034px; top: 30px; width: 230px; }',
+    '.panel-inner .action-grid { grid-template-columns: repeat(4, 50px); column-gap: 10px; row-gap: 14px; }',
+    '.panel-inner .action-box { width: 50px; height: 50px; }',
+    '.panel-inner .action:last-child .action-label { transform: none; }',
+    '.no-unit .hand > * { visibility: hidden; }',
+    // всплывающее меню режима огня
+    '#fire-menu { position: fixed; z-index: 40; display: none; min-width: 300px; padding: 6px; background: rgba(10, 13, 15, 0.96);',
+    '  border: 1px solid #5c6a72; box-shadow: 0 8px 24px rgba(0,0,0,0.6); font-family: Arial, sans-serif; user-select: none; }',
+    '#fire-menu.open { display: block; }',
+    '#fire-menu .menu-title { font-size: 10px; font-weight: bold; letter-spacing: 1px; color: #8a959c; margin: 2px 6px 6px; }',
+    '#fire-menu .menu-item { display: flex; align-items: center; height: 34px; margin-top: 4px; padding: 0 12px; border: 1px solid #3a454b; background: #12181b;',
+    '  color: #e4e8ea; font-size: 15px; font-weight: bold; cursor: pointer; }',
+    '#fire-menu .menu-item:hover { border-color: #e8a33a; color: #ffd28a; background: #2a2210; }',
+    '#fire-menu .menu-item.disabled { opacity: 0.4; cursor: default; }',
+    '#fire-menu .menu-item.disabled:hover { border-color: #3a454b; color: #e4e8ea; background: #12181b; }',
+    '#fire-menu .menu-label { flex: 1; }',
+    '#fire-menu .menu-value { width: 92px; text-align: right; font: 13px Consolas, "DejaVu Sans Mono", monospace; color: #bfd0d8; }',
+    '#fire-menu .menu-empty { padding: 8px 12px; color: #8a959c; font-size: 12px; }',
+    // окно характеристик
+    '#stats-window { position: fixed; inset: 0; z-index: 45; display: none; background: rgba(4, 6, 7, 0.28); font-family: Arial, sans-serif; user-select: none; }',
+    '#stats-window.open { display: block; }',
+    '#stats-window .sheet { position: absolute; left: 50%; top: 50%; width: 760px; transform-origin: 50% 50%; background: rgba(14, 20, 18, 0.96); border: 1px solid #4c6a58;',
+    '  box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #d8e8d0; padding: 0 0 12px; }',
+    '#stats-window .head { margin: 12px; padding: 8px 14px; border: 1px solid #4c6a58; display: flex; align-items: baseline; justify-content: space-between; }',
+    '#stats-window .head b { font-size: 22px; color: #c8f0a0; letter-spacing: 1px; }',
+    '#stats-window .head span { font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #8fb894; }',
+    '#stats-window table { border-collapse: collapse; margin: 0 12px; width: calc(100% - 24px); }',
+    '#stats-window td { height: 24px; border-bottom: 1px solid #22382c; padding: 0 8px; }',
+    '#stats-window td.name { width: 250px; font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #a8d8a0; }',
+    '#stats-window td.value { width: 70px; text-align: right; font: bold 14px Consolas, "DejaVu Sans Mono", monospace; color: #ffc070; border-left: 1px solid #22382c; border-right: 1px solid #22382c; }',
+    '#stats-window td.value small { color: #6f8a78; font-weight: normal; font-size: 11px; }',
+    '#stats-window .track { position: relative; height: 12px; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 7 - 1px), #22382c calc(100% / 7 - 1px) calc(100% / 7)); }',
+    '#stats-window .track i { position: absolute; left: 0; top: 2px; bottom: 2px; }',
+    '#stats-window .track i.max { background: rgba(255,255,255,0.12); }',
+    '#stats-window .scale { display: flex; justify-content: space-between; margin: 0 12px 0 352px; font: 10px Consolas, monospace; color: #c8f0a0; padding: 0 0 2px; }',
+    '#stats-window .note { margin: 10px 20px 0; font-size: 11px; color: #8fb894; }'
+  ].join('\n');
+  document.head.appendChild(style);
+
+  function handHtml(side, title) {
+    return '<div class="box hand ' + side + '" data-hand="' + (side === 'left' ? 'leftHand' : 'rightHand') + '" title="Щелчок — режим огня или бросок">' +
+      '<div class="hand-title" id="hand-' + side + '-title">' + title + '</div><div class="hand-name" id="hand-' + side + '-name"></div>' +
+      '<canvas id="hand-' + side + '-canvas" width="200" height="264"></canvas><div class="hand-empty" id="hand-' + side + '-empty">ПУСТО</div>' +
+      '<div class="hand-ammo"><div class="hand-rounds" id="hand-' + side + '-rounds"></div><div class="hand-reserve" id="hand-' + side + '-reserve"></div></div></div>';
+  }
   inner.innerHTML =
     '<div class="box minimap"><canvas id="minimap" width="216" height="216"></canvas><span class="caption">КВАДРАТ 47-Б</span></div>' +
-    '<div class="box portrait"><img id="portrait" alt=""><div class="scan"></div>' +
+    handHtml('left', 'ЛЕВАЯ РУКА') +
+    '<div class="box portrait" title="Снаряжение (6, I)"><img id="portrait" alt=""><div class="scan"></div>' +
       '<div class="nameplate"><span id="callsign"></span><span id="rank"></span></div></div>' +
-    '<div class="stats"><div class="unit-name" id="unit-name"></div><div class="unit-sub" id="unit-sub"></div>' +
+    handHtml('right', 'ПРАВАЯ РУКА') +
+    '<div class="stats" title="Подробные характеристики"><div class="unit-name" id="unit-name"></div><div class="unit-sub" id="unit-sub"></div>' +
       bar('tu', 'ОЧКИ ДЕЙСТВИЯ') + bar('hp', 'ЗДОРОВЬЕ') + bar('st', 'ВЫНОСЛИВОСТЬ') + bar('mo', 'МОРАЛЬ') +
       '<div class="chips"><span class="chip" id="chip-stance"></span><span class="chip green" id="chip-optics"></span>' +
       '<span class="chip" id="chip-combat"></span></div></div>' +
-    '<div class="actions"><div class="action-grid">' + buttonsHtml + '</div>' +
-      '<div class="box firemodes"><div class="box-title">РЕЖИМ ОГНЯ</div><div id="modes"></div></div></div>' +
-    '<div class="box weapon"><div class="weapon-name" id="weapon-name"></div><div class="weapon-note" id="weapon-note"></div>' +
-      '<div class="no-weapon" id="no-weapon">НЕТ ОРУЖИЯ</div>' +
-      '<img id="weapon-image" alt=""><div class="ammo"><div><div class="ammo-label">МАГАЗИН</div>' +
-      '<div class="ammo-reserve" id="ammo-reserve"></div></div><div class="ammo-count" id="ammo-count"></div></div>' +
-      '<div class="ammo-pips" id="ammo-pips"></div></div>';
+    '<div class="actions"><div class="action-grid">' + buttonsHtml + '</div></div>';
 
   var element = function (id) { return document.getElementById(id); };
 
@@ -75,11 +133,103 @@ var Panel = (function () {
   });
 
   // щелчок по портрету — экран снаряжения
-  element('portrait').parentNode.addEventListener('click', function () { Game.action('gear'); });
-  element('portrait').parentNode.style.cursor = 'pointer';
-  element('portrait').parentNode.title = 'Снаряжение (6, I)';
+  inner.querySelector('.portrait').addEventListener('click', function () { Game.action('gear'); });
 
-  var modesElement = element('modes');   // строки режимов заполняет update()
+  // ---------------- меню руки: режимы огня, бросок ----------------
+  var menu = document.createElement('div');
+  menu.id = 'fire-menu';
+  document.body.appendChild(menu);
+  var menuHand = null;
+  function closeMenu() {
+    if (!menuHand) return false;
+    menu.classList.remove('open');
+    var open = inner.querySelector('.hand.open');
+    if (open) open.classList.remove('open');
+    menuHand = null;
+    return true;
+  }
+  function openMenu(handNode) {
+    var unit = Game.selected, slot = handNode.getAttribute('data-hand');
+    if (!unit) return;
+    if (menuHand === slot) { closeMenu(); return; }
+    closeMenu();
+    var actions = Game.handActions(unit, slot), view = Game.handView(unit, slot);
+    var html = '<div class="menu-title">' + (view ? view.name : (slot === 'leftHand' ? 'ЛЕВАЯ РУКА' : 'ПРАВАЯ РУКА')) + '</div>';
+    if (!actions.length) html += '<div class="menu-empty">' + (view ? 'С этим предметом действий нет. Переложить — в снаряжении.' : 'Рука пуста. Взять предмет — в снаряжении (6).') + '</div>';
+    actions.forEach(function (action, index) {
+      html += '<div class="menu-item' + (action.disabled ? ' disabled' : '') + '" data-index="' + index + '" title="' + (action.disabled || '') + '">' +
+        '<span class="menu-label">' + action.label + '</span><span class="menu-value">ТОЧН ' + action.chance + '%</span><span class="menu-value">ОД ' + action.cost + '</span></div>';
+    });
+    menu.innerHTML = html;
+    menu.classList.add('open');
+    handNode.classList.add('open');
+    menuHand = slot;
+    // над ячейкой руки, не выходя за край окна
+    var box = handNode.getBoundingClientRect(), width = menu.offsetWidth, height = menu.offsetHeight;
+    var left = Math.max(8, Math.min(window.innerWidth - width - 8, box.left + box.width / 2 - width / 2));
+    menu.style.left = left + 'px';
+    menu.style.top = Math.max(8, box.top - height - 8) + 'px';
+  }
+  menu.addEventListener('click', function (event) {
+    var item = event.target.closest ? event.target.closest('.menu-item') : null;
+    if (!item || item.classList.contains('disabled')) return;
+    var slot = menuHand;
+    closeMenu();
+    Game.handAction(Game.selected, slot, Number(item.getAttribute('data-index')));
+  });
+  Array.prototype.forEach.call(inner.querySelectorAll('.hand'), function (node) {
+    node.addEventListener('click', function (event) { event.stopPropagation(); openMenu(node); });
+  });
+  window.addEventListener('mousedown', function (event) {
+    if (!menuHand) return;
+    if (menu.contains(event.target) || (event.target.closest && event.target.closest('.hand'))) return;
+    closeMenu();
+  });
+
+  // ---------------- окно характеристик ----------------
+  var statsWindow = document.createElement('div');
+  statsWindow.id = 'stats-window';
+  document.body.appendChild(statsWindow);
+  function closeStats() { statsWindow.classList.remove('open'); }
+  function openStats() {
+    var unit = Game.selected;
+    if (!unit) return;
+    var extra = Game.statsOf(unit), labels = unit.statLabels;
+    var rows = [
+      [labels[0], unit.timeUnits, unit.maxTimeUnits, '#c8e060'],
+      [labels[2], unit.stamina, unit.maxStamina, '#e8d850'],
+      [labels[1], unit.health, unit.maxHealth, '#e05a50'],
+      unit.bravery !== undefined ? ['ХРАБРОСТЬ', unit.bravery, null, '#c09ae0'] : null,
+      [labels[3], unit.morale, 100, '#a070e0'],
+      unit.reactions !== undefined ? ['РЕАКЦИЯ', unit.reactions, null, '#f0b830'] : null,
+      unit.accuracy !== undefined ? ['ТОЧНОСТЬ СТРЕЛЬБЫ', unit.accuracy, null, '#80b0e0'] : null,
+      unit.throwing !== undefined ? ['ТОЧНОСТЬ БРОСКА', unit.throwing, null, '#e8a040'] : null,
+      unit.strength !== undefined ? ['СИЛА', unit.strength, null, '#60c070'] : null,
+      unit.strength !== undefined ? ['ВЕС СНАРЯЖЕНИЯ', extra.weight, unit.strength, extra.overload ? '#ff7a5a' : '#9ab0a0'] : null,
+      ['БРОНЯ', unit.armor || 0, null, '#e8ece8']
+    ].filter(Boolean);
+    var maxScale = 140;
+    var html = '<div class="sheet"><div class="head"><b>' + unit.rank.charAt(0).toUpperCase() + unit.rank.slice(1) + ' ' + unit.name + '</b><span>' + unit.callsign + (unit.role ? ' · ' + unit.role : '') + '</span></div>' +
+      '<div class="scale">' + [0, 20, 40, 60, 80, 100, 120, 140].map(function (value) { return '<span>' + value + '</span>'; }).join('') + '</div><table>';
+    rows.forEach(function (row) {
+      var value = row[1], maximum = row[2];
+      html += '<tr><td class="name">' + row[0] + '</td><td class="value">' + value + (maximum ? '<small>/' + maximum + '</small>' : '') + '</td><td><div class="track">' +
+        (maximum ? '<i class="max" style="width:' + Math.min(100, maximum / maxScale * 100).toFixed(1) + '%"></i>' : '') +
+        '<i style="width:' + Math.min(100, value / maxScale * 100).toFixed(1) + '%;background:' + row[3] + '"></i></div></td></tr>';
+    });
+    html += '</table>' + (extra.overload ? '<div class="note">Перегруз: вес снаряжения больше силы на ' + extra.overload + ' — столько ОД теряется в начале хода.</div>' : '') +
+      '<div class="note">Щелчок или Esc — закрыть.</div></div>';
+    statsWindow.innerHTML = html;
+    statsWindow.classList.add('open');
+    var sheet = statsWindow.querySelector('.sheet');
+    var scale = Math.min(1.4, window.innerWidth * 0.9 / 760, window.innerHeight * 0.85 / sheet.offsetHeight);
+    sheet.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+  inner.querySelector('.stats').addEventListener('click', openStats);
+  statsWindow.addEventListener('click', closeStats);
+  window.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && statsWindow.classList.contains('open')) { closeStats(); event.stopImmediatePropagation(); }
+  }, true);
 
   // ---------------- мини-карта ----------------
   var minimap = element('minimap');
@@ -184,6 +334,26 @@ var Panel = (function () {
     if (node.classList.contains(name) !== on) node.classList.toggle(name, on);
   }
 
+  // ячейка руки: предмет (холст перерисовывается только при смене предмета или патронов), название, патроны
+  function updateHand(side, view) {
+    var key = view ? view.key : 'empty';
+    setText('hand-' + side + '-name', view ? view.name : '');
+    element('hand-' + side + '-empty').style.display = view ? 'none' : 'block';
+    setHtml('hand-' + side + '-rounds', view && view.capacity ? view.rounds + '<span>/' + view.capacity + '</span>' : '');
+    setText('hand-' + side + '-reserve', view && view.reserve !== null && view.reserve !== undefined ? 'ЗАПАС ' + view.reserve : '');
+    var canvas = element('hand-' + side + '-canvas');
+    if (canvas.dataset.key === key) return;
+    var context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (!view) { canvas.dataset.key = key; return; }
+    context.save();
+    context.filter = 'drop-shadow(0 0 1px rgba(235,240,242,0.85))';
+    view.draw(context, 8, 8, canvas.width - 16, canvas.height - 16);
+    context.restore();
+    // картинка могла ещё не загрузиться: тогда перерисовать на следующем кадре
+    canvas.dataset.key = context.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data[3] || !view.name ? key : '';
+  }
+
   function update() {
     var unit = Game.selected;
     setClass(inner, 'no-unit', !unit);
@@ -197,8 +367,6 @@ var Panel = (function () {
       return;
     }
     setImage('portrait', 'assets/ui/portrait_' + unit.portrait + '.png');
-    setClass(inner, 'unarmed', !unit.weapon);
-    if (unit.weapon) setImage('weapon-image', unit.weaponImage || 'assets/ui/weapon_' + unit.camo + '.png');
     setText('callsign', unit.callsign);
     setText('rank', unit.rank);
     setText('unit-name', unit.name);
@@ -213,37 +381,19 @@ var Panel = (function () {
     setText('chip-optics', unit.optics);
     setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН ' + unit.accuracy : '') + (unit.reactions ? ' · РЕАК ' + unit.reactions : ''));
     setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
-    setText('weapon-name', unit.weapon || (unit.kind === 'mech' ? 'ВООРУЖЕНИЕ' : 'ОРУЖИЕ'));
-    setText('weapon-note', unit.weapon ? unit.weaponNote : (unit.kind === 'mech' ? 'НЕ УСТАНОВЛЕНО' : 'ТОЛЬКО ТЕЛО, БЕЗ СНАРЯЖЕНИЯ'));
-    if (unit.weapon) {
-      setText('ammo-reserve', 'ЗАПАС: ' + unit.reserve);
-      setHtml('ammo-count', unit.ammo + '<span>/' + unit.magazine + '</span>');
-      var pips = '';
-      for (var index = 0; index < unit.magazine; index++) pips += '<i' + (index < unit.ammo ? ' class="on"' : '') + '></i>';
-      setHtml('ammo-pips', pips);
-    }
-    // режимы огня оружия юнита; шанс — по цели под курсором в режиме прицела
-    var chances = Game.aimChances();
-    var modes = Game.modesOf(unit).map(function (mode, index) {
-      var classes = 'mode' + (unit.weapon && index === unit.fireMode ? ' active' : '') + (!unit.weapon || mode.cost > unit.timeUnits ? ' short' : '');
-      return '<div class="' + classes + '" data-mode="' + index + '"><span class="mode-name">' + mode.name + '</span>' +
-        '<span class="mode-cost">' + mode.cost + ' ОД</span><span class="mode-chance">' + (chances ? chances[index] + '%' : '—') + '</span></div>';
-    }).join('');
-    setHtml('modes', modes);
-    // кнопки, на которые не хватает ОД
+    setText('hand-left-title', unit.inventory ? 'ЛЕВАЯ РУКА' : 'НАВЕСНОЕ');
+    setText('hand-right-title', unit.inventory ? 'ПРАВАЯ РУКА' : 'ВООРУЖЕНИЕ');
+    updateHand('left', Game.handView(unit, 'leftHand'));
+    updateHand('right', Game.handView(unit, 'rightHand'));
+    // кнопки, на которые не хватает ОД; выше/ниже — по уровням обзора
     var tu = unit.timeUnits;
     setClass(inner.querySelector('[data-action="kneel"]'), 'short', !unit.canKneel || (unit.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
     setClass(inner.querySelector('[data-action="reload"]'), 'short', !unit.weapon || Game.COST.reload > tu || unit.ammo >= unit.magazine || unit.reserve <= 0);
-    setClass(inner.querySelector('[data-action="aim"]'), 'short', !unit.weapon || unit.ammo <= 0 || Game.cheapestCost(unit) > tu);
-    setClass(inner.querySelector('[data-action="aim"]'), 'active', Game.aiming);
-    setClass(inner.querySelector('[data-action="step"]'), 'active', !Game.aiming);
+    setClass(inner.querySelector('[data-action="up"]'), 'short', Game.view.level >= Game.LEVELS - 1);
+    setClass(inner.querySelector('[data-action="down"]'), 'short', Game.view.level <= 0);
+    setClass(inner.querySelector('[data-action="step"]'), 'active', !Game.aiming && !Game.throwing);
     setClass(inner, 'busy', Game.busy);
   }
-
-  modesElement.addEventListener('click', function (event) {
-    var node = event.target.closest ? event.target.closest('.mode') : null;
-    if (node) Game.setFireMode(Number(node.getAttribute('data-mode')));
-  });
 
   // ---------------- масштаб под ширину окна ----------------
   function layout() {
@@ -254,5 +404,5 @@ var Panel = (function () {
   }
   layout();
 
-  return { update: update, layout: layout };
+  return { update: update, layout: layout, closeMenu: closeMenu };
 })();
