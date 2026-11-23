@@ -130,17 +130,5 @@
    "alien": true,
    "walkPhase": 0.9375
   }
- },
- {
-  "name": "alien_dead",
-  "options": {
-   "alien": true,
-   "dead": true,
-   "frame": [
-    4.2,
-    2.8,
-    0.5
-   ]
-  }
  }
 ]

@@ -1,0 +1,86 @@
+[
+ {
+  "name": "mech_fall_f0",
+  "options": {
+   "mech": true,
+   "fall": 0.1429,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_fall_f1",
+  "options": {
+   "mech": true,
+   "fall": 0.2857,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_fall_f2",
+  "options": {
+   "mech": true,
+   "fall": 0.4286,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_fall_f3",
+  "options": {
+   "mech": true,
+   "fall": 0.5714,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_fall_f4",
+  "options": {
+   "mech": true,
+   "fall": 0.7143,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_fall_f5",
+  "options": {
+   "mech": true,
+   "fall": 0.8571,
+   "frame": [
+    6.0,
+    4.8,
+    1.3
+   ]
+  }
+ },
+ {
+  "name": "mech_dead",
+  "options": {
+   "mech": true,
+   "dead": true,
+   "frame": [
+    6.0,
+    4.8,
+    1.0
+   ]
+  }
+ }
+]

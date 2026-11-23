@@ -160,7 +160,7 @@
       for (var dy = 0; dy < size; dy++) {
         for (var dx = 0; dx < size; dx++) {
           var cellCol = col + dx, cellRow = row + dy;
-          if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover)) return false;
+          if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover) || wreckAt(cellCol, cellRow, level)) return false;
           if (size > 1 && stairOffset(cellCol, cellRow, level) !== 0) return false;
           // внутри площадки большого юнита не должно быть стен
           if (dx > 0 && !edgeOpen(cellCol - 1, cellRow, cellCol, cellRow, level)) return false;
@@ -758,7 +758,14 @@
   function kill(unit) {
     unit.dead = true;
     if (SPRITE_ANCHORS[unit.spriteSet + '_dead_d0']) {
-      corpses.push({ name: unit.spriteSet + '_dead_d' + unit.direction, x: unit.x, y: unit.y, elevation: unit.elevation, col: unit.col, row: unit.row, level: unit.level });
+      // падение: кадры *_fall_f0..f5, затем лежит (*_dead). Обломки робота занимают его площадку, над ними дым и искры
+      var wreck = unit.kind === 'mech';
+      corpses.push({
+        name: unit.spriteSet + '_dead_d' + unit.direction, set: unit.spriteSet, direction: unit.direction,
+        fallStart: performance.now(), fallFrames: SPRITE_ANCHORS[unit.spriteSet + '_fall_f0_d0'] ? FALL_FRAMES : 0,
+        frameTime: wreck ? 120 : 85, wreck: wreck, size: unit.size, nextSparks: 0, nextSmoke: 0,
+        x: unit.x, y: unit.y, elevation: unit.elevation, col: unit.col, row: unit.row, level: unit.level
+      });
     }
     var index = units.indexOf(unit);
     if (index >= 0) units.splice(index, 1);
@@ -876,15 +883,118 @@
     aiWaitUntil = now + 350;
   }
 
-  // тело погибшего: рисуется по глубине как подсветка пола своей клетки
+  // кадр падения или лежащего тела
+  var FALL_FRAMES = 6;
+  function corpseFrame(corpse, now) {
+    var frame = Math.floor((now - corpse.fallStart) / corpse.frameTime);
+    return frame < corpse.fallFrames ? frame : -1;
+  }
+  function corpseSprite(corpse, now) {
+    var frame = corpseFrame(corpse, now);
+    return frame >= 0 ? corpse.set + '_fall_f' + frame + '_d' + corpse.direction : corpse.name;
+  }
+  // обломки робота на клетке: по ним нельзя пройти
+  function wreckAt(col, row, level) {
+    for (var index = 0; index < corpses.length; index++) {
+      var corpse = corpses[index];
+      if (corpse.wreck && corpse.level === level && col >= corpse.col && col < corpse.col + corpse.size && row >= corpse.row && row < corpse.row + corpse.size) return corpse;
+    }
+    return null;
+  }
+  // тело погибшего: пока падает — по глубине как юнит, лежащее — как подсветка пола своей клетки;
+  // обломки робота высокие и всегда рисуются как юнит
   function corpseItems() {
+    var now = performance.now();
     return corpses.filter(function (corpse) { return corpse.level <= view.level; }).map(function (corpse) {
-      var image = images[corpse.name], anchor = SPRITE_ANCHORS[corpse.name];
+      var name = corpseSprite(corpse, now);
+      var image = images[name], anchor = SPRITE_ANCHORS[name];
       var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
       var rect = image && image.naturalWidth ? { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight }
         : { x: foot.x - 40, y: foot.y - 30, width: 80, height: 40 };
-      return { depth: depthKey(corpse.col, corpse.row, corpse.level, 1.3), rect: rect, draw: function () { drawSprite(corpse.name, corpse.x, corpse.y, corpse.elevation); } };
+      var standing = corpse.wreck || corpseFrame(corpse, now) >= 0;
+      var depth = standing ? depthKey(corpse.col, corpse.row, corpse.level, 3.5) + (corpse.size - 1) * 100 : depthKey(corpse.col, corpse.row, corpse.level, 1.3);
+      return { depth: depth, rect: rect, draw: function () { drawSprite(name, corpse.x, corpse.y, corpse.elevation); } };
     });
+  }
+
+  // ---------------- дым и искры над обломками ----------------
+  // Дым: мягкие серые клубы поднимаются и расплываются по ветру. Искры: короткие вспышки из точки на корпусе,
+  // разлетаются и падают. Частицы хранятся в координатах карты (клетки, высота в метрах), смещение искр — в пикселях.
+  var particles = [];
+  var WIND = { col: 0.05, row: -0.12 };          // клеток в секунду
+  function wreckPoint(corpse, spread) {
+    return { x: corpse.x + (Math.random() - 0.5) * spread, y: corpse.y + (Math.random() - 0.5) * spread, h: corpse.elevation + 0.5 + Math.random() * 0.6 };
+  }
+  function emitSparks(corpse, now, count) {
+    var point = wreckPoint(corpse, 0.9);
+    particles.push({ kind: 'glow', point: point, born: now, life: 140 });
+    for (var index = 0; index < count; index++) {
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, speed = 90 + Math.random() * 190;
+      particles.push({ kind: 'spark', point: point, born: now, life: 260 + Math.random() * 380,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
+    }
+  }
+  function updateWrecks(now) {
+    corpses.forEach(function (corpse) {
+      if (!corpse.wreck || corpseFrame(corpse, now) >= 0) return;
+      if (!corpse.landed) {                         // удар о землю: сноп искр
+        corpse.landed = true;
+        emitSparks(corpse, now, 22);
+        corpse.nextSmoke = now; corpse.nextSparks = now + 700;
+      }
+      if (now >= corpse.nextSmoke) {
+        var start = wreckPoint(corpse, 0.7);
+        particles.push({ kind: 'smoke', point: start, born: now, life: 2800 + Math.random() * 1000, size: 12 + Math.random() * 6, grow: 40 + Math.random() * 16,
+          rise: 0.7 + Math.random() * 0.3, shade: 50 + Math.floor(Math.random() * 35) });
+        corpse.nextSmoke = now + 220 + Math.random() * 200;
+      }
+      if (now >= corpse.nextSparks) {
+        emitSparks(corpse, now, 5 + Math.floor(Math.random() * 8));
+        corpse.nextSparks = now + 500 + Math.random() * 1800;
+      }
+    });
+    particles = particles.filter(function (particle) { return now < particle.born + particle.life; });
+  }
+  function drawParticles() {
+    if (!particles.length) return;
+    var now = performance.now();
+    context.save();
+    // сначала дым, поверх искры
+    // доля прожитого: кадр рисуется чуть позже обновления, поэтому ограничиваем 0..1
+    function partOf(particle) { return Math.min(1, Math.max(0, (now - particle.born) / particle.life)); }
+    particles.forEach(function (particle) {
+      if (particle.kind !== 'smoke') return;
+      var age = (now - particle.born) / 1000, part = partOf(particle);
+      var screen = screenOf({ x: particle.point.x + WIND.col * age, y: particle.point.y + WIND.row * age, h: particle.point.h + particle.rise * age });
+      var radius = particle.size + particle.grow * part;
+      var alpha = 0.6 * Math.min(1, part * 5) * (1 - part * part);
+      var gradient = context.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
+      gradient.addColorStop(0, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',' + alpha.toFixed(3) + ')');
+      gradient.addColorStop(0.45, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',' + (alpha * 0.7).toFixed(3) + ')');
+      gradient.addColorStop(1, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',0)');
+      context.fillStyle = gradient;
+      context.fillRect(screen.x - radius, screen.y - radius, radius * 2, radius * 2);
+    });
+    context.globalCompositeOperation = 'lighter';
+    context.lineCap = 'round';
+    particles.forEach(function (particle) {
+      var age = (now - particle.born) / 1000, part = partOf(particle), base = screenOf(particle.point);
+      if (particle.kind === 'glow') {
+        var glow = context.createRadialGradient(base.x, base.y, 0, base.x, base.y, 22);
+        glow.addColorStop(0, 'rgba(255, 220, 140, ' + (0.8 * (1 - part)).toFixed(3) + ')');
+        glow.addColorStop(1, 'rgba(255, 140, 40, 0)');
+        context.fillStyle = glow;
+        context.fillRect(base.x - 22, base.y - 22, 44, 44);
+      } else if (particle.kind === 'spark') {
+        var gravity = 520;
+        var x = base.x + particle.vx * age, y = base.y + particle.vy * age + gravity * age * age / 2;
+        var tailX = x - particle.vx * 0.025, tailY = y - (particle.vy + gravity * age) * 0.025;
+        context.strokeStyle = part < 0.5 ? 'rgba(255, 246, 200, ' + (1 - part * 0.6).toFixed(3) + ')' : 'rgba(255, 150, 50, ' + (1.4 - part * 1.4).toFixed(3) + ')';
+        context.lineWidth = 1.6;
+        context.beginPath(); context.moveTo(tailX, tailY); context.lineTo(x, y); context.stroke();
+      }
+    });
+    context.restore();
   }
 
   // ---------------- отрисовка стрельбы ----------------
@@ -1519,6 +1629,7 @@
     drawPathLabel();
     if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
     drawAimMarker();
+    drawParticles();
     drawCombatEffects();
   }
 
@@ -1594,6 +1705,7 @@
     drawPathLabel();
     if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
     drawAimMarker();
+    drawParticles();
     drawCombatEffects();
   }
 
@@ -1659,6 +1771,7 @@
     units.forEach(function (unit) { updateUnit(unit, seconds); });
     updateDoors(seconds);
     updateShots(now);
+    updateWrecks(now);
     updateAI(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
     if (phase === 'squad' && selected && followLevel(selected) !== followedLevel) viewFollow(selected);
@@ -1679,7 +1792,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses,
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };

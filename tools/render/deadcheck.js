@@ -1,6 +1,6 @@
 // Проверка поз погибших: вид сбоку, вид с торца и сверху-сбоку; красная линия — уровень земли.
 import * as THREE from 'three';
-import { buildDead, lyingJoints } from './dead.js';
+import { buildDead, buildFall, lyingJoints } from './dead.js';
 const VIEW = 420;
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(VIEW * 3, VIEW * 2);
@@ -75,6 +75,24 @@ window.check = (options, row) => {
     if (bestHeight < 0.02) heights.minima.push(best.applyMatrix4(inverse).toArray().map((value) => +value.toFixed(2)).join(','));
   });
   return heights;
+};
+// раскадровка падения: строка row, вид сбоку (side) или сверху-сбоку
+window.filmstrip = (options, progressList, row, view) => {
+  const width = Math.floor(VIEW * 3 / progressList.length);
+  scene.background = new THREE.Color(0xf0f0f0);
+  progressList.forEach((progress, index) => {
+    const body = options.mechFall ? options.mechFall(progress) : buildFall(options, progress);
+    scene.add(body);
+    const camera = new THREE.OrthographicCamera(-1.3, 1.3, 1.3 * VIEW / width, -1.3 * VIEW / width, 0.1, 30);
+    if (options.span) { camera.left *= options.span; camera.right *= options.span; camera.top *= options.span; camera.bottom *= options.span; }
+    if (view === 'side') camera.position.set(6, 0.9, 0); else if (view === 'front') camera.position.set(0, 0.9, 6); else camera.position.set(4, 4, 3);
+    camera.lookAt(0, view === 'iso' ? 0.3 : 0.9, 0);
+    camera.updateProjectionMatrix();
+    renderer.setViewport(index * width, (1 - row) * VIEW, width, VIEW);
+    renderer.setScissor(index * width, (1 - row) * VIEW, width, VIEW);
+    renderer.render(scene, camera);
+    scene.remove(body);
+  });
 };
 window.snapshot = () => renderer.domElement.toDataURL('image/png');
 window.ready = true;

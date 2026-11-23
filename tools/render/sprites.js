@@ -9,8 +9,8 @@ import { toXZ } from './world.js';
 import { buildStockySoldier, walkCycle, climbCycle } from './soldier2.js';
 import { rockMaterial } from './world.js';
 import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } from './alien3.js';
-import { buildMechPosed } from './mechpose.js';
-import { buildDead } from './dead.js';
+import { buildMechPosed, buildMechFall } from './mechpose.js';
+import { buildDead, buildFall } from './dead.js';
 import { rockGeometry } from './lib.js';
 import { setEnvIntensity } from './lib.js';
 
@@ -155,7 +155,10 @@ window.renderSprite = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
+  // падение (fall 0..1) и лежащие (dead): бойцы и пришельцы — dead.js, робот — обломки из mechpose.js
+  else if (options.mech && (options.dead || options.fall !== undefined)) soldier = buildMechFall(options.dead ? 1 : options.fall);
   else if (options.dead) soldier = buildDead(options);
+  else if (options.fall !== undefined) soldier = buildFall(options, options.fall);
   else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : options.pose || 'idle');
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {

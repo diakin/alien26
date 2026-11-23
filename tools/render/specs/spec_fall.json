@@ -1,0 +1,289 @@
+[
+ {
+  "name": "black_fall_f0",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.1429,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_fall_f1",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.2857,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_fall_f2",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.4286,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_fall_f3",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.5714,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_fall_f4",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.7143,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_fall_f5",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "fall": 0.8571,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "black_dead",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f0",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.1429,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f1",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.2857,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f2",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.4286,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f3",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.5714,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f4",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.7143,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_fall_f5",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "fall": 0.8571,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "green_dead",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f0",
+  "options": {
+   "alien": true,
+   "fall": 0.1429,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f1",
+  "options": {
+   "alien": true,
+   "fall": 0.2857,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f2",
+  "options": {
+   "alien": true,
+   "fall": 0.4286,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f3",
+  "options": {
+   "alien": true,
+   "fall": 0.5714,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f4",
+  "options": {
+   "alien": true,
+   "fall": 0.7143,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_fall_f5",
+  "options": {
+   "alien": true,
+   "fall": 0.8571,
+   "frame": [
+    4.2,
+    2.8,
+    0.8
+   ]
+  }
+ },
+ {
+  "name": "alien_dead",
+  "options": {
+   "alien": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ]
+  }
+ }
+]

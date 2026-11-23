@@ -348,10 +348,11 @@ export function buildParts(spec) {
     });
   const tailRadii = [0.075, 0.058, 0.042, 0.029, 0.018, 0.009];
   // у лежащего на боку хвост ложится на землю: высота после укладки — координата x, земля на spec.tailLevel
-  if (spec.tailLevel !== undefined) {
-    tailPoints.forEach((point, index) => { point.x += (spec.tailLevel + tailRadii[index] - point.x) * Math.min(1, index / 2); });
-  } else {
-    tailPoints.forEach((point, index) => { point.y = Math.max(point.y, tailRadii[index] + 0.004); });
+  // tailBlend 0..1 — доля укладки (кадры падения)
+  const tailBlend = spec.tailLevel === undefined ? 0 : spec.tailBlend ?? 1;
+  if (tailBlend < 1) tailPoints.forEach((point, index) => { point.y = Math.max(point.y, tailRadii[index] + 0.004); });
+  if (tailBlend > 0) {
+    tailPoints.forEach((point, index) => { point.x += (spec.tailLevel + tailRadii[index] - point.x) * Math.min(1, index / 2) * tailBlend; });
   }
   for (let index = 0; index < tailPoints.length - 1; index++) {
     field.cone(tail, tailPoints[index], tailPoints[index + 1], tailRadii[index], tailRadii[index + 1], { k: 0.04, cell: 0.036 - index * 0.003 });
@@ -650,6 +651,7 @@ export function buildAlienGear(rig, spec) {
   // пистолет: в руке, в кобуре или выпал (погибший — пистолет кладёт рядом sprites.js)
   if (spec.pistol === 'none') return gear;
   const pistol = buildPlasmaPistol();
+  pistol.name = 'pistol';
   if (spec.pistol === 'holster') {
     orientPistol(pistol, thigh, rig.forward);
     pistol.position.copy(holsterCenter).addScaledVector(thigh, -0.05).addScaledVector(outward, 0.035);

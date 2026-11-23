@@ -160,10 +160,18 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
   placed(box(0.08, 0.17, 0.07, materials.plastic, 0.014), local(-0.25, 0.37, -0.08), torsoQuat);
   const antenna = add(segment(local(-0.25, 0.45, -0.1), local(-0.3, 0.8, -0.2), 0.006, 0.004, materials.plastic, 5));
   antenna.castShadow = false;
+  // pack === 'separate': рюкзак собирается отдельной группой в координатах модели (для падения, dead.js)
+  // Группа рюкзака: начало — центр рюкзака, оси — оси корпуса
+  let packGroup = null;
   if (pack) {
-    placed(box(0.34, 0.36, 0.17, materials.gear, 0.05), local(0, 0.36, -0.29), torsoQuat);
-    placed(box(0.3, 0.08, 0.16, materials.gearDark, 0.035), local(0, 0.56, -0.29), torsoQuat);
-    placed(box(0.06, 0.2, 0.05, materials.gear, 0.015), local(0.19, 0.3, -0.29), torsoQuat);
+    packGroup = new THREE.Group();
+    packGroup.position.copy(local(0, 0.36, -0.29));
+    packGroup.quaternion.copy(torsoQuat);
+    const packPart = (mesh, x, y, z) => { mesh.position.set(x, y, z); packGroup.add(mesh); };
+    packPart(box(0.34, 0.36, 0.17, materials.gear, 0.05), 0, 0, 0);
+    packPart(box(0.3, 0.08, 0.16, materials.gearDark, 0.035), 0, 0.2, 0);
+    packPart(box(0.06, 0.2, 0.05, materials.gear, 0.015), 0.19, -0.06, 0);
+    if (pack !== 'separate') add(packGroup);
   }
 
   // голова
@@ -307,6 +315,6 @@ export function buildStockySoldier({ camo = 'black', pose = 'idle', nvg = false,
   });
 
   setShadows(soldier);
-  soldier.userData = { head: headCenter.clone(), muzzle: rifle.localToWorld(rifle.userData.muzzle.clone()), rifle, joints };
+  soldier.userData = { head: headCenter.clone(), muzzle: rifle.localToWorld(rifle.userData.muzzle.clone()), rifle, joints, pack: pack === 'separate' ? packGroup : null };
   return soldier;
 }
