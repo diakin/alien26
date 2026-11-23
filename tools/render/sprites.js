@@ -179,11 +179,14 @@ window.renderSprite = (options, direction) => {
   if (composer) composer.render(); else renderer.render(scene, camera);
   const color = capture();
 
-  // 2. маска силуэта
+  // 2. маска силуэта (полупрозрачные наклейки — копоть — в маску не входят)
+  const decals = [];
+  soldier.traverse((node) => { if (node.userData.decal) { decals.push(node); node.visible = false; } });
   scene.background = new THREE.Color(0x000000);
   scene.overrideMaterial = white;
   renderer.render(scene, camera);
   scene.overrideMaterial = null;
+  decals.forEach((node) => { node.visible = true; });
   const mask = capture();
 
   // 3. тень на земле (боец невидим для камеры, но отбрасывает тень)
@@ -196,7 +199,18 @@ window.renderSprite = (options, direction) => {
   const shadow = capture();
 
   scene.remove(soldier);
-  return { color, mask, shadow, anchor: anchor(), width: WIDTH, height: HEIGHT, scale: PIXELS_PER_METER };
+  // точки эффектов (пламя, дым, искры у обломков робота): пиксели кадра
+  let effects;
+  if (soldier.userData.effects) {
+    effects = {};
+    for (const [kind, points] of Object.entries(soldier.userData.effects)) {
+      effects[kind] = points.map((point) => {
+        const projected = soldier.localToWorld(point.clone()).project(camera);
+        return [(projected.x + 1) / 2 * WIDTH, (1 - projected.y) / 2 * HEIGHT];
+      });
+    }
+  }
+  return { color, mask, shadow, anchor: anchor(), width: WIDTH, height: HEIGHT, scale: PIXELS_PER_METER, effects };
 };
 window.debugShadow = () => {
   const soldier = buildStockySoldier({ camo: 'black', pose: 'idle' });

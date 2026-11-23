@@ -16,7 +16,7 @@ for (const spec of specs) {
     const result = await page.evaluate(([options, dir]) => window.renderSprite(options, dir), [spec.options, direction]);
     const base = `${outDir}/${spec.name}_d${direction}`;
     for (const pass of ['color', 'mask', 'shadow']) fs.writeFileSync(`${base}_${pass}.png`, Buffer.from(result[pass].split(',')[1], 'base64'));
-    index[`${spec.name}_d${direction}`] = { anchor: result.anchor, width: result.width, height: result.height, scale: result.scale };
+    index[`${spec.name}_d${direction}`] = { anchor: result.anchor, width: result.width, height: result.height, scale: result.scale, effects: result.effects };
   }
   console.log('done', spec.name);
 }

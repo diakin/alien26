@@ -768,7 +768,7 @@
         fallSkip: skip,
         name: unit.spriteSet + '_dead_d' + unit.direction, set: unit.spriteSet, direction: unit.direction,
         fallStart: performance.now(), fallFrames: SPRITE_ANCHORS[unit.spriteSet + '_fall_f0_d0'] ? FALL_FRAMES : 0,
-        frameTime: wreck ? 120 : 85, wreck: wreck, size: unit.size, nextSparks: 0, nextSmoke: 0,
+        frameTime: wreck ? 120 : 85, wreck: wreck, size: unit.size, nextFlame: 0, nextSmoke: 0, nextArc: 0,
         x: unit.x, y: unit.y, elevation: unit.elevation, col: unit.col, row: unit.row, level: unit.level
       });
     }
@@ -922,40 +922,104 @@
     });
   }
 
-  // ---------------- дым и искры над обломками ----------------
-  // Дым: мягкие серые клубы поднимаются и расплываются по ветру. Искры: короткие вспышки из точки на корпусе,
-  // разлетаются и падают. Частицы хранятся в координатах карты (клетки, высота в метрах), смещение искр — в пикселях.
+  // ---------------- дым, пламя и искры над обломками ----------------
+  // Точки на спрайте обломков (пробоина, которая горит и дымит; пробоина двигателя; люк с вырванной проводкой)
+  // посчитаны при рендере для каждого ракурса: EFFECT_POINTS в data.js, пиксели от точки привязки.
+  // Частицы хранятся в пикселях относительно точки привязки обломков, поэтому следуют за камерой.
+  // Дым: клубы из заранее нарисованных пятен (объём: светлый верх, тёмный низ), тёмные у пробоины, светлеют
+  // и расплываются по мере подъёма, сносятся ветром. Пламя: короткоживущие яркие языки, складываются по яркости,
+  // под ними мерцающий отсвет. Проводка: электрическая дуга с голубой вспышкой и сноп искр, падающих вниз.
   var particles = [];
-  var WIND = { col: 0.05, row: -0.12 };          // клеток в секунду
-  function wreckPoint(corpse, spread) {
-    return { x: corpse.x + (Math.random() - 0.5) * spread, y: corpse.y + (Math.random() - 0.5) * spread, h: corpse.elevation + 0.5 + Math.random() * 0.6 };
+  var puffImages = makePuffImages();
+  var flameImage = makeFlameImage();
+  function makePuffImages() {
+    var result = { dark: [], light: [] };
+    [['dark', [58, 54, 50]], ['light', [128, 124, 118]]].forEach(function (entry) {
+      for (var variant = 0; variant < 4; variant++) {
+        var size = 96, canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        var puff = canvas.getContext('2d'), color = entry[1];
+        var seed = variant * 7 + 3;
+        var random = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+        for (var blob = 0; blob < 9; blob++) {
+          var angle = random() * Math.PI * 2, distance = random() * 18, radius = 14 + random() * 12;
+          var x = size / 2 + Math.cos(angle) * distance, y = size / 2 + Math.sin(angle) * distance * 0.8;
+          var gradient = puff.createRadialGradient(x, y, 0, x, y, radius);
+          gradient.addColorStop(0, 'rgba(255,255,255,1)');
+          gradient.addColorStop(0.65, 'rgba(255,255,255,0.85)');
+          gradient.addColorStop(1, 'rgba(255,255,255,0)');
+          puff.fillStyle = gradient;
+          puff.fillRect(0, 0, size, size);
+        }
+        // объём: свет сверху-слева, тень снизу
+        puff.globalCompositeOperation = 'source-atop';
+        var shade = puff.createLinearGradient(size * 0.3, size * 0.15, size * 0.65, size * 0.9);
+        var lit = color.map(function (value) { return Math.min(255, Math.round(value * 1.45)); }), dark = color.map(function (value) { return Math.round(value * 0.6); });
+        shade.addColorStop(0, 'rgb(' + lit.join(',') + ')');
+        shade.addColorStop(0.5, 'rgb(' + color.join(',') + ')');
+        shade.addColorStop(1, 'rgb(' + dark.join(',') + ')');
+        puff.fillStyle = shade;
+        puff.fillRect(0, 0, size, size);
+        result[entry[0]].push(canvas);
+      }
+    });
+    return result;
   }
-  function emitSparks(corpse, now, count) {
-    var point = wreckPoint(corpse, 0.9);
-    particles.push({ kind: 'glow', point: point, born: now, life: 140 });
+  function makeFlameImage() {
+    var size = 64, canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    var flame = canvas.getContext('2d');
+    var gradient = flame.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255, 250, 220, 1)');
+    gradient.addColorStop(0.25, 'rgba(255, 210, 90, 0.95)');
+    gradient.addColorStop(0.55, 'rgba(255, 110, 20, 0.6)');
+    gradient.addColorStop(1, 'rgba(180, 30, 0, 0)');
+    flame.fillStyle = gradient;
+    flame.fillRect(0, 0, size, size);
+    return canvas;
+  }
+  function effectPoints(corpse, kind) {
+    var points = window.EFFECT_POINTS && EFFECT_POINTS[corpse.name];
+    return points && points[kind] && points[kind].length ? points[kind] : [[0, -40]];
+  }
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function emitSmoke(corpse, now, point, dark) {
+    particles.push({ kind: 'smoke', corpse: corpse, x: point[0] + (Math.random() - 0.5) * 8, y: point[1] - 4 + (Math.random() - 0.5) * 6, born: now,
+      life: 3200 + Math.random() * 1600, size: 16 + Math.random() * 8, grow: 60 + Math.random() * 40, vx: 8 + Math.random() * 10, vy: -(30 + Math.random() * 14),
+      spin: (Math.random() - 0.5) * 0.6, angle: Math.random() * Math.PI * 2, variant: Math.floor(Math.random() * 4), peak: dark ? 0.9 : 0.7 });
+  }
+  function emitFlame(corpse, now, point) {
+    particles.push({ kind: 'flame', corpse: corpse, x: point[0] + (Math.random() - 0.5) * 10, y: point[1] + (Math.random() - 0.5) * 4, born: now,
+      life: 320 + Math.random() * 380, size: 18 + Math.random() * 12, vx: (Math.random() - 0.5) * 14, vy: -(50 + Math.random() * 45) });
+  }
+  function emitSparks(corpse, now, point, count, electric) {
+    particles.push({ kind: electric ? 'arc' : 'glow', corpse: corpse, x: point[0], y: point[1], born: now, life: electric ? 90 : 160, seed: Math.random() });
     for (var index = 0; index < count; index++) {
-      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, speed = 90 + Math.random() * 190;
-      particles.push({ kind: 'spark', point: point, born: now, life: 260 + Math.random() * 380,
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.8, speed = 70 + Math.random() * 180;
+      particles.push({ kind: 'spark', corpse: corpse, x: point[0], y: point[1], born: now, life: 250 + Math.random() * 450,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
     }
   }
   function updateWrecks(now) {
     corpses.forEach(function (corpse) {
       if (!corpse.wreck || corpseFrame(corpse, now) >= 0) return;
-      if (!corpse.landed) {                         // удар о землю: сноп искр
+      var fire = effectPoints(corpse, 'fire'), smoke = effectPoints(corpse, 'smoke'), wires = effectPoints(corpse, 'wires');
+      if (!corpse.landed) {                         // удар о землю: сноп искр и клубы пыли с дымом
         corpse.landed = true;
-        emitSparks(corpse, now, 22);
-        corpse.nextSmoke = now; corpse.nextSparks = now + 700;
+        emitSparks(corpse, now, fire[0], 26, false);
+        for (var puff = 0; puff < 5; puff++) emitSmoke(corpse, now, pick(smoke), true);
+        corpse.nextSmoke = now; corpse.nextFlame = now; corpse.nextArc = now + 400;
       }
+      if (now - corpse.nextFlame > 500) corpse.nextFlame = now;      // после паузы (вкладка была скрыта) не догоняем
+      while (now >= corpse.nextFlame) { emitFlame(corpse, corpse.nextFlame, pick(fire)); corpse.nextFlame += 28 + Math.random() * 20; }
       if (now >= corpse.nextSmoke) {
-        var start = wreckPoint(corpse, 0.7);
-        particles.push({ kind: 'smoke', point: start, born: now, life: 2800 + Math.random() * 1000, size: 12 + Math.random() * 6, grow: 40 + Math.random() * 16,
-          rise: 0.7 + Math.random() * 0.3, shade: 50 + Math.floor(Math.random() * 35) });
-        corpse.nextSmoke = now + 220 + Math.random() * 200;
+        emitSmoke(corpse, now, pick(smoke), Math.random() < 0.7);
+        corpse.nextSmoke = now + 170 + Math.random() * 130;
       }
-      if (now >= corpse.nextSparks) {
-        emitSparks(corpse, now, 5 + Math.floor(Math.random() * 8));
-        corpse.nextSparks = now + 500 + Math.random() * 1800;
+      if (now >= corpse.nextArc) {
+        // короткое замыкание: иногда две-три вспышки подряд
+        emitSparks(corpse, now, pick(wires), 5 + Math.floor(Math.random() * 10), true);
+        corpse.nextArc = now + (Math.random() < 0.35 ? 90 + Math.random() * 80 : 350 + Math.random() * 1300);
       }
     });
     particles = particles.filter(function (particle) { return now < particle.born + particle.life; });
@@ -963,36 +1027,95 @@
   function drawParticles() {
     if (!particles.length) return;
     var now = performance.now();
-    context.save();
-    // сначала дым, поверх искры
+    var origins = new Map();
+    function originOf(corpse) {
+      if (!origins.has(corpse)) {
+        var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
+        origins.set(corpse, corpse.level <= view.level ? { x: foot.x - camera.x, y: foot.y - camera.y } : null);
+      }
+      return origins.get(corpse);
+    }
     // доля прожитого: кадр рисуется чуть позже обновления, поэтому ограничиваем 0..1
     function partOf(particle) { return Math.min(1, Math.max(0, (now - particle.born) / particle.life)); }
+    context.save();
+    // отсвет пламени
+    context.globalCompositeOperation = 'lighter';
+    corpses.forEach(function (corpse) {
+      if (!corpse.wreck || !corpse.landed) return;
+      var origin = originOf(corpse);
+      if (!origin) return;
+      effectPoints(corpse, 'fire').forEach(function (point) {
+        var flicker = 0.75 + 0.25 * Math.sin(now / 47) * Math.sin(now / 83 + 1.3);
+        var x = origin.x + point[0], y = origin.y + point[1], radius = 46 * flicker;
+        var glow = context.createRadialGradient(x, y, 0, x, y, radius);
+        glow.addColorStop(0, 'rgba(255, 140, 40, ' + (0.32 * flicker).toFixed(3) + ')');
+        glow.addColorStop(1, 'rgba(255, 80, 10, 0)');
+        context.fillStyle = glow;
+        context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      });
+    });
+    // пламя под дымом
+    particles.forEach(function (particle) {
+      if (particle.kind !== 'flame') return;
+      var origin = originOf(particle.corpse);
+      if (!origin) return;
+      var age = (now - particle.born) / 1000, part = partOf(particle);
+      var size = particle.size * (1 - 0.7 * part);
+      context.globalAlpha = Math.min(1, part * 8) * (1 - part);
+      context.drawImage(flameImage, origin.x + particle.x + particle.vx * age - size / 2, origin.y + particle.y + particle.vy * age - size * 0.6, size, size * 1.25);
+    });
+    context.globalAlpha = 1;
+    // дым
+    context.globalCompositeOperation = 'source-over';
     particles.forEach(function (particle) {
       if (particle.kind !== 'smoke') return;
+      var origin = originOf(particle.corpse);
+      if (!origin) return;
       var age = (now - particle.born) / 1000, part = partOf(particle);
-      var screen = screenOf({ x: particle.point.x + WIND.col * age, y: particle.point.y + WIND.row * age, h: particle.point.h + particle.rise * age });
-      var radius = particle.size + particle.grow * part;
-      var alpha = 0.6 * Math.min(1, part * 5) * (1 - part * part);
-      var gradient = context.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
-      gradient.addColorStop(0, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',' + alpha.toFixed(3) + ')');
-      gradient.addColorStop(0.45, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',' + (alpha * 0.7).toFixed(3) + ')');
-      gradient.addColorStop(1, 'rgba(' + particle.shade + ',' + particle.shade + ',' + particle.shade + ',0)');
-      context.fillStyle = gradient;
-      context.fillRect(screen.x - radius, screen.y - radius, radius * 2, radius * 2);
+      var x = origin.x + particle.x + particle.vx * age + Math.sin(age * 1.7 + particle.angle) * 4;
+      var y = origin.y + particle.y + particle.vy * age * (1 - 0.3 * part);
+      var size = particle.size + particle.grow * Math.sqrt(part);
+      var alpha = particle.peak * Math.min(1, part * 7) * (1 - Math.pow(part, 1.5));
+      context.save();
+      context.translate(x, y);
+      context.rotate(particle.angle + particle.spin * age);
+      context.globalAlpha = alpha * (1 - part);
+      context.drawImage(puffImages.dark[particle.variant], -size / 2, -size / 2, size, size);
+      context.globalAlpha = alpha * part;
+      context.drawImage(puffImages.light[particle.variant], -size / 2, -size / 2, size, size);
+      context.restore();
     });
+    // искры, вспышки и дуги поверх
     context.globalCompositeOperation = 'lighter';
     context.lineCap = 'round';
     particles.forEach(function (particle) {
-      var age = (now - particle.born) / 1000, part = partOf(particle), base = screenOf(particle.point);
-      if (particle.kind === 'glow') {
-        var glow = context.createRadialGradient(base.x, base.y, 0, base.x, base.y, 22);
-        glow.addColorStop(0, 'rgba(255, 220, 140, ' + (0.8 * (1 - part)).toFixed(3) + ')');
-        glow.addColorStop(1, 'rgba(255, 140, 40, 0)');
+      var origin = originOf(particle.corpse);
+      if (!origin || particle.kind === 'smoke' || particle.kind === 'flame') return;
+      var age = (now - particle.born) / 1000, part = partOf(particle);
+      var baseX = origin.x + particle.x, baseY = origin.y + particle.y;
+      if (particle.kind === 'glow' || particle.kind === 'arc') {
+        var electric = particle.kind === 'arc', radius = electric ? 26 : 30;
+        var glow = context.createRadialGradient(baseX, baseY, 0, baseX, baseY, radius);
+        glow.addColorStop(0, electric ? 'rgba(200, 230, 255, ' + (0.9 * (1 - part)).toFixed(3) + ')' : 'rgba(255, 220, 140, ' + (0.85 * (1 - part)).toFixed(3) + ')');
+        glow.addColorStop(1, electric ? 'rgba(80, 140, 255, 0)' : 'rgba(255, 140, 40, 0)');
         context.fillStyle = glow;
-        context.fillRect(base.x - 22, base.y - 22, 44, 44);
+        context.fillRect(baseX - radius, baseY - radius, radius * 2, radius * 2);
+        if (electric) {
+          // ломаная дуга: каждый кадр новая форма
+          context.strokeStyle = 'rgba(230, 245, 255, ' + (1 - part * 0.5).toFixed(3) + ')';
+          context.lineWidth = 1.5;
+          context.beginPath();
+          var angle = particle.seed * Math.PI * 2, length = 12 + particle.seed * 10;
+          context.moveTo(baseX, baseY);
+          for (var step = 1; step <= 4; step++) {
+            var along = length * step / 4;
+            context.lineTo(baseX + Math.cos(angle) * along + (Math.random() - 0.5) * 7, baseY + Math.sin(angle) * along * 0.6 + (Math.random() - 0.5) * 7);
+          }
+          context.stroke();
+        }
       } else if (particle.kind === 'spark') {
         var gravity = 520;
-        var x = base.x + particle.vx * age, y = base.y + particle.vy * age + gravity * age * age / 2;
+        var x = baseX + particle.vx * age, y = baseY + particle.vy * age + gravity * age * age / 2;
         var tailX = x - particle.vx * 0.025, tailY = y - (particle.vy + gravity * age) * 0.025;
         context.strokeStyle = part < 0.5 ? 'rgba(255, 246, 200, ' + (1 - part * 0.6).toFixed(3) + ')' : 'rgba(255, 150, 50, ' + (1.4 - part * 1.4).toFixed(3) + ')';
         context.lineWidth = 1.6;
