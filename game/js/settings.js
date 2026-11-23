@@ -15,6 +15,7 @@ var Settings = (function () {
     { key: 'soundVolume', label: 'Громкость звуков', type: 'range', min: 0, max: 100, step: 5, value: 70, format: function (value) { return value + '%'; } },
     { key: 'musicVolume', label: 'Громкость музыки', type: 'range', min: 0, max: 100, step: 5, value: 45, format: function (value) { return value + '%'; } },
     { key: 'musicTheme', label: 'Музыка', type: 'select', value: 0, options: [[0, 'По обстановке'], [1, 'Только общая'], [2, 'Только боевая']] },
+    { key: 'musicPause', label: 'Паузы в музыке', type: 'select', value: 30, options: [[30, '30 с играет, 30 с тишина'], [60, '30 с играет, 60 с тишина'], [0, 'Без пауз']] },
     { key: 'ambienceVolume', label: 'Громкость фона (ветер)', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
     { group: 'ГРАФИКА' },
     { key: 'renderScale', label: 'Разрешение отрисовки', type: 'select', value: 1, options: [[1, 'Полное'], [0.75, '75 % — быстрее'], [0.5, '50 % — для слабых машин']] },
@@ -57,7 +58,7 @@ var Settings = (function () {
     '  border: 1px solid #4c5b62; box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #e4e8ea; padding: 16px 22px 14px; }',
     '#settings h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: 1px; }',
     '#settings .group { margin: 14px 0 4px; font-size: 10px; font-weight: bold; letter-spacing: 1.5px; color: #8fd18a; border-bottom: 1px solid #2f3a3f; padding-bottom: 4px; }',
-    '#settings .row { display: flex; align-items: center; min-height: 32px; font-size: 13px; }',
+    '#settings .row { display: flex; align-items: center; min-height: 29px; font-size: 13px; }',
     '#settings .row label { flex: 1; }',
     '#settings input[type=range] { width: 190px; accent-color: #e8a33a; }',
     '#settings .value { width: 52px; text-align: right; font: bold 12px Consolas, "DejaVu Sans Mono", monospace; color: #ffd28a; }',
@@ -97,7 +98,8 @@ var Settings = (function () {
       }
       html += '</div>';
     });
-    html += '<div class="note">«По обстановке»: общая тема, пока тихо; боевая — когда идёт перестрелка или пришелец и боец видят друг друга. ' +
+    html += '<div class="note">«По обстановке»: общая тема, пока тихо; боевая — когда идёт перестрелка или пришелец и боец видят друг друга; ' +
+      'с началом или концом боя новая тема включается сразу, даже во время паузы. ' +
       'Разрешение отрисовки ниже полного снижает нагрузку на видеокарту, картинка становится мягче.</div>' +
       '<div class="buttons"><button data-do="reset">ПО УМОЛЧАНИЮ</button><button data-do="close">ГОТОВО</button></div></div>';
     root.innerHTML = html;

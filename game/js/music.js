@@ -468,8 +468,15 @@ var Music = (function () {
   var THEMES = { calm: CALM, battle: BATTLE };
 
   // ---------------- воспроизведение в игре ----------------
+  // Музыка звучит фрагментами: 30 с играет (последние 3 с затихает), затем 30 с тишины (настройка «Паузы в музыке»).
+  // Следующий фрагмент темы продолжается с места, где закончился прошлый, — с начала ближайшей фразы в 4 такта.
+  // Смена темы (началась или закончилась перестрелка) включает новую тему сразу, и во время паузы тоже.
   var LOOKAHEAD = 1.2;                            // насколько заранее планировать такты, секунды
+  var FADE_OUT = 3;
+  var timing = { play: 30, pause: 30 };
   var context = null, master = null, runs = [], mood = 'calm', timer = null;
+  var resumeBar = { calm: 0, battle: 0 };         // с какого такта продолжить тему
+  var pauseUntil = 0, lastTheme = null;
 
   function createMaster(audioContext, destination) {
     var compressor = audioContext.createDynamicsCompressor();
@@ -497,6 +504,10 @@ var Music = (function () {
     if (settings.musicTheme === 2) return 'battle';
     return mood;
   }
+  function pauseSeconds() {
+    var settings = window.Settings ? Settings.values : {};
+    return settings.musicPause === undefined ? timing.pause : settings.musicPause;
+  }
   function current() { return runs.filter(function (run) { return !run.stopping; })[0] || null; }
 
   function startRun(name) {
@@ -506,30 +517,43 @@ var Music = (function () {
     var startTime = context.currentTime + 0.1;
     gain.gain.setValueAtTime(0, startTime);
     gain.gain.linearRampToValueAtTime(1, startTime + 2);
-    var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: 0, absoluteBar: 0, nextTime: startTime, stopping: false };
+    var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: resumeBar[name], absoluteBar: 0,
+      nextTime: startTime, stopping: false, endTime: startTime + timing.play };
     runs.push(run);
+    lastTheme = name;
+    pauseUntil = 0;
   }
   function stopRun(run) {
     if (run.stopping) return;
     run.stopping = true;
+    // продолжить потом с начала следующей фразы в 4 такта
+    resumeBar[run.theme.name] = (Math.ceil(run.bar / 4) * 4) % run.theme.bars;
     var now = context.currentTime;
     run.gain.gain.cancelScheduledValues(now);
     run.gain.gain.setValueAtTime(run.gain.gain.value, now);
-    run.gain.gain.linearRampToValueAtTime(0, now + 3);
+    run.gain.gain.linearRampToValueAtTime(0, now + FADE_OUT);
     setTimeout(function () {
       run.gain.disconnect();
       runs.splice(runs.indexOf(run), 1);
-    }, 6000);
+    }, (FADE_OUT + 3) * 1000);
   }
   function refresh() {
     if (!context) return;
     var name = wanted(), playing = current();
     if (playing && playing.theme.name === name) return;
     if (playing) stopRun(playing);
-    if (name) startRun(name);
+    // та же тема во время паузы ждёт конца паузы; другая тема или выход из выключенного состояния — сразу
+    if (name && (playing || name !== lastTheme || context.currentTime >= pauseUntil)) startRun(name);
   }
   function tick() {
     var now = context.currentTime;
+    var playing = current();
+    if (playing && pauseSeconds() > 0 && now >= playing.endTime - FADE_OUT) {
+      stopRun(playing);                            // фрагмент отзвучал: затихание и пауза
+      pauseUntil = now + FADE_OUT + pauseSeconds();
+      playing = null;
+    }
+    if (!playing && wanted() && pauseUntil && now >= pauseUntil) startRun(wanted());
     runs.forEach(function (run) {
       if (run.stopping) return;
       if (run.nextTime < now - 0.5) run.nextTime = now + 0.05;   // вкладка была в фоне: не догоняем пропущенное
@@ -548,7 +572,14 @@ var Music = (function () {
     mood = name;
     refresh();
   }
-  if (window.Settings) Settings.onChange(function (values, key) { if (!key || key === 'musicTheme' || key === 'musicVolume') refresh(); });
+  if (window.Settings) Settings.onChange(function (values, key) {
+    if (!key || key === 'musicTheme' || key === 'musicVolume') refresh();
+    if (key === 'musicPause' && context) {
+      var playing = current();
+      if (playing) playing.endTime = values.musicPause > 0 ? Math.max(playing.endTime, context.currentTime + FADE_OUT + 1) : Infinity;
+      else if (values.musicPause === 0 || pauseUntil) pauseUntil = Math.min(pauseUntil || Infinity, context.currentTime + values.musicPause);
+    }
+  });
 
   // ---------------- рендер без звуковой карты ----------------
   function renderOffline(name, bars, sampleRate, solo) {
@@ -566,6 +597,8 @@ var Music = (function () {
     attach: attach, setMood: setMood, renderOffline: renderOffline,
     get mood() { return mood; },
     get playing() { var run = context && current(); return run ? run.theme.name : null; },
+    get pausedFor() { return context && !current() && pauseUntil ? Math.max(0, pauseUntil - context.currentTime) : 0; },
+    setTiming: function (play, pause) { timing.play = play; timing.pause = pause; },   // для проверки
     themes: THEMES
   };
 })();
