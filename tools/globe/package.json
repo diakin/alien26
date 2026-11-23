@@ -1,0 +1,9 @@
+{
+  "name": "alien26-globe-data",
+  "private": true,
+  "description": "Данные для глобуса: границы стран (Natural Earth через world-atlas) и текстура Natural Earth II (из пакета cesium)",
+  "dependencies": {
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
+  }
+}

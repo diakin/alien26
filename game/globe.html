@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Aliens26 — глобальная карта</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #040507; font-family: Arial, sans-serif; color: #e4e8ea; user-select: none; }
+  #space { position: absolute; left: 0; top: 0; cursor: grab; }
+  #space.dragging { cursor: grabbing; }
+  #side { position: absolute; right: 0; top: 0; bottom: 0; width: 250px; box-sizing: border-box; padding: 14px 14px 12px;
+    background: linear-gradient(180deg, #11171a, #0b0f11); border-left: 1px solid #2c363b; display: flex; flex-direction: column; gap: 10px; }
+  .caption { font-size: 10px; font-weight: bold; letter-spacing: 1.5px; color: #8fd18a; }
+  .title { font-size: 18px; font-weight: bold; letter-spacing: 2px; margin-top: 2px; }
+  .card { border: 1px solid #3a454b; background: rgba(10, 14, 16, 0.7); padding: 9px 10px; }
+  .card .name { font-size: 15px; font-weight: bold; color: #ffd28a; margin: 4px 0 2px; }
+  .card .line { font-size: 11px; color: #a9b4ba; line-height: 16px; }
+  .card .signal { color: #e0673e; font-weight: bold; letter-spacing: 1px; }
+  button { font: bold 11px Arial, sans-serif; letter-spacing: 1.5px; color: #cfd8dc; background: #161b1e; border: 1px solid #3a454b; height: 30px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: #e8a33a; color: #ffd28a; }
+  button:disabled { color: #56626a; border-color: #263036; cursor: default; }
+  #start { height: 44px; font-size: 13px; color: #1a1206; background: linear-gradient(180deg, #f0b04a, #c9821f); border-color: #ffd28a; }
+  #start:hover { color: #000; background: linear-gradient(180deg, #ffc35e, #d89028); }
+  .menu { display: grid; grid-template-columns: 1fr; gap: 5px; }
+  .clock { border: 1px solid #3a454b; background: #0a1013; text-align: center; padding: 6px 4px 7px; }
+  .clock .time { font: bold 28px Consolas, "DejaVu Sans Mono", monospace; color: #9fd7ee; letter-spacing: 1px; }
+  .clock .time small { font-size: 15px; color: #6fa9c0; }
+  .clock .date { font-size: 12px; font-weight: bold; letter-spacing: 1px; color: #9fd7ee; margin-top: 2px; }
+  .speeds { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .speeds button { height: 24px; font-size: 10px; }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr) 10px 1fr; grid-template-rows: repeat(3, 28px); gap: 4px; margin-top: auto; }
+  .pad button { height: 28px; padding: 0; font-size: 13px; letter-spacing: 0; }
+  .pad .zoom-in { grid-column: 5; grid-row: 1; }
+  .pad .zoom-out { grid-column: 5; grid-row: 3; }
+  .pad .home { grid-column: 5; grid-row: 2; font-size: 9px; letter-spacing: 0.5px; }
+  .hint { font-size: 10px; color: #6c7980; line-height: 14px; }
+  #side > * { flex-shrink: 0; }
+  #side { overflow-y: auto; }
+  @media (max-height: 820px) {
+    #side { gap: 7px; padding-top: 10px; }
+    .card { padding: 7px 9px; }
+    .menu { gap: 4px; }
+    .menu button { height: 25px; }
+    #start { height: 38px; }
+    .clock .time { font-size: 22px; }
+    .speeds button { height: 21px; }
+    .pad { grid-template-rows: repeat(3, 24px); }
+    .pad button { height: 24px; }
+    .hint { display: none; }
+  }
+  #note { position: absolute; left: 16px; bottom: 14px; font-size: 11px; color: #6c7980; }
+</style>
+</head>
+<body>
+<canvas id="space"></canvas>
+<div id="note">Тяните мышью — вращение глобуса, колесо — приближение. Данные карты: Natural Earth.</div>
+<div id="side">
+  <div>
+    <div class="caption">ГЛОБАЛЬНАЯ КАРТА</div>
+    <div class="title">ALIENS26</div>
+  </div>
+  <div class="card">
+    <div class="caption">ЗАДАНИЕ</div>
+    <div class="name">База на плато</div>
+    <div class="line" id="mission-place">Квадрат 47-Б</div>
+    <div class="line" id="mission-coords"></div>
+    <div class="line"><span class="signal">● СИГНАЛ</span> — посадка неизвестного объекта</div>
+  </div>
+  <button id="start">НАЧАТЬ ЗАДАНИЕ</button>
+  <div class="menu">
+    <button disabled title="В разработке">ПЕРЕХВАТ</button>
+    <button disabled title="В разработке">БАЗЫ</button>
+    <button disabled title="В разработке">ГРАФИКИ</button>
+    <button disabled title="В разработке">ЭНЦИКЛОПЕДИЯ</button>
+    <button disabled title="В разработке">НАСТРОЙКИ</button>
+    <button disabled title="В разработке">ФИНАНСЫ</button>
+  </div>
+  <div class="clock">
+    <div class="time" id="clock-time">06:00<small>:00</small></div>
+    <div class="date" id="clock-date"></div>
+  </div>
+  <div class="speeds">
+    <button disabled>5 СЕК</button><button disabled>1 МИН</button>
+    <button disabled>5 МИН</button><button disabled>30 МИН</button>
+    <button disabled>1 ЧАС</button><button disabled>1 ДЕНЬ</button>
+  </div>
+  <div class="pad">
+    <button data-turn="up" style="grid-column: 2; grid-row: 1;" title="Повернуть вверх">▲</button>
+    <button data-turn="left" style="grid-column: 1; grid-row: 2;" title="Повернуть влево">◀</button>
+    <button data-turn="right" style="grid-column: 3; grid-row: 2;" title="Повернуть вправо">▶</button>
+    <button data-turn="down" style="grid-column: 2; grid-row: 3;" title="Повернуть вниз">▼</button>
+    <button class="zoom-in" data-zoom="in" title="Приблизить">+</button>
+    <button class="home" data-home="1" title="Показать место задания">ЗАДАНИЕ</button>
+    <button class="zoom-out" data-zoom="out" title="Отдалить">−</button>
+  </div>
+  <div class="hint">Стрелки — вращение, + / − — приближение, Enter — начать задание.</div>
+</div>
+<script src="js/globe_texture.js"></script>
+<script src="js/globe_borders.js"></script>
+<script src="js/globe.js"></script>
+</body>
+</html>
