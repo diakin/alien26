@@ -1293,12 +1293,26 @@
     if (!unit || unit.dead || phase !== 'squad' || !selected || busy()) return;
     if (!weaponOf(selected)) { say('Нет оружия'); return; }
     throwing = null; aiming = true; aimTarget = unit;
-    var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
-    var screenX = foot.x - camera.x, screenY = foot.y - camera.y, margin = 80;
-    if (screenX < margin || screenX > viewWidth - margin || screenY < margin || screenY > viewHeight - margin) {
-      centerOn((selected.x + unit.x) / 2, (selected.y + unit.y) / 2, (selected.elevation + unit.elevation) / 2);
-    }
+    showTarget(unit);
     updateHover();
+  }
+  // Камера к цели прицела: если враг не виден целиком, камера стремится к середине между бойцом и врагом,
+  // но сдвигается так, чтобы враг (от ног до головы) остался в кадре с отступами. На дальней дистанции
+  // боец и враг вместе не помещаются — тогда в кадре враг, а боец у края или за ним (вернуть — «К БОЙЦУ», C).
+  function showTarget(unit) {
+    var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
+    var headPixels = (unit.height || 2) * Iso.pixelsPerMeterUp;
+    // сверху — блок хода и подсказка (до ~120 px) плюс метка шанса над головой; справа — колонка меток
+    var marginLeft = 160, marginRight = 200, marginBottom = 80;
+    var marginTop = Math.min(headPixels + 200, viewHeight * 0.6);
+    var screenX = foot.x - camera.x, screenY = foot.y - camera.y;
+    if (screenX >= marginLeft && screenX <= viewWidth - marginRight && screenY >= marginTop && screenY <= viewHeight - marginBottom) return;
+    var middle = Iso.toScreen((selected.x + unit.x) / 2, (selected.y + unit.y) / 2, (selected.elevation + unit.elevation) / 2);
+    var cameraX = middle.x - viewWidth / 2, cameraY = middle.y - viewHeight / 2;
+    cameraX = Math.max(foot.x - (viewWidth - marginRight), Math.min(foot.x - marginLeft, cameraX));
+    cameraY = Math.max(foot.y - (viewHeight - marginBottom), Math.min(foot.y - marginTop, cameraY));
+    camera.x = cameraX; camera.y = cameraY;
+    clampCamera();
   }
   function drawMarkedEnemy() {
     if (!markedEnemy || markedEnemy.dead) return;
