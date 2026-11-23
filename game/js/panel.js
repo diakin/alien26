@@ -69,6 +69,9 @@ var Panel = (function () {
     '.panel-inner .action-box { width: 50px; height: 50px; }',
     '.panel-inner .action:last-child .action-label { transform: none; }',
     '.no-unit .hand > * { visibility: hidden; }',
+    '.viewing .portrait, .viewing .hand { border-color: #c0462e; }',
+    '.viewing .unit-name { color: #ff9a7a; }',
+    '.viewing #chip-stance { color: #ff9a7a; border-color: #6a3328; }',
     // всплывающее меню режима огня
     '#fire-menu { position: fixed; z-index: 40; display: none; min-width: 300px; padding: 6px; background: rgba(10, 13, 15, 0.96);',
     '  border: 1px solid #5c6a72; box-shadow: 0 8px 24px rgba(0,0,0,0.6); font-family: Arial, sans-serif; user-select: none; }',
@@ -149,13 +152,15 @@ var Panel = (function () {
     return true;
   }
   function openMenu(handNode) {
-    var unit = Game.selected, slot = handNode.getAttribute('data-hand');
+    var unit = Game.shown, slot = handNode.getAttribute('data-hand');
     if (!unit) return;
     if (menuHand === slot) { closeMenu(); return; }
     closeMenu();
-    var actions = Game.handActions(unit, slot), view = Game.handView(unit, slot);
+    var viewing = unit !== Game.selected;
+    var actions = viewing ? [] : Game.handActions(unit, slot), view = Game.handView(unit, slot);
     var html = '<div class="menu-title">' + (view ? view.name : (slot === 'leftHand' ? 'ЛЕВАЯ РУКА' : 'ПРАВАЯ РУКА')) + '</div>';
-    if (!actions.length) html += '<div class="menu-empty">' + (view ? 'С этим предметом действий нет. Переложить — в снаряжении.' : 'Рука пуста. Взять предмет — в снаряжении (6).') + '</div>';
+    if (viewing) html += '<div class="menu-empty">' + (view ? view.name + (view.capacity ? ' · ' + view.rounds + '/' + view.capacity : '') + '. Просмотр пришельца — действий нет.' : 'Рука пуста.') + '</div>';
+    else if (!actions.length) html += '<div class="menu-empty">' + (view ? 'С этим предметом действий нет. Переложить — в снаряжении.' : 'Рука пуста. Взять предмет — в снаряжении (6).') + '</div>';
     actions.forEach(function (action, index) {
       html += '<div class="menu-item' + (action.disabled ? ' disabled' : '') + '" data-index="' + index + '" title="' + (action.disabled || '') + '">' +
         '<span class="menu-label">' + action.label + '</span><span class="menu-value">ТОЧН ' + action.chance + '%</span><span class="menu-value">ОД ' + action.cost + '</span></div>';
@@ -192,7 +197,7 @@ var Panel = (function () {
   document.body.appendChild(statsWindow);
   function closeStats() { statsWindow.classList.remove('open'); }
   function openStats() {
-    var unit = Game.selected;
+    var unit = Game.shown;
     if (!unit) return;
     var extra = Game.statsOf(unit), labels = unit.statLabels;
     var rows = [
@@ -356,7 +361,9 @@ var Panel = (function () {
   }
 
   function update() {
-    var unit = Game.selected;
+    var unit = Game.shown;
+    var viewing = !!unit && unit !== Game.selected;
+    setClass(inner, 'viewing', viewing);
     setClass(inner, 'no-unit', !unit);
     setText('turn-number', ('0' + Game.turn).slice(-2));
     setText('toast', Game.message);
@@ -378,18 +385,19 @@ var Panel = (function () {
     setStat('st', unit.stamina, unit.maxStamina);
     setStat('mo', unit.morale, 100);
     var standing = Game.atEase(unit) ? 'ВОЛЬНО' : 'СТОЯ';
-    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ОК' : 'СТОЙКА: ' + standing));
+    if (viewing) setText('chip-stance', 'ПРОСМОТР · СТРЕЛЯЕТ ' + (Game.selected ? Game.selected.callsign : '—'));
+    else setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ОК' : 'СТОЙКА: ' + standing));
     setText('chip-optics', unit.optics);
     setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН ' + unit.accuracy : '') + (unit.reactions ? ' · РЕАК ' + unit.reactions : ''));
-    setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
+    setText('label-kneel', (Game.selected || unit).kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
     setText('hand-left-title', unit.inventory ? 'ЛЕВАЯ РУКА' : 'НАВЕСНОЕ');
     setText('hand-right-title', unit.inventory ? 'ПРАВАЯ РУКА' : 'ВООРУЖЕНИЕ');
     updateHand('left', Game.handView(unit, 'leftHand'));
     updateHand('right', Game.handView(unit, 'rightHand'));
     // кнопки, на которые не хватает ОД; выше/ниже — по уровням обзора
-    var tu = unit.timeUnits;
-    setClass(inner.querySelector('[data-action="kneel"]'), 'short', !unit.canKneel || (unit.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
-    setClass(inner.querySelector('[data-action="reload"]'), 'short', !unit.weapon || Game.COST.reload > tu || unit.ammo >= unit.magazine || unit.reserve <= 0);
+    var actor = Game.selected || unit, tu = actor.timeUnits;      // кнопки действуют за выбранного бойца
+    setClass(inner.querySelector('[data-action="kneel"]'), 'short', !actor.canKneel || (actor.kneeling ? Game.COST.stand : Game.COST.kneel) > tu);
+    setClass(inner.querySelector('[data-action="reload"]'), 'short', !actor.weapon || Game.COST.reload > tu || actor.ammo >= actor.magazine || actor.reserve <= 0);
     setClass(inner.querySelector('[data-action="up"]'), 'short', Game.view.level >= Game.LEVELS - 1);
     setClass(inner.querySelector('[data-action="down"]'), 'short', Game.view.level <= 0);
     setClass(inner.querySelector('[data-action="step"]'), 'active', !Game.aiming && !Game.throwing);

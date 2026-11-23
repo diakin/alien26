@@ -6,10 +6,11 @@ var Settings = (function () {
   var STORAGE_KEY = 'aliens26.settings';
   var FIELDS = [
     { group: 'ИГРА' },
-    { key: 'moveSpeed', label: 'Скорость перемещения юнитов', type: 'range', min: 0.5, max: 3, step: 0.25, value: 1, format: function (value) { return '×' + value.toFixed(2).replace(/0$/, ''); } },
+    { key: 'moveSpeed', label: 'Скорость перемещения юнитов', type: 'range', min: 0.5, max: 6, step: 0.25, value: 3, format: function (value) { return '×' + value.toFixed(2).replace(/0$/, ''); } },
     { key: 'aiSpeed', label: 'Скорость хода пришельцев', type: 'range', min: 0.5, max: 3, step: 0.25, value: 1, format: function (value) { return '×' + value.toFixed(2).replace(/0$/, ''); } },
     { key: 'followAliens', label: 'Камера следит за пришельцами в их ход', type: 'check', value: true },
     { key: 'damageNumbers', label: 'Цифры урона над целью', type: 'check', value: true },
+    { key: 'inspectAliens', label: 'Просмотр пришельцев: щелчок показывает его на панели', type: 'check', value: true },
     { group: 'ЗВУК' },
     { key: 'soundVolume', label: 'Громкость звуков', type: 'range', min: 0, max: 100, step: 5, value: 70, format: function (value) { return value + '%'; } },
     { key: 'musicVolume', label: 'Громкость музыки и фона', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
@@ -23,6 +24,8 @@ var Settings = (function () {
   FIELDS.forEach(function (field) { if (field.key) values[field.key] = field.value; });
   try {
     var saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
+    // версия 2: скорость перемещения по умолчанию ×3 — старое сохранённое значение не переносится
+    if (!saved.version || saved.version < 2) delete saved.moveSpeed;
     Object.keys(saved).forEach(function (key) { if (key in values && key !== 'fullscreen') values[key] = saved[key]; });
   } catch (error) { /* хранилище недоступно — значения по умолчанию */ }
   values.fullscreen = false;               // полный экран браузер включает только по действию игрока
@@ -30,7 +33,7 @@ var Settings = (function () {
   var listeners = [];
   function onChange(listener) { listeners.push(listener); listener(values, null); }
   function save() {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values)); } catch (error) { /* не сохраняем */ }
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({ version: 2 }, values))); } catch (error) { /* не сохраняем */ }
   }
   function set(key, value) {
     values[key] = value;

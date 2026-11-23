@@ -919,6 +919,8 @@
 
   // экран снаряжения выбранного бойца (js/inventory.js)
   function openInventory() {
+    var shown = shownUnit();
+    if (shown && shown !== selected && shown.inventory) { if (window.Inventory) { keys = {}; Inventory.open(shown); } return; }   // просмотр пришельца
     if (!selected) { say('Выберите бойца'); return; }
     if (!selected.inventory) { say('У ' + selected.callsign + ' нет снаряжения: пушка и лента — часть машины'); return; }
     if (window.Inventory) { keys = {}; Inventory.open(selected); }
@@ -927,12 +929,13 @@
   function endTurn() {
     if (phase !== 'squad') return;
     if (shots.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
-    aiming = false; aimTarget = null;
+    aiming = false; aimTarget = null; inspected = null;
     startAlienPhase();
   }
 
   function selectUnit(unit, center) {
     if (unit && unit.side !== 'squad') return;
+    inspected = null;
     if (unit !== selected) { aiming = false; aimTarget = null; throwing = null; }
     selected = unit;
     if (unit) viewFollow(unit);
@@ -947,7 +950,13 @@
   }
 
   function setFireMode(index) { if (selected) selected.fireMode = index; }
-  function cancelAim() { aiming = false; aimTarget = null; throwing = null; updateHover(); }
+  function cancelAim() { aiming = false; aimTarget = null; throwing = null; inspected = null; updateHover(); }
+  // Просмотр пришельца (настройка «Просмотр пришельцев»): после щелчка по пришельцу панель показывает его —
+  // руки, портрет, характеристики; снаряжение и окно характеристик открываются для него только для чтения.
+  // Действовать по-прежнему выбранный боец: следующий щелчок по пришельцу — выстрел.
+  var inspected = null;
+  function inspect(unit) { inspected = Settings.values.inspectAliens && unit && unit.side === 'aliens' ? unit : null; }
+  function shownUnit() { return inspected && !inspected.dead && units.indexOf(inspected) >= 0 ? inspected : selected; }
   function toggleAim() {
     if (aiming) { cancelAim(); return; }
     if (busy()) return;
@@ -1104,6 +1113,7 @@
     if (index >= 0) units.splice(index, 1);
     say(unit.callsign + (unit.side === 'aliens' ? ' уничтожен' : ' выбыл'));
     if (aimTarget === unit) aimTarget = null;
+    if (inspected === unit) inspected = null;
     if (selected === unit) { selected = null; aiming = false; aimTarget = null; selectNext(); }
     if (!units.some(function (other) { return other.side === 'aliens'; })) say('Пришельцы уничтожены');
     else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) say('Отряд погиб');
@@ -1849,7 +1859,7 @@
       // выстрел по юниту, по взятому в прицел врагу или по точке над клеткой; враг остаётся в прицеле
       var target = aimTargetUnderMouse();
       if (!target || busy()) return;
-      if (target.unit && target.unit.side === 'aliens') aimTarget = target.unit;
+      if (target.unit && target.unit.side === 'aliens') { aimTarget = target.unit; inspect(target.unit); }
       fire(selected, target, selected.fireMode);
       updateHover();
       return;
@@ -1859,7 +1869,11 @@
     var clickedUnit = tile ? unitAt(tile.col, tile.row, tile.level) : null;
     if (clickedUnit) {
       if (clickedUnit.side === 'squad') selectUnit(clickedUnit, false);
-      else if (selected && weaponOf(selected) && !busy()) { aiming = true; aimTarget = clickedUnit; updateHover(); }   // щелчок по врагу — взять в прицел
+      else {
+        inspect(clickedUnit);                                             // показать на панели (если включено)
+        if (selected && weaponOf(selected) && !busy()) { aiming = true; aimTarget = clickedUnit; }   // щелчок по врагу — взять в прицел
+        updateHover();
+      }
       return;
     }
     moveSelectedTo(tile);
@@ -2449,6 +2463,7 @@
     COST: COST, MAGAZINE: MAGAZINE, FIRE_MODES: FIRE_MODES, GRID: GRID,
     units: units, obstacles: obstacles, camera: camera, KINDS: KINDS,
     get selected() { return selected; },
+    get shown() { return shownUnit(); },
     get turn() { return turn; },
     get message() { return Date.now() < message.until ? message.text : ''; },
     get busy() { return busy(); },

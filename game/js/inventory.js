@@ -116,7 +116,7 @@ var Inventory = (function () {
       more.textContent = 'ЕЩЁ ПРЕДМЕТОВ: ' + hidden;
       body.appendChild(more);
     }
-    defaultInfo = message ? '<span class="warn">' + message + '</span>' : view.canAct ? 'Перетащите предмет мышью. Цена переноса — в ОД.' : '<span class="warn">Переносить предметы можно в свой ход, когда боец стоит на месте</span>';
+    defaultInfo = unit.side !== 'squad' ? '<span class="warn">Просмотр пришельца — только чтение</span>' : message ? '<span class="warn">' + message + '</span>' : view.canAct ? 'Перетащите предмет мышью. Цена переноса — в ОД.' : '<span class="warn">Переносить предметы можно в свой ход, когда боец стоит на месте</span>';
     showInfo(defaultInfo);
   }
 
