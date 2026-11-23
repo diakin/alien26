@@ -790,11 +790,12 @@
   }
 
   // ---------------- ответный огонь ----------------
-  // Как в UFO: когда пришелец заходит на новую клетку, каждый боец, который его видит (прямая линия огня свободна,
-  // в пределах дальности), сравнивает свою готовность с готовностью пришельца. Готовность = Реакция × доля
-  // оставшихся ОД (у пришельца — с учётом ещё не пройденных шагов). Если у бойца готовность выше и ОД хватает
-  // на самый дешёвый выстрел с поворотом — он стреляет. Первым стреляет тот, у кого готовность выше.
-  // Пока летят пули, пришелец стоит на клетке.
+  // Как в UFO, для обеих сторон: когда юнит в свой ход заходит на новую клетку, каждый юнит другой стороны,
+  // который его видит (прямая линия огня свободна, в пределах дальности), сравнивает свою готовность с готовностью
+  // идущего. Готовность = Реакция × доля оставшихся ОД (у идущего — с учётом ещё не пройденных шагов). Если готовность
+  // выше и ОД хватает на самый дешёвый выстрел с поворотом — стреляет. Первым стреляет тот, у кого готовность выше.
+  // На ответный огонь идут ОД, оставшиеся с прошлого хода своей стороны. Пока летят пули, идущий стоит на клетке;
+  // боец отряда под огнём останавливается, ОД за непройденные шаги возвращаются.
   function readiness(unit, timeUnits) { return (unit.reactions || 0) * timeUnits / unit.maxTimeUnits; }
   function reactionCheck(mover) {
     if (!combat || mover.dead) return;
@@ -802,7 +803,7 @@
     var target = { unit: mover, point: targetPointOf(mover) };
     var ready = [];
     units.forEach(function (unit) {
-      if (unit.side !== 'squad' || unit.dead || unit.ammo <= 0) return;
+      if (unit.side === mover.side || unit.dead || unit.ammo <= 0) return;
       var weapon = weaponOf(unit);
       if (!weapon) return;
       var modeIndex = 0;
@@ -813,10 +814,21 @@
       if (score > moverScore) ready.push({ unit: unit, score: score, modeIndex: modeIndex });
     });
     ready.sort(function (first, second) { return second.score - first.score; });
+    var fired = false;
     ready.forEach(function (entry, order) {
-      if (fire(entry.unit, target, entry.modeIndex, order * 420)) say(entry.unit.callsign + ': ответный огонь по ' + mover.callsign);
+      if (fire(entry.unit, target, entry.modeIndex, order * 420)) { fired = true; say(entry.unit.callsign + ': ответный огонь по ' + mover.callsign); }
     });
+    if (fired && mover.side === 'squad' && mover.path.length) {
+      var refund = 0;
+      mover.path.forEach(function (step) { refund += step.cost; });
+      mover.timeUnits += refund;
+      mover.path = [];
+      mover.walked = 0;
+      if (mover === selected) viewFollow(mover);
+    }
   }
+  // идёт ли юнит в свой ход (тогда по нему возможен ответный огонь)
+  function ownPhase(unit) { return (unit.side === 'aliens') === (phase === 'aliens'); }
 
   // ---------------- ход пришельцев: простой ИИ ----------------
   // Каждый пришелец по очереди: видит бойца (прямая линия огня свободна, в пределах дальности) — стреляет,
@@ -1413,8 +1425,8 @@
   // ---------------- движение ----------------
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
-    // под ответным огнём пришелец стоит на клетке, пока летят пули
-    if (unit.side === 'aliens' && phase === 'aliens' && shots.length && unit.segmentLength === 0) return;
+    // под ответным огнём идущий стоит на клетке, пока летят пули
+    if (ownPhase(unit) && shots.length && unit.segmentLength === 0) return;
     var next = unit.path[0];
     // подъём или спуск по приставной лестнице: на месте, меняется только высота
     if (next.climb) {
@@ -1462,7 +1474,7 @@
       unit.path.shift();
       unit.segmentLength = 0;
       if (!unit.path.length) { unit.walked = 0; if (unit === selected) viewFollow(unit); }
-      if (unit.side === 'aliens' && phase === 'aliens') reactionCheck(unit);
+      if (ownPhase(unit)) reactionCheck(unit);
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
       unit.y += deltaY / distanceTiles * stepTiles;
