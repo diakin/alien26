@@ -204,9 +204,9 @@ var Panel = (function () {
     setStat('st', unit.stamina, unit.maxStamina);
     setStat('mo', unit.morale, 100);
     var standing = Game.atEase(unit) ? 'ВОЛЬНО' : 'СТОЯ';
-    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ИСПРАВНА' : 'СТОЙКА: ' + standing));
+    setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ОК' : 'СТОЙКА: ' + standing));
     setText('chip-optics', unit.optics);
-    setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН. ' + unit.accuracy : ''));
+    setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН ' + unit.accuracy : '') + (unit.reactions ? ' · РЕАК ' + unit.reactions : ''));
     setText('label-kneel', unit.kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');
     setText('weapon-name', unit.weapon || (unit.kind === 'mech' ? 'ВООРУЖЕНИЕ' : 'ОРУЖИЕ'));
     setText('weapon-note', unit.weapon ? unit.weaponNote : (unit.kind === 'mech' ? 'НЕ УСТАНОВЛЕНО' : 'ТОЛЬКО ТЕЛО, БЕЗ СНАРЯЖЕНИЯ'));

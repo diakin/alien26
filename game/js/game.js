@@ -105,32 +105,32 @@
   }
   var PROFILES = [
     { name: 'Андрей Волков', callsign: 'ВОРОН-1', rank: 'ст. сержант', role: 'ШТУРМОВИК', missions: 14, camo: 'black',
-      side: 'squad', accuracy: 64, armor: 10, weaponType: 'carbine',
+      side: 'squad', accuracy: 64, reactions: 55, armor: 10, weaponType: 'carbine',
       maxTimeUnits: 56, health: 38, maxHealth: 45, stamina: 61, maxStamina: 70, morale: 88, optics: 'ПНВ',
       weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 28, reserve: 4 },
     { name: 'Ирина Соколова', callsign: 'ВОРОН-2', rank: 'сержант', role: 'СТРЕЛОК', missions: 9, camo: 'green',
-      side: 'squad', accuracy: 72, armor: 8, weaponType: 'carbine',
+      side: 'squad', accuracy: 72, reactions: 64, armor: 8, weaponType: 'carbine',
       maxTimeUnits: 60, health: 41, maxHealth: 41, stamina: 66, maxStamina: 66, morale: 92, optics: 'ОЧКИ',
       weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 30, reserve: 5 },
     { name: 'Тимур Ахметов', callsign: 'ВОРОН-3', rank: 'мл. сержант', role: 'ПУЛЕМЁТЧИК', missions: 11, camo: 'green',
-      side: 'squad', accuracy: 58, armor: 12, weaponType: 'carbine',
+      side: 'squad', accuracy: 58, reactions: 46, armor: 12, weaponType: 'carbine',
       maxTimeUnits: 52, health: 50, maxHealth: 52, stamina: 74, maxStamina: 80, morale: 79, optics: 'ОЧКИ',
       weapon: 'КАРАБИН КС-9М', weaponNote: 'КОЛЛИМАТОР · ФОНАРЬ', ammo: 17, reserve: 3 },
     { name: 'Олег Ржевский', callsign: 'ВОРОН-4', rank: 'ефрейтор', role: 'РАЗВЕДЧИК', missions: 6, camo: 'black',
-      side: 'squad', accuracy: 66, armor: 8, weaponType: 'carbine',
+      side: 'squad', accuracy: 66, reactions: 72, armor: 8, weaponType: 'carbine',
       maxTimeUnits: 62, health: 33, maxHealth: 40, stamina: 58, maxStamina: 64, morale: 71, optics: 'ПНВ',
       weapon: 'КАРАБИН КС-9', weaponNote: 'ПБС · КОЛЛИМАТОР', ammo: 30, reserve: 2 },
     // пришельцы: ходят и стреляют сами (простой ИИ в фазе пришельцев)
     { kind: 'alien', name: 'Страж, особь 1', callsign: 'ЦЕЛЬ-1', rank: 'страж', subtitle: 'ПРИШЕЛЕЦ · УПРАВЛЯЕТ ИИ', camo: 'alien',
-      side: 'aliens', accuracy: 60, armor: 6, weaponType: 'plasmaPistol',
+      side: 'aliens', accuracy: 60, reactions: 50, armor: 6, weaponType: 'plasmaPistol',
       maxTimeUnits: 64, health: 58, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       weapon: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', weaponNote: 'ЭНЕРГОЯЧЕЙКА', ammo: 20, reserve: 2 },
     { kind: 'alien', name: 'Страж, особь 2', callsign: 'ЦЕЛЬ-2', rank: 'страж', subtitle: 'ПРИШЕЛЕЦ · УПРАВЛЯЕТ ИИ', camo: 'alien',
-      side: 'aliens', accuracy: 60, armor: 6, weaponType: 'plasmaPistol',
+      side: 'aliens', accuracy: 60, reactions: 50, armor: 6, weaponType: 'plasmaPistol',
       maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       weapon: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', weaponNote: 'ЭНЕРГОЯЧЕЙКА', ammo: 20, reserve: 2 },
     { kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
-      side: 'squad', accuracy: 62, armor: 30, weaponType: 'autocannon',
+      side: 'squad', accuracy: 62, reactions: 38, armor: 30, weaponType: 'autocannon',
       weapon: 'АВТОПУШКА АП-30', weaponNote: 'КАЛИБР 30 ММ · ЛЕНТА', ammo: 40, reserve: 3,
       maxTimeUnits: 48, health: 180, maxHealth: 180, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
       statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'] }
@@ -614,13 +614,13 @@
   function endTurn() {
     if (phase !== 'squad') return;
     if (shots.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
-    aiming = false;
+    aiming = false; aimTarget = null;
     startAlienPhase();
   }
 
   function selectUnit(unit, center) {
     if (unit && unit.side !== 'squad') return;
-    if (unit !== selected) aiming = false;
+    if (unit !== selected) { aiming = false; aimTarget = null; }
     selected = unit;
     if (unit) viewFollow(unit);
     if (unit && center) centerOn(unit.x, unit.y, unit.elevation);
@@ -634,8 +634,9 @@
   }
 
   function setFireMode(index) { if (selected) selected.fireMode = index; }
+  function cancelAim() { aiming = false; aimTarget = null; updateHover(); }
   function toggleAim() {
-    if (aiming) { aiming = false; updateHover(); return; }
+    if (aiming) { cancelAim(); return; }
     if (busy()) return;
     if (!weaponOf(selected)) { say('Нет оружия'); return; }
     if (selected.ammo <= 0) { say('Магазин пуст — перезарядите'); return; }
@@ -647,6 +648,7 @@
   // Как в UFO: шанс попадания решает, летит ли пуля в силуэт цели; промах отклоняется, и пуля может попасть
   // в стену, предмет, пол или другого юнита на линии огня (js/combat.js).
   var aiming = false;                 // режим прицела у выбранного бойца
+  var aimTarget = null;               // враг, взятый в прицел: остаётся в прицеле после выстрела, пока жив
   var shots = [];                     // летящие пули и сгустки плазмы
   var flashes = [];                   // вспышки попаданий и цифры урона
   var phase = 'squad';                // чей ход: squad — отряд игрока, aliens — пришельцы (ИИ)
@@ -684,12 +686,17 @@
   }
   function isAiming(unit) { return (unit === selected && aiming) || (unit.firingUntil && performance.now() < unit.firingUntil); }
 
-  // цель под курсором в режиме прицела: юнит или точка над клеткой
+  // цель в режиме прицела: юнит на клетке под курсором (пришелец — ещё и по фигуре), иначе взятый в прицел враг,
+  // иначе точка над клеткой
   function aimTargetUnderMouse() {
-    var unit = unitUnderMouse(true);
     var tile = tileUnderMouse();
-    if (!unit && tile) unit = unitAt(tile.col, tile.row, tile.level);
+    var unit = tile ? unitAt(tile.col, tile.row, tile.level) : null;
+    if (!unit || unit === selected) {
+      var figure = unitUnderMouse(true);
+      unit = figure && figure.side === 'aliens' ? figure : null;
+    }
     if (unit && unit !== selected) return { unit: unit, point: targetPointOf(unit) };
+    if (aimTarget && !aimTarget.dead && units.indexOf(aimTarget) >= 0) return { unit: aimTarget, point: targetPointOf(aimTarget), locked: true };
     if (tile) return { unit: null, point: { x: tile.col + 0.5, y: tile.row + 0.5, h: elevationOf(tile.col, tile.row, tile.level) + 0.6 } };
     return null;
   }
@@ -703,7 +710,8 @@
     return { mode: mode, chance: target.unit ? Combat.hitChance(shooter, mode, distance) : null, cost: mode.cost + turnCostTo(shooter, target.point), clear: clear, distance: distance };
   }
 
-  function fire(shooter, target, modeIndex) {
+  function fire(shooter, target, modeIndex, delay) {
+    delay = delay || 0;
     var weapon = weaponOf(shooter);
     if (!weapon) { say('Нет оружия'); return false; }
     var mode = weapon.modes[modeIndex] || weapon.modes[0];
@@ -715,10 +723,10 @@
     if (direction >= 0) shooter.direction = direction;
     if (!combat) setCombat(true);                       // первый выстрел — боевая обстановка
     var now = performance.now(), count = Math.min(mode.shots, shooter.ammo);
-    shooter.firingUntil = now + 900 + count * 160;
+    shooter.firingUntil = now + delay + 900 + count * 160;
     for (var index = 0; index < count; index++) {
       shooter.ammo--;
-      shots.push({ shooter: shooter, target: target, mode: mode, weapon: weapon, start: now + 250 + index * 160, result: null });
+      shots.push({ shooter: shooter, target: target, mode: mode, weapon: weapon, start: now + delay + 250 + index * 160, result: null });
     }
     return true;
   }
@@ -775,9 +783,39 @@
     var index = units.indexOf(unit);
     if (index >= 0) units.splice(index, 1);
     say(unit.callsign + (unit.side === 'aliens' ? ' уничтожен' : ' выбыл'));
-    if (selected === unit) { selected = null; aiming = false; selectNext(); }
+    if (aimTarget === unit) aimTarget = null;
+    if (selected === unit) { selected = null; aiming = false; aimTarget = null; selectNext(); }
     if (!units.some(function (other) { return other.side === 'aliens'; })) say('Пришельцы уничтожены');
     else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) say('Отряд погиб');
+  }
+
+  // ---------------- ответный огонь ----------------
+  // Как в UFO: когда пришелец заходит на новую клетку, каждый боец, который его видит (прямая линия огня свободна,
+  // в пределах дальности), сравнивает свою готовность с готовностью пришельца. Готовность = Реакция × доля
+  // оставшихся ОД (у пришельца — с учётом ещё не пройденных шагов). Если у бойца готовность выше и ОД хватает
+  // на самый дешёвый выстрел с поворотом — он стреляет. Первым стреляет тот, у кого готовность выше.
+  // Пока летят пули, пришелец стоит на клетке.
+  function readiness(unit, timeUnits) { return (unit.reactions || 0) * timeUnits / unit.maxTimeUnits; }
+  function reactionCheck(mover) {
+    if (!combat || mover.dead) return;
+    var moverScore = readiness(mover, mover.timeUnits + (mover.path.length ? pathCost(mover, mover.path) : 0));
+    var target = { unit: mover, point: targetPointOf(mover) };
+    var ready = [];
+    units.forEach(function (unit) {
+      if (unit.side !== 'squad' || unit.dead || unit.ammo <= 0) return;
+      var weapon = weaponOf(unit);
+      if (!weapon) return;
+      var modeIndex = 0;
+      weapon.modes.forEach(function (mode, index) { if (mode.cost < weapon.modes[modeIndex].cost) modeIndex = index; });
+      var preview = shotPreview(unit, target, modeIndex);
+      if (!preview.clear || preview.distance > weapon.range || preview.cost > unit.timeUnits) return;
+      var score = readiness(unit, unit.timeUnits);
+      if (score > moverScore) ready.push({ unit: unit, score: score, modeIndex: modeIndex });
+    });
+    ready.sort(function (first, second) { return second.score - first.score; });
+    ready.forEach(function (entry, order) {
+      if (fire(entry.unit, target, entry.modeIndex, order * 420)) say(entry.unit.callsign + ': ответный огонь по ' + mover.callsign);
+    });
   }
 
   // ---------------- ход пришельцев: простой ИИ ----------------
@@ -1178,43 +1216,61 @@
     context.restore();
   }
   // рамка цели и подпись: шанс, стоимость, закрыта ли линия огня
+  // Маркер прицела: жёлтая рамка вокруг цели и мигающий над ней кружок с крестиком; пока цель в прицеле,
+  // маркер остаётся и во время выстрела. Подпись — шанс попадания и стоимость выстрела.
   function drawAimMarker() {
-    if (!aiming || !selected || busy()) return;
+    if (!aiming || !selected) return;
     var target = aimTargetUnderMouse();
     if (!target) return;
-    var preview = shotPreview(selected, target, selected.fireMode);
-    var enough = preview.cost <= selected.timeUnits && selected.ammo > 0;
+    var now = performance.now(), blink = Math.sin(now / 700 * Math.PI * 2) > -0.35 ? 1 : 0.25;
     var anchor;
     context.save();
+    context.lineWidth = 2;
     if (target.unit) {
-      var rect = spriteRect(target.unit, drawPosition(target.unit));
-      var left = rect.x - camera.x, top = rect.y - camera.y, right = left + rect.width, bottom = top + rect.height, corner = 10;
-      context.strokeStyle = target.unit.side === 'aliens' ? '#ff5a46' : '#ffd23a';
-      context.lineWidth = 2;
+      // рамка по фигуре: ширина и рост юнита, а не весь кадр спрайта (в нём место под тень)
+      var position = drawPosition(target.unit), foot = Iso.toScreen(position.x, position.y, position.elevation);
+      var halfWidth = target.unit.pickWidth + 6, tall = (target.unit.kneeling ? 1.2 : target.unit.height) * Iso.pixelsPerMeterUp;
+      var left = foot.x - camera.x - halfWidth, right = foot.x - camera.x + halfWidth, top = foot.y - camera.y - tall - 8, bottom = foot.y - camera.y + 8 * target.unit.size, corner = 12;
+      context.strokeStyle = '#ffd23a';
+      context.shadowColor = 'rgba(0, 0, 0, 0.6)'; context.shadowBlur = 3;
       context.beginPath();
       [[left, top, 1, 1], [right, top, -1, 1], [left, bottom, 1, -1], [right, bottom, -1, -1]].forEach(function (item) {
         context.moveTo(item[0] + item[2] * corner, item[1]); context.lineTo(item[0], item[1]); context.lineTo(item[0], item[1] + item[3] * corner);
       });
       context.stroke();
-      anchor = { x: (left + right) / 2, y: top - 8 };
+      // мигающий кружок с крестиком над рамкой
+      var centerX = (left + right) / 2, centerY = top - 16;
+      context.globalAlpha = blink;
+      context.beginPath();
+      context.arc(centerX, centerY, 9, 0, Math.PI * 2);
+      context.moveTo(centerX - 14, centerY); context.lineTo(centerX - 4, centerY); context.moveTo(centerX + 4, centerY); context.lineTo(centerX + 14, centerY);
+      context.moveTo(centerX, centerY - 14); context.lineTo(centerX, centerY - 4); context.moveTo(centerX, centerY + 4); context.lineTo(centerX, centerY + 14);
+      context.stroke();
+      context.globalAlpha = 1;
+      context.shadowBlur = 0;
+      anchor = { x: centerX, y: centerY - 22 };
     } else {
       var point = screenOf(target.point);
-      context.strokeStyle = '#ffd23a'; context.lineWidth = 2;
+      context.strokeStyle = '#ffd23a';
       context.beginPath(); context.arc(point.x, point.y, 9, 0, Math.PI * 2); context.moveTo(point.x - 14, point.y); context.lineTo(point.x + 14, point.y); context.moveTo(point.x, point.y - 14); context.lineTo(point.x, point.y + 14); context.stroke();
       anchor = { x: point.x, y: point.y - 20 };
     }
-    var lines = [(preview.chance !== null ? preview.chance + '%  ·  ' : '') + preview.cost + ' ОД'];
-    if (!preview.clear) lines.push('ЛИНИЯ ОГНЯ ЗАКРЫТА');
-    if (selected.ammo <= 0) lines.push('МАГАЗИН ПУСТ');
-    context.font = 'bold 13px Arial, sans-serif'; context.textAlign = 'center';
-    lines.forEach(function (text, index) {
-      var y = anchor.y - (lines.length - 1 - index) * 17;
-      var width = context.measureText(text).width + 14;
-      context.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      context.fillRect(anchor.x - width / 2, y - 13, width, 17);
-      context.fillStyle = index === 0 ? (enough ? '#bff4ff' : '#ff8a6a') : '#ffc070';
-      context.fillText(text, anchor.x, y);
-    });
+    if (!busy()) {
+      var preview = shotPreview(selected, target, selected.fireMode);
+      var enough = preview.cost <= selected.timeUnits && selected.ammo > 0;
+      var lines = [(preview.chance !== null ? preview.chance + '%  ·  ' : '') + preview.cost + ' ОД'];
+      if (!preview.clear) lines.push('ЛИНИЯ ОГНЯ ЗАКРЫТА');
+      if (selected.ammo <= 0) lines.push('МАГАЗИН ПУСТ');
+      context.font = 'bold 13px Arial, sans-serif'; context.textAlign = 'center';
+      lines.forEach(function (text, index) {
+        var y = anchor.y - (lines.length - 1 - index) * 17;
+        var width = context.measureText(text).width + 14;
+        context.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        context.fillRect(anchor.x - width / 2, y - 13, width, 17);
+        context.fillStyle = index === 0 ? (enough ? '#bff4ff' : '#ff8a6a') : '#ffc070';
+        context.fillText(text, anchor.x, y);
+      });
+    }
     context.restore();
   }
 
@@ -1295,17 +1351,20 @@
     }
     if (event.button !== 0 || phase !== 'squad') return;
     if (aiming) {
-      // выстрел по юниту или по точке над клеткой; после выстрела режим прицела снимается
+      // выстрел по юниту, по взятому в прицел врагу или по точке над клеткой; враг остаётся в прицеле
       var target = aimTargetUnderMouse();
-      if (target && !busy() && fire(selected, target, selected.fireMode)) { aiming = false; updateHover(); }
+      if (!target || busy()) return;
+      if (target.unit && target.unit.side === 'aliens') aimTarget = target.unit;
+      fire(selected, target, selected.fireMode);
+      updateHover();
       return;
     }
-    var clickedUnit = unitUnderMouse(true);
+    // юнит выбирается только по клетке, на которой он стоит (не по фигуре: она заходит на соседние клетки)
     var tile = tileUnderMouse();
-    if (!clickedUnit && tile) clickedUnit = unitAt(tile.col, tile.row, tile.level);
+    var clickedUnit = tile ? unitAt(tile.col, tile.row, tile.level) : null;
     if (clickedUnit) {
       if (clickedUnit.side === 'squad') selectUnit(clickedUnit, false);
-      else if (selected && weaponOf(selected) && !busy()) { aiming = true; updateHover(); }   // щелчок по врагу — прицел
+      else if (selected && weaponOf(selected) && !busy()) { aiming = true; aimTarget = clickedUnit; updateHover(); }   // щелчок по врагу — взять в прицел
       return;
     }
     moveSelectedTo(tile);
@@ -1323,7 +1382,7 @@
     updateHover();
   });
   window.addEventListener('mouseup', function (event) {
-    if (mouse.dragging && !mouse.moved && event.button === 2 && aiming) { aiming = false; mouse.dragging = false; updateHover(); return; }
+    if (mouse.dragging && !mouse.moved && event.button === 2 && aiming) { mouse.dragging = false; cancelAim(); return; }
     if (mouse.dragging && !mouse.moved && event.button === 2 && selected && phase === 'squad') {
       // поворот к центру рамки курсора: у робота рамка 2x2, и если она стоит на нём самом — не поворачиваться
       var tile = tileUnderMouse();
@@ -1340,7 +1399,7 @@
   var ACTION_KEYS = { '2': 'kneel', '3': 'aim', '4': 'reload', '7': 'next', '0': 'endTurn' };
   window.addEventListener('keydown', function (event) {
     keys[event.key] = true;
-    if (event.key === 'Escape') { if (aiming) { aiming = false; updateHover(); } else selectUnit(null); }
+    if (event.key === 'Escape') { if (aiming) cancelAim(); else selectUnit(null); }
     if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') showGrid = !showGrid;
     if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
@@ -1354,6 +1413,8 @@
   // ---------------- движение ----------------
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
+    // под ответным огнём пришелец стоит на клетке, пока летят пули
+    if (unit.side === 'aliens' && phase === 'aliens' && shots.length && unit.segmentLength === 0) return;
     var next = unit.path[0];
     // подъём или спуск по приставной лестнице: на месте, меняется только высота
     if (next.climb) {
@@ -1401,6 +1462,7 @@
       unit.path.shift();
       unit.segmentLength = 0;
       if (!unit.path.length) { unit.walked = 0; if (unit === selected) viewFollow(unit); }
+      if (unit.side === 'aliens' && phase === 'aliens') reactionCheck(unit);
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
       unit.y += deltaY / distanceTiles * stepTiles;
@@ -1920,7 +1982,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
