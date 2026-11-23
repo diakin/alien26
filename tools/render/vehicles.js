@@ -199,20 +199,37 @@ export function buildArmyTruck() {
   const cabFront = 4.74, cabRear = 3.62, cabZ = (cabFront + cabRear) / 2, cabLength = cabFront - cabRear;
   boxMesh(truck, 1.3, 0.24, cabLength - 0.1, material.frame, 0, 1.06, cabZ);
   crossExtrude(truck, section(2.18, 0.98, 0.1, 0.05, 1.0, 0.05), cabRear, cabFront, material.olive, undefined, 0.05);
-  crossExtrude(truck, section(2.08, 0.6, 0.3, 0.02, 1.95, 0.06), cabRear + 0.04, cabFront - 0.1, material.olive,
-    (t) => ({ scale: 1, drop: 0.02 * t }), 0.06);
+  // верх кабины — по боковому профилю: передний верх скруглён, лобовое стекло наклонено назад, крыша плавно
+  // переходит в заднюю стенку; боковые кромки скруглены фаской вытяжки
+  const windshieldBottom = { z: cabFront - 0.02, y: 1.96 }, windshieldTop = { z: cabFront - 0.24, y: 2.44 };
+  const cabProfile = [[cabRear + 0.02, 1.95], [cabFront - 0.02, 1.95], [windshieldBottom.z, windshieldBottom.y]];
+  const roofY = 2.6, rearRadius = 0.16, frontRadiusZ = 0.24;
+  for (let step = 1; step <= 10; step++) {         // скругление от верха стекла к крыше: четверть эллипса
+    const angle = step / 10 * Math.PI / 2;
+    cabProfile.push([windshieldTop.z - frontRadiusZ * (1 - Math.cos(angle)), windshieldTop.y + (roofY - windshieldTop.y) * Math.sin(angle)]);
+  }
+  for (let step = 0; step <= 8; step++) {          // скругление крыши к задней стенке
+    const angle = step / 8 * Math.PI / 2;
+    cabProfile.push([cabRear + 0.04 + rearRadius - Math.sin(angle) * rearRadius, roofY - rearRadius + Math.cos(angle) * rearRadius]);
+  }
+  sideExtrude(truck, cabProfile, 2.1, material.olive, 0, 0.09);
+  // лобовое стекло на наклоне, две половины со стойкой
+  const slope = Math.atan2(windshieldBottom.z - windshieldTop.z, windshieldTop.y - windshieldBottom.y);
+  // скругление кромок вытяжки наращивает профиль на 0,09 м — стекло ставится поверх
+  const glassZ = (windshieldBottom.z + windshieldTop.z) / 2 + 0.1 * Math.cos(slope), glassY = (windshieldBottom.y + windshieldTop.y) / 2 + 0.1 * Math.sin(slope);
   for (const side of [-1, 1]) {
-    const pane = boxMesh(truck, 0.86, 0.4, 0.03, material.glass, side * 0.49, 2.24, cabFront - 0.07, 0.02);
-    pane.rotation.x = -0.18;
-    boxMesh(truck, 0.03, 0.36, 0.6, material.glass, side * 1.042, 2.2, cabZ + 0.14, 0.02);     // окно двери
+    const pane = boxMesh(truck, 0.84, 0.44, 0.03, material.glass, side * 0.48, glassY, glassZ, 0.02);
+    pane.rotation.x = -slope;
+    boxMesh(truck, 0.03, 0.36, 0.6, material.glass, side * 1.06, 2.22, cabZ + 0.02, 0.02);      // окно двери
     boxMesh(truck, 0.03, 0.85, 0.02, material.oliveDark, side * 1.1, 1.55, cabZ - 0.28);       // шов двери
     boxMesh(truck, 0.03, 0.03, 0.12, material.steel, side * 1.105, 1.8, cabZ - 0.16);           // ручка
     tubeMesh(truck, [[side * 1.05, 2.0, cabFront - 0.1], [side * 1.28, 2.12, cabFront], [side * 1.31, 2.34, cabFront]], 0.014, material.frame);
     boxMesh(truck, 0.04, 0.26, 0.16, material.frame, side * 1.32, 2.36, cabFront, 0.015);
   }
-  boxMesh(truck, 0.06, 0.42, 0.04, material.oliveDark, 0, 2.24, cabFront - 0.06);
+  const pillar = boxMesh(truck, 0.06, 0.46, 0.04, material.oliveDark, 0, glassY, glassZ + 0.01);
+  pillar.rotation.x = -slope;
   boxMesh(truck, 1.1, 0.28, 0.03, material.glass, 0, 2.22, cabRear + 0.03, 0.02);                 // заднее окно
-  for (const x of [-0.25, 0, 0.25]) boxMesh(truck, 0.07, 0.04, 0.05, material.amber, x, 2.55, cabFront - 0.18, 0.01);
+  for (const x of [-0.25, 0, 0.25]) boxMesh(truck, 0.07, 0.04, 0.05, material.amber, x, 2.7, cabFront - 0.4, 0.01);
   // под кабиной: топливный бак, ящик аккумуляторов; выхлоп за кабиной
   cylinderMesh(truck, 0.26, 0.85, material.oliveDark, 0.88, 0.78, 3.05, 'z', 20);
   for (const z of [2.75, 3.35]) boxMesh(truck, 0.04, 0.58, 0.05, material.frame, 0.88, 0.78, z);

@@ -19,10 +19,10 @@ var Inventory = (function () {
 
   var style = document.createElement('style');
   style.textContent = [
-    '#inventory { position: fixed; inset: 0; background: rgba(4, 6, 7, 0.74); z-index: 50; display: none; user-select: none; font-family: Arial, sans-serif; }',
+    '#inventory { position: fixed; inset: 0; background: rgba(4, 6, 7, 0.28); z-index: 50; display: none; user-select: none; font-family: Arial, sans-serif; }',
     '#inventory.open { display: block; }',
     '#inventory .sheet { position: absolute; left: 50%; top: 50%; width: ' + WIDTH + 'px; height: ' + HEIGHT + 'px; margin: -' + HEIGHT / 2 + 'px 0 0 -' + WIDTH / 2 + 'px;',
-    '  background: linear-gradient(#141a1d, #0b0f11); border: 1px solid #3c4950; box-shadow: 0 0 0 1px #000, 0 12px 40px rgba(0,0,0,0.6); color: #e4e8ea; transform-origin: 50% 50%; }',
+    '  background: linear-gradient(rgba(24, 31, 35, 0.96), rgba(14, 18, 21, 0.96)); border: 1px solid #4c5b62; box-shadow: 0 0 0 1px #000, 0 12px 40px rgba(0,0,0,0.6); color: #e4e8ea; transform-origin: 50% 50%; }',
     '#inventory .title { position: absolute; left: 20px; top: 14px; font-size: 21px; font-weight: bold; }',
     '#inventory .subtitle { position: absolute; left: 20px; top: 42px; font-size: 10px; font-weight: bold; letter-spacing: 1px; color: #8a959c; }',
     '#inventory .numbers { position: absolute; right: 150px; top: 16px; text-align: right; font: 13px Consolas, "DejaVu Sans Mono", monospace; line-height: 19px; color: #8a959c; }',
@@ -32,14 +32,15 @@ var Inventory = (function () {
     '#inventory button { height: 30px; min-width: 34px; background: #161b1e; border: 1px solid #3a454b; color: #e4e8ea; font: bold 12px Arial, sans-serif; letter-spacing: 1px; cursor: pointer; }',
     '#inventory button:hover { border-color: #e8a33a; color: #ffd28a; }',
     '#inventory .label { position: absolute; font-size: 10px; font-weight: bold; letter-spacing: 1px; color: #8fd18a; white-space: nowrap; }',
-    '#inventory .slot { position: absolute; border: 1px solid #3a4a52; background-color: #070a0b;',
-    '  background-image: linear-gradient(#22303a 1px, transparent 1px), linear-gradient(90deg, #22303a 1px, transparent 1px); background-size: ' + CELL + 'px ' + CELL + 'px; }',
+    '#inventory .slot { position: absolute; border: 1px solid #6a7b84; background-color: #56636a;',
+    '  background-image: linear-gradient(#73838b 1px, transparent 1px), linear-gradient(90deg, #73838b 1px, transparent 1px); background-size: ' + CELL + 'px ' + CELL + 'px;',
+    '  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35); }',
     '#inventory .slot.single { background-image: none; }',
     '#inventory .figure { position: absolute; height: 230px; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.6)); pointer-events: none; }',
     '#inventory .item { position: absolute; cursor: grab; }',
     '#inventory .item:hover { outline: 1px solid rgba(232, 163, 58, 0.7); }',
     '#inventory .item.dragging { cursor: grabbing; outline: none; z-index: 5; pointer-events: none; opacity: 0.9; }',
-    '#inventory .item canvas { display: block; }',
+    '#inventory .item canvas { display: block; filter: drop-shadow(0 0 1px rgba(235, 240, 242, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }',
     '#inventory .rounds { position: absolute; right: 2px; bottom: 1px; font: bold 10px Consolas, monospace; color: #ffd28a; text-shadow: 0 0 2px #000, 0 0 2px #000; }',
     '#inventory .target { position: absolute; pointer-events: none; border: 2px solid; box-sizing: border-box; }',
     '#inventory .target.ok { border-color: #7ce07a; background: rgba(124, 224, 122, 0.12); }',
@@ -59,7 +60,7 @@ var Inventory = (function () {
   document.body.appendChild(root);
   var sheet = root.querySelector('.sheet'), body = root.querySelector('.body'), infoLine = root.querySelector('.info');
 
-  var unit = null, drag = null, message = '', defaultInfo = '';
+  var unit = null, drag = null, message = '', defaultInfo = '', pixelScale = 1;
 
   function open(target) {
     unit = target;
@@ -71,8 +72,10 @@ var Inventory = (function () {
   function close() { root.classList.remove('open'); unit = null; drag = null; }
   function isOpen() { return root.classList.contains('open'); }
   function fit() {
-    var scale = Math.min(1, (window.innerWidth - 20) / WIDTH, (window.innerHeight - 20) / HEIGHT);
+    // окно занимает до 80 % экрана по высоте и до 90 % по ширине, но не больше чем в 1,6 раза крупнее макета
+    var scale = Math.min(1.6, window.innerWidth * 0.9 / WIDTH, window.innerHeight * 0.8 / HEIGHT);
     sheet.style.transform = 'scale(' + scale + ')';
+    pixelScale = scale * (window.devicePixelRatio || 1);
   }
 
   function slotRect(slot) {
@@ -123,10 +126,18 @@ var Inventory = (function () {
     element.className = 'item';
     element.style.left = rect.x + 'px'; element.style.top = rect.y + 'px';
     element.style.width = rect.width + 'px'; element.style.height = rect.height + 'px';
+    // холст в разрешении экрана: окно увеличено, иначе предмет был бы размытым
     var canvas = document.createElement('canvas');
-    canvas.width = rect.width; canvas.height = rect.height;
+    canvas.width = Math.round(rect.width * pixelScale); canvas.height = Math.round(rect.height * pixelScale);
+    canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
     element.appendChild(canvas);
-    var draw = function () { var context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); Items.drawItem(context, entry.item, 2, 2, rect.width - 4, rect.height - 4); };
+    var draw = function () {
+      var context = canvas.getContext('2d');
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+      Items.drawItem(context, entry.item, 3, 3, rect.width - 6, rect.height - 6);
+    };
     draw();
     if (info.image) { var image = new Image(); image.onload = draw; image.src = info.image; }
     if (entry.item.rounds !== undefined) {
@@ -235,7 +246,7 @@ var Inventory = (function () {
     else if (event.key === 'ArrowLeft') step(-1);
     else if (event.key === 'ArrowRight') step(1);
   });
-  window.addEventListener('resize', function () { if (isOpen()) fit(); });
+  window.addEventListener('resize', function () { if (isOpen()) { fit(); render(); } });
 
   return { open: open, close: close, isOpen: isOpen, render: render };
 })();
