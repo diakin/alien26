@@ -28,6 +28,19 @@
 `python3 texture.py <NaturalEarthII/2> <папка>/land.geojson <папка>/borders.json ../../game/js`;
 тайлы NaturalEarthII — из пакета cesium (`npm pack cesium`, папка `Build/Cesium/Assets/Textures/NaturalEarthII`).
 
+### Подземная база и конвертоплан (проект)
+
+`docs/base/` — план базы в горе: `base_plan.png` (ярус 48×25 клеток, модули, двери и ворота), `base_section.png`
+(разрез: ярус на −30 м, шахта подъёмника ангара к люку в склоне, грузовой лифт и штольня к ущелью),
+`base_plan.json` (помещения, коридоры, двери — исходные данные для будущей карты). Собирает `tools/base/plan.py`
+(`python3 plan.py ../../docs/base`), он же проверяет пересечения и считает клетки: модули 1–7 — 643 клетки,
+с обеспечением и коридорами — 937 (1464 м²).
+
+Конвертоплан КТ-6 «Гриф» — `buildTiltrotor({ cutaway, rampOpen })` в `tools/render/vehicles.js`, размеры и
+раскладка салона по клеткам — `TILTROTOR`: 15 × 12,5 × 6,5 м, салон 4×6 клеток высотой 4 м, кормовая рампа,
+боковая дверь с трапом, 6 сидений и место K7. Проверка: `vehiclecheck.html`, `window.check('buildTiltrotor',
+'TILTROTOR', 9.5, { cutaway: true }, true)` — с K7 и шестью бойцами в салоне; рендеры — `docs/base/tiltrotor_*.png`.
+
 ### Карта из тайлов
 
 Каждый элемент клетки — пол, стена W, стена N, предмет — отрендерен отдельно той же камерой и лежит в атласе
