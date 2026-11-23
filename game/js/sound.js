@@ -1,11 +1,11 @@
 // Звуки, синтезированные в браузере (Web Audio), без файлов: выстрел карабина, плазма, автопушка, попадание,
 // взрыв гранаты, крики при гибели (боец — стон, пришелец — визг), падение тела, шаги бойцов, пришельцев и K7,
-// лязг перекладин лестницы. Фон — шум ветра (регулятор «музыка и фон»).
+// лязг перекладин лестницы. Фон — шум ветра (регулятор «фон»). Музыка — js/music.js, звучит через musicGain.
 // Браузер разрешает звук только после действия игрока, поэтому звук включается на первый щелчок или клавишу.
 var Sound = (function () {
   'use strict';
 
-  var audio = null, effectsGain = null, ambienceGain = null, noiseBuffer = null;
+  var audio = null, effectsGain = null, ambienceGain = null, musicGain = null, noiseBuffer = null;
   function volume(key) { return window.Settings ? Settings.values[key] / 100 : 0.6; }
 
   function start() {
@@ -17,21 +17,25 @@ var Sound = (function () {
     effectsGain.connect(audio.destination);
     ambienceGain = audio.createGain();
     ambienceGain.connect(audio.destination);
+    musicGain = audio.createGain();
+    musicGain.connect(audio.destination);
     // белый шум на 2 секунды — основа для выстрелов, взрывов и ветра
     noiseBuffer = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
     var data = noiseBuffer.getChannelData(0);
     for (var index = 0; index < data.length; index++) data[index] = Math.random() * 2 - 1;
     applyVolumes();
     startWind();
+    if (window.Music) Music.attach(audio, musicGain);
   }
   function applyVolumes() {
     if (!audio) return;
     effectsGain.gain.value = volume('soundVolume') * 0.8;
-    ambienceGain.gain.value = volume('musicVolume') * 0.5;
+    ambienceGain.gain.value = volume('ambienceVolume') * 0.5;
+    musicGain.gain.value = volume('musicVolume');
   }
   window.addEventListener('mousedown', start, true);
   window.addEventListener('keydown', start, true);
-  if (window.Settings) Settings.onChange(function (values, key) { if (!key || key === 'soundVolume' || key === 'musicVolume') applyVolumes(); });
+  if (window.Settings) Settings.onChange(function (values, key) { if (!key || key === 'soundVolume' || key === 'musicVolume' || key === 'ambienceVolume') applyVolumes(); });
 
   function noise(duration, filterType, frequency, peak, attack, decay, when) {
     var source = audio.createBufferSource();

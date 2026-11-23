@@ -13,7 +13,9 @@ var Settings = (function () {
     { key: 'inspectAliens', label: 'Просмотр пришельцев: щелчок показывает его на панели', type: 'check', value: true },
     { group: 'ЗВУК' },
     { key: 'soundVolume', label: 'Громкость звуков', type: 'range', min: 0, max: 100, step: 5, value: 70, format: function (value) { return value + '%'; } },
-    { key: 'musicVolume', label: 'Громкость музыки и фона', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
+    { key: 'musicVolume', label: 'Громкость музыки', type: 'range', min: 0, max: 100, step: 5, value: 45, format: function (value) { return value + '%'; } },
+    { key: 'musicTheme', label: 'Музыка', type: 'select', value: 0, options: [[0, 'По обстановке'], [1, 'Только общая'], [2, 'Только боевая']] },
+    { key: 'ambienceVolume', label: 'Громкость фона (ветер)', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
     { group: 'ГРАФИКА' },
     { key: 'renderScale', label: 'Разрешение отрисовки', type: 'select', value: 1, options: [[1, 'Полное'], [0.75, '75 % — быстрее'], [0.5, '50 % — для слабых машин']] },
     { key: 'fullscreen', label: 'Полный экран', type: 'check', value: false, live: true },
@@ -26,6 +28,8 @@ var Settings = (function () {
     var saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
     // версия 2: скорость перемещения по умолчанию ×3 — старое сохранённое значение не переносится
     if (!saved.version || saved.version < 2) delete saved.moveSpeed;
+    // версия 3: регулятор «музыка и фон» разделён на музыку и фон — старое значение переходит к фону
+    if (!saved.version || saved.version < 3) { if ('musicVolume' in saved) saved.ambienceVolume = saved.musicVolume; delete saved.musicVolume; }
     Object.keys(saved).forEach(function (key) { if (key in values && key !== 'fullscreen') values[key] = saved[key]; });
   } catch (error) { /* хранилище недоступно — значения по умолчанию */ }
   values.fullscreen = false;               // полный экран браузер включает только по действию игрока
@@ -33,7 +37,7 @@ var Settings = (function () {
   var listeners = [];
   function onChange(listener) { listeners.push(listener); listener(values, null); }
   function save() {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({ version: 2 }, values))); } catch (error) { /* не сохраняем */ }
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({ version: 3 }, values))); } catch (error) { /* не сохраняем */ }
   }
   function set(key, value) {
     values[key] = value;
@@ -93,7 +97,7 @@ var Settings = (function () {
       }
       html += '</div>';
     });
-    html += '<div class="note">Музыки в игре пока нет: регулятор «музыка и фон» управляет фоновым шумом ветра. ' +
+    html += '<div class="note">«По обстановке»: общая тема, пока тихо; боевая — когда идёт перестрелка или пришелец и боец видят друг друга. ' +
       'Разрешение отрисовки ниже полного снижает нагрузку на видеокарту, картинка становится мягче.</div>' +
       '<div class="buttons"><button data-do="reset">ПО УМОЛЧАНИЮ</button><button data-do="close">ГОТОВО</button></div></div>';
     root.innerHTML = html;

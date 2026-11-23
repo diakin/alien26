@@ -838,6 +838,7 @@
     if (direction >= 0) selected.direction = direction;
     selected.inventory.splice(selected.inventory.indexOf(entry), 1);
     if (!combat) setCombat(true);
+    lastShotTurn = turn;
     var landing = { x: target.point.x, y: target.point.y, h: target.point.h, level: target.tile.level };
     if (Math.random() * 100 >= target.chance) {        // промах: отклонение
       var angle = Math.random() * Math.PI * 2, spread = (0.6 + Math.random() * (0.5 + target.distance / 6)) / Iso.tileMeters;
@@ -1044,6 +1045,7 @@
     var direction = Iso.directionOf(target.point.x - shooter.x, target.point.y - shooter.y);
     if (direction >= 0) shooter.direction = direction;
     if (!combat) setCombat(true);                       // первый выстрел — боевая обстановка
+    lastShotTurn = turn;
     var now = performance.now(), count = Math.min(mode.shots, shooter.ammo);
     shooter.firingUntil = now + delay + 900 + count * 160;
     for (var index = 0; index < count; index++) {
@@ -1194,6 +1196,29 @@
     if (selected) { viewFollow(selected); centerOn(selected.x, selected.y, selected.elevation); }
     updateHover();
   }
+  // ---- музыка (js/music.js): общая тема, пока тихо; боевая — если стреляли в этот или прошлый ход
+  // либо живые пришелец и боец ближе 25 м видят друг друга (ничто не заслоняет линию от ствола до корпуса) ----
+  var lastShotTurn = -10, musicCheckAt = 0, CONTACT_METERS = 25;
+  function inContact() {
+    return units.some(function (alien) {
+      if (alien.side !== 'aliens' || alien.dead) return false;
+      return units.some(function (unit) {
+        if (unit.side !== 'squad' || unit.dead) return false;
+        var point = targetPointOf(unit), from = muzzleOf(alien, point);
+        var distance = Combat.distanceMeters(combatWorld, from, point);
+        if (distance > CONTACT_METERS) return false;
+        var line = Combat.trace(combatWorld, from, point, distance + 0.3, alien);
+        return line.kind === 'unit' && line.unit === unit;
+      });
+    });
+  }
+  function musicMood() { return combat && (turn - lastShotTurn <= 1 || inContact()) ? 'battle' : 'calm'; }
+  function updateMusic(now) {
+    if (!window.Music || now < musicCheckAt) return;
+    musicCheckAt = now + 1000;                     // раз в секунду: трассировки пар пришелец — боец
+    Music.setMood(musicMood());
+  }
+
   function visibleTargets(alien) {
     var weapon = weaponOf(alien);
     var result = [];
@@ -2558,6 +2583,7 @@
     updateThrows(now);
     updateWrecks(now);
     updateAI(now);
+    updateMusic(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
     if (phase === 'squad' && selected && followLevel(selected) !== followedLevel) viewFollow(selected);
     // боец вошёл в помещение или вышел из него — стены срезаются или восстанавливаются
@@ -2589,7 +2615,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
