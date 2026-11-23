@@ -66,7 +66,7 @@ var Items = (function () {
   // Оружие — картинки из панели (горизонтальные), повёрнутые вдоль длинной стороны предмета; остальное рисуется.
   var images = {};
   function imageOf(path) {
-    if (!images[path]) { images[path] = new Image(); images[path].src = path; }
+    if (!images[path]) images[path] = Assets.image(path, 1);        // очередь с повтором при обрыве (js/assets.js)
     return images[path];
   }
   Object.keys(TYPES).forEach(function (type) { if (TYPES[type].image) imageOf(TYPES[type].image); });
@@ -86,7 +86,7 @@ var Items = (function () {
   // По короткой стороне допускается небольшой выход за рамку (приклад и магазин), чтобы оружие не было мелким.
   function drawImage(context, path, crop, x, y, width, height) {
     var image = imageOf(path);
-    if (!image.complete || !image.naturalWidth) return;
+    if (!Assets.ready(image)) return;
     var vertical = height > width;
     var boxWidth = vertical ? height : width, boxHeight = vertical ? width : height;
     var scale = Math.min(boxWidth / crop[2], boxHeight * 1.3 / crop[3]);

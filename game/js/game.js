@@ -38,16 +38,33 @@
   var panelElement = document.getElementById('panel');
 
   // ---------------- загрузка картинок ----------------
+  // Спрайты грузятся через очередь js/assets.js: сначала стойки (их видно сразу), потом прицел и первый
+  // кадр ходьбы, затем остальная ходьба, лестница и падение. Кадр, нужный прямо сейчас, идёт вне очереди.
   var images = {};
-  function load(name, src) {
-    var image = new Image();
-    image.src = src;
-    images[name] = image;
-    return image;
+  function spriteSource(name) { return (name.indexOf('rock') === 0 ? 'assets/objects/' : 'assets/units/') + name + '.png'; }
+  function spritePriority(name) {
+    if (/_idle_|_ease_|^rock/.test(name)) return 2;
+    if (/_kneelAim_|_standAim_|_walk_f0_/.test(name)) return 3;
+    if (/_walk_/.test(name)) return 4;
+    return 5;
   }
-  Object.keys(SPRITE_ANCHORS).forEach(function (name) {
-    load(name, (name.indexOf('rock') === 0 ? 'assets/objects/' : 'assets/units/') + name + '.png');
-  });
+  Object.keys(SPRITE_ANCHORS).forEach(function (name) { images[name] = Assets.image(spriteSource(name), spritePriority(name)); });
+  // Имя кадра, который можно нарисовать сейчас: нужный, а пока он не загружен — стойка того же юнита
+  // в том же направлении (или в любом). Для лежащих тел подходит только кадр тела. null — рисовать нечего.
+  function drawableSprite(name) {
+    var image = images[name];
+    if (Assets.ready(image)) return name;
+    if (image) Assets.want(spriteSource(name));
+    var match = /^([a-z]+)_.*_d(\d+)$/.exec(name);
+    if (!match) return null;
+    var set = match[1], direction = match[2];
+    var candidates = /_dead_|_fall_/.test(name) ? [set + '_dead_d' + direction]
+      : [set + '_idle_d' + direction, set + '_ease_d' + direction, set + '_walk_f0_d' + direction];
+    for (var index = 0; index < candidates.length; index++) if (Assets.ready(images[candidates[index]])) return candidates[index];
+    if (/_dead_|_fall_/.test(name)) return null;
+    for (var other = 0; other < 8; other++) if (Assets.ready(images[set + '_idle_d' + other])) return set + '_idle_d' + other;
+    return null;
+  }
 
   // ---------------- клетки карты ----------------
   function inside(col, row) { return col >= 0 && row >= 0 && col < GRID && row < GRID; }
@@ -432,8 +449,6 @@
     var data = MAP.variants[key];
     var variant = { key: key, data: data, pieces: [], ready: false };
     variants[key] = variant;
-    variant.background = new Image();
-    variant.mask = data.mask ? new Image() : null;
     function tryBuild() {
       if (!variant.background.complete || !variant.background.naturalWidth) return;
       if (variant.mask && (!variant.mask.complete || !variant.mask.naturalWidth)) return;
@@ -441,10 +456,12 @@
       buildPieces(variant);
       variant.ready = true;
     }
-    if (data.doorAtlas) { variant.doorAtlas = new Image(); variant.doorAtlas.src = data.doorAtlas; }
-    variant.background.onload = tryBuild;
-    variant.background.src = data.background;
-    if (variant.mask) { variant.mask.onload = tryBuild; variant.mask.src = data.mask; }
+    // фон и маска — первыми в очереди загрузки; при обрыве загрузка повторяется (js/assets.js)
+    variant.background = Assets.image(data.background, Assets.URGENT);
+    variant.mask = data.mask ? Assets.image(data.mask, Assets.URGENT) : null;
+    if (data.doorAtlas) variant.doorAtlas = Assets.image(data.doorAtlas, 1);
+    Assets.image(data.background, Assets.URGENT, tryBuild);
+    if (data.mask) Assets.image(data.mask, Assets.URGENT, tryBuild);
     return variant;
   }
   // каждый кусок — свой маленький холст: фон, обрезанный маской куска
@@ -482,8 +499,8 @@
   var tileImage = null, shadowImage = null, shadowCanvas = null, groundPieces = null, tileViews = {};
   var tileStats = { ground: 0, shadows: 0, pieces: 0 };
   if (TILESET) {
-    tileImage = new Image(); tileImage.src = TILESET.image;
-    shadowImage = new Image(); shadowImage.src = TILESET.shadows;
+    tileImage = Assets.image(TILESET.image, Assets.URGENT);
+    shadowImage = Assets.image(TILESET.shadows, Assets.URGENT);
     shadowCanvas = document.createElement('canvas');
   }
   // кусок картинки тайла на месте клетки: прямоугольник в пикселях карты и в атласе
@@ -585,7 +602,7 @@
       current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
       staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
       list.sort(function (first, second) { return first.depth - second.depth; });
-      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else item.draw(); });
+      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
     });
     return chunk;
   }
@@ -1834,7 +1851,7 @@
   }
 
   function spriteRect(unit, position) {
-    var name = spriteName(unit), image = images[name], anchor = SPRITE_ANCHORS[name];
+    var name = drawableSprite(spriteName(unit)) || spriteName(unit), image = images[name], anchor = SPRITE_ANCHORS[name];
     var foot = Iso.toScreen(position.x, position.y, position.elevation);
     if (!image || !anchor || !image.naturalWidth) return { x: foot.x - unit.pickWidth, y: foot.y - unit.height * Iso.pixelsPerMeterUp, width: unit.pickWidth * 2, height: unit.height * Iso.pixelsPerMeterUp };
     return { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight };
@@ -2277,11 +2294,42 @@
     context.restore();
   }
 
-  function drawSprite(name, col, row, elevation) {
-    var image = images[name], anchor = SPRITE_ANCHORS[name];
-    if (!image || !image.complete || !anchor) return;
+  // Ошибка в одном элементе не должна обрывать кадр: иначе не рисуется всё, что идёт после него по глубине.
+  // В консоль — один раз на каждое новое сообщение.
+  var drawErrors = {};
+  function safeDraw(item) {
+    try { item.draw(); } catch (error) {
+      var message = String(error && error.message || error);
+      if (!drawErrors[message]) { drawErrors[message] = true; console.error('Ошибка отрисовки:', error); }
+    }
+  }
+  // unit — юнит, которому принадлежит кадр: если не загружен ни кадр, ни запасная стойка, рисуется силуэт-заглушка
+  function drawSprite(name, col, row, elevation, unit) {
     var foot = Iso.toScreen(col, row, elevation || 0);
-    context.drawImage(image, Math.round(foot.x - camera.x - anchor[0]), Math.round(foot.y - camera.y - anchor[1]));
+    var drawable = drawableSprite(name);
+    if (!drawable) { if (unit) drawPlaceholder(unit, foot); return; }
+    var anchor = SPRITE_ANCHORS[drawable];
+    context.drawImage(images[drawable], Math.round(foot.x - camera.x - anchor[0]), Math.round(foot.y - camera.y - anchor[1]));
+  }
+  // заглушка, пока графика юнита грузится: тень на земле и полупрозрачный силуэт в цвет стороны
+  function drawPlaceholder(unit, foot) {
+    var x = foot.x - camera.x, y = foot.y - camera.y;
+    var height = unit.height * Iso.pixelsPerMeterUp, width = Math.max(14, (unit.pickWidth || 12) * 1.1);
+    context.save();
+    context.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    context.beginPath(); context.ellipse(x, y, width * 0.75, width * 0.36, 0, 0, Math.PI * 2); context.fill();
+    context.fillStyle = 'rgba(14, 20, 22, 0.6)';
+    context.strokeStyle = unit.side === 'aliens' ? '#e0673e' : '#9bd88f';
+    context.lineWidth = 1.5;
+    var radius = width / 2;
+    context.beginPath();
+    context.moveTo(x - radius, y - 2);
+    context.lineTo(x - radius, y - height + radius);
+    context.arc(x, y - height + radius, radius, Math.PI, 0);
+    context.lineTo(x + radius, y - 2);
+    context.closePath();
+    context.fill(); context.stroke();
+    context.restore();
   }
 
   // маршрут: доступная часть голубая, на остальную не хватает ОД — оранжевая
@@ -2334,7 +2382,7 @@
   // створка: entry = [дверь, x, y, w, h, sx, sy] — место на карте и в атласе; cutLevel — срезанный уровень или -1
   function drawDoor(atlas, entry, cutLevel) {
     var door = doors[entry[0]];
-    if (!door || !atlas || !atlas.complete) return;
+    if (!door || !Assets.ready(atlas)) return;
     var tile = Iso.tileMeters;
     var cut = cutLevel === door.level;
     var top = cut ? 0.8 : 2.12;
@@ -2373,7 +2421,7 @@
     // показываем вариант, как только он готов; до этого — прежний
     var wanted = variants[variantKey(view.level, view.cut)];
     if (wanted && wanted.ready) shownVariant = wanted;
-    if (shownVariant && shownVariant.background.complete) context.drawImage(shownVariant.background, -Math.round(camera.x), -Math.round(camera.y));
+    if (shownVariant && Assets.ready(shownVariant.background)) context.drawImage(shownVariant.background, -Math.round(camera.x), -Math.round(camera.y));
 
     // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка.
     // Для робота рамка охватывает всю его площадку 2x2.
@@ -2390,7 +2438,7 @@
       if (unit.level > view.level) return;          // выше уровня обзора — не видно
       var position = drawPosition(unit);
       rects.push(spriteRect(unit, position));
-      drawList.push({ depth: unitDepth(unit), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation); } });
+      drawList.push({ depth: unitDepth(unit), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation, unit); } });
     });
     obstacles.forEach(function (rock) { drawList.push({ depth: depthKey(rock.col, rock.row, 0, 4), draw: function () { drawSprite(rock.sprite, rock.col + 0.5, rock.row + 0.5); } }); });
     if (shownVariant && shownVariant.ready) {
@@ -2412,7 +2460,7 @@
       });
     }
     drawList.sort(function (first, second) { return first.depth - second.depth; });
-    drawList.forEach(function (item) { item.draw(); });
+    drawList.forEach(safeDraw);
 
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
@@ -2429,7 +2477,7 @@
   // а за рамку ничего не выходит, поэтому ближние куски вне группы не страдают.
   function renderTiles() {
     var current = tileView(view.level, view.cut);
-    if (!tileImage.complete || !shadowImage.complete) return;
+    if (!Assets.ready(tileImage) || !Assets.ready(shadowImage)) return;
     drawChunks(current);
     var hover = hoverStyle();
 
@@ -2442,7 +2490,7 @@
     units.forEach(function (unit) {
       if (unit.level > view.level) return;
       var position = drawPosition(unit);
-      dynamic.push({ depth: unitDepth(unit), rect: spriteRect(unit, position), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation); } });
+      dynamic.push({ depth: unitDepth(unit), rect: spriteRect(unit, position), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation, unit); } });
     });
     current.doors.forEach(function (entry) {
       var door = doors[entry[0]];
@@ -2484,7 +2532,7 @@
       context.beginPath();
       context.rect(Math.floor(group.rect.x - camera.x), Math.floor(group.rect.y - camera.y), Math.ceil(group.rect.width) + 1, Math.ceil(group.rect.height) + 1);
       context.clip();
-      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else item.draw(); });
+      list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
       context.restore();
     });
 
@@ -2594,7 +2642,28 @@
     }
     if (wasMoving) updateHover();
     render();
+    drawLoading();
     if (window.Panel) window.Panel.update();
+  }
+
+  // плашка загрузки графики слева вверху, пока очередь не опустеет
+  function drawLoading() {
+    var state = Assets.progress();
+    if (state.ready >= state.total) return;
+    var text = 'ЗАГРУЗКА ГРАФИКИ  ' + state.ready + ' / ' + state.total + (state.waiting ? '   ·   ПОВТОР: ' + state.waiting : '');
+    context.save();
+    context.font = 'bold 11px Arial, sans-serif';
+    var width = context.measureText(text).width + 28, x = 16, y = 124;      // под кнопкой «НАСТРОЙКИ»
+    context.fillStyle = 'rgba(10, 13, 15, 0.86)';
+    context.fillRect(x, y, width, 24);
+    context.strokeStyle = state.waiting ? '#c0703a' : '#3a454b';
+    context.strokeRect(x + 0.5, y + 0.5, width - 1, 23);
+    context.fillStyle = 'rgba(232, 163, 58, 0.35)';
+    context.fillRect(x + 1, y + 21, (width - 2) * state.ready / state.total, 2);
+    context.fillStyle = '#cfd8dc';
+    context.textBaseline = 'middle';
+    context.fillText(text, x + 14, y + 12);
+    context.restore();
   }
 
   Settings.onChange(function (values, key) {
@@ -2621,6 +2690,6 @@
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
-    centerOn: centerOn, variantReady: function () { if (TILESET) return tileImage.complete; var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
+    centerOn: centerOn, variantReady: function () { if (TILESET) return Assets.ready(tileImage); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

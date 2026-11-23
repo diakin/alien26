@@ -241,8 +241,8 @@ var Panel = (function () {
   var minimapContext = minimap.getContext('2d');
   var mapBackground = null;      // уменьшенная копия фона
   var mapScale = 1, mapOffsetX = 0, mapOffsetY = 0;
-  var fieldImage = new Image();
-  fieldImage.onload = function () {
+  var fieldImage = null;
+  function buildMinimapBackground() {
     mapScale = Math.min(minimap.width / FIELD.width, minimap.height / FIELD.height) * 1.32;
     mapOffsetX = (minimap.width - FIELD.width * mapScale) / 2;
     mapOffsetY = (minimap.height - FIELD.height * mapScale) / 2 + 14;
@@ -261,7 +261,7 @@ var Panel = (function () {
       mapContext.beginPath(); mapContext.moveTo(0, line + 0.5); mapContext.lineTo(minimap.width, line + 0.5); mapContext.stroke();
     }
   };
-  fieldImage.src = MAP.minimap;
+  fieldImage = Assets.image(MAP.minimap, Assets.URGENT, buildMinimapBackground);
 
   function mapPoint(col, row) {
     var point = Iso.toScreen(col, row);

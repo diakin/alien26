@@ -139,7 +139,7 @@ var Inventory = (function () {
       Items.drawItem(context, entry.item, 3, 3, rect.width - 6, rect.height - 6);
     };
     draw();
-    if (info.image) { var image = new Image(); image.onload = draw; image.src = info.image; }
+    if (info.image) Assets.image(info.image, Assets.URGENT, draw);
     if (entry.item.rounds !== undefined) {
       var rounds = document.createElement('div');
       rounds.className = 'rounds';
