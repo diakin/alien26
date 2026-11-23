@@ -1005,7 +1005,12 @@
   }
 
   function setFireMode(index) { if (selected) selected.fireMode = index; }
-  function cancelAim() { aiming = false; aimTarget = null; throwing = null; inspected = null; updateHover(); }
+  function cancelAim() {
+    aiming = false; aimTarget = null; throwing = null; inspected = null;
+    if (aimRaisedView && selected) viewFollow(selected);   // обзор был поднят к цели — вернуть к бойцу
+    aimRaisedView = false;
+    updateHover();
+  }
   // Просмотр пришельца (настройка «Просмотр пришельцев»): после щелчка по пришельцу панель показывает его —
   // руки, портрет, характеристики; снаряжение и окно характеристик открываются для него только для чтения.
   // Действовать по-прежнему выбранный боец: следующий щелчок по пришельцу — выстрел.
@@ -1302,7 +1307,17 @@
     if (!weaponOf(selected)) { say('Нет оружия'); return; }
     throwing = null; aiming = true; aimTarget = unit;
     showTarget(unit);
+    raiseViewTo(unit);
     updateHover();
+  }
+  // Уровни выше уровня обзора не рисуются. Если цель выше — обзор поднимается до её уровня (нижние уровни
+  // с бойцом остаются видны), стены срезаются, если цель в помещении. После отмены прицела обзор возвращается к бойцу.
+  var aimRaisedView = false;
+  function raiseViewTo(unit) {
+    var level = followLevel(unit);
+    if (level <= view.level) return;
+    setView(level, view.cut || isIndoor(unit.col, unit.row, unit.level));
+    aimRaisedView = true;
   }
   // Камера к цели прицела: если враг не виден целиком, камера стремится к середине между бойцом и врагом,
   // но сдвигается так, чтобы враг (от ног до головы) остался в кадре с отступами. На дальней дистанции
