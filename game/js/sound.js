@@ -1,5 +1,6 @@
 // Звуки, синтезированные в браузере (Web Audio), без файлов: выстрел карабина, плазма, автопушка, попадание,
-// взрыв гранаты, падение тела, шаги K7 не озвучены. Фон — шум ветра (регулятор «музыка и фон»).
+// взрыв гранаты, крики при гибели (боец — стон, пришелец — визг), падение тела, шаги бойцов, пришельцев и K7,
+// лязг перекладин лестницы. Фон — шум ветра (регулятор «музыка и фон»).
 // Браузер разрешает звук только после действия игрока, поэтому звук включается на первый щелчок или клавишу.
 var Sound = (function () {
   'use strict';
@@ -59,6 +60,33 @@ var Sound = (function () {
     oscillator.start(time); oscillator.stop(time + duration + 0.05);
   }
 
+  // голос: пила через полосовые фильтры-форманты (гласная), высота плавно падает, дрожание голоса
+  function voice(from, to, duration, formants, peak, vibratoRate, vibratoDepth, type) {
+    var time = audio.currentTime;
+    var source = audio.createOscillator();
+    source.type = type || 'sawtooth';
+    source.frequency.setValueAtTime(from, time);
+    source.frequency.exponentialRampToValueAtTime(to, time + duration);
+    var vibrato = audio.createOscillator(), vibratoGain = audio.createGain();
+    vibrato.frequency.value = vibratoRate; vibratoGain.gain.value = vibratoDepth;
+    vibrato.connect(vibratoGain); vibratoGain.connect(source.frequency);
+    var envelope = audio.createGain();
+    envelope.gain.setValueAtTime(0.0001, time);
+    envelope.gain.exponentialRampToValueAtTime(peak, time + 0.04);
+    envelope.gain.setValueAtTime(peak, time + duration * 0.45);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    formants.forEach(function (formant) {
+      var filter = audio.createBiquadFilter();
+      filter.type = 'bandpass'; filter.frequency.value = formant[0]; filter.Q.value = formant[1];
+      var level = audio.createGain(); level.gain.value = formant[2];
+      source.connect(filter); filter.connect(level); level.connect(envelope);
+    });
+    envelope.connect(effectsGain);
+    source.start(time); vibrato.start(time);
+    source.stop(time + duration + 0.05); vibrato.stop(time + duration + 0.05);
+  }
+  function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
+
   // звук события; distance — расстояние от центра экрана в клетках: дальние тише
   function play(kind, distance) {
     if (!audio || volume('soundVolume') <= 0) return;
@@ -83,6 +111,35 @@ var Sound = (function () {
     } else if (kind === 'crash') {
       noise(1.0, 'lowpass', 500, 0.9 * far, 0.005, 0.8);
       for (var hit = 0; hit < 4; hit++) noise(0.15, 'bandpass', 1200 + hit * 500, 0.35 * far, 0.002, 0.1, 0.1 + hit * 0.12);
+    } else if (kind === 'deathSoldier') {
+      // стон: «а-а» с падающей высотой и выдох
+      var pitch = jitter(170, 0.3);
+      voice(pitch, pitch * 0.5, 0.75, [[700, 6, 1.0], [1150, 8, 0.6], [2500, 10, 0.25]], 0.5 * far, 6, 4);
+      noise(0.5, 'bandpass', 1200, 0.12 * far, 0.05, 0.4, 0.25);
+    } else if (kind === 'deathAlien') {
+      // визг пришельца: два расстроенных голоса с быстрым дрожанием и шипение
+      var screech = jitter(620, 0.25);
+      voice(screech, screech * 0.35, 0.9, [[1400, 4, 1.0], [2600, 6, 0.5]], 0.32 * far, 28, 40, 'sawtooth');
+      voice(screech * 1.5, screech * 0.4, 0.8, [[1800, 5, 0.6]], 0.18 * far, 31, 55, 'square');
+      noise(0.7, 'highpass', 3000, 0.18 * far, 0.02, 0.6);
+    } else if (kind === 'stepSoldier') {
+      // ботинок: глухой удар и хруст гравия
+      noise(0.08, 'lowpass', jitter(260, 0.3), 0.32 * far, 0.004, 0.06);
+      noise(0.05, 'highpass', jitter(3200, 0.3), 0.06 * far, 0.002, 0.035, 0.01);
+    } else if (kind === 'stepAlien') {
+      // мягкая лапа и стук когтей
+      noise(0.08, 'lowpass', jitter(180, 0.3), 0.22 * far, 0.008, 0.07);
+      for (var claw = 0; claw < 2; claw++) noise(0.02, 'bandpass', jitter(4200, 0.2), 0.07 * far, 0.001, 0.015, 0.02 + claw * 0.025);
+    } else if (kind === 'stepMech') {
+      // тяжёлая стопа: удар, низкий гул и шипение гидравлики
+      noise(0.25, 'lowpass', 140, 0.75 * far, 0.004, 0.2);
+      tone('sine', jitter(62, 0.1), 34, 0.28, 0.55 * far);
+      noise(0.3, 'bandpass', 2400, 0.08 * far, 0.05, 0.2, 0.08);
+    } else if (kind === 'ladder') {
+      // перекладина: металлический звон
+      tone('triangle', jitter(950, 0.1), 900, 0.12, 0.08 * far);
+      tone('sine', jitter(1480, 0.1), 1450, 0.09, 0.05 * far);
+      noise(0.04, 'highpass', 2500, 0.05 * far, 0.002, 0.03);
     } else if (kind === 'spark') {
       noise(0.06, 'highpass', 4000, 0.12 * far, 0.001, 0.04);
     } else if (kind === 'click') {

@@ -1,6 +1,8 @@
 // Бойцы, оружие и пришельцы (собраны из примитивов, позы через ИК).
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { buildRifle } from './weapons.js';
+export { buildRifle };
 import { segment, ball, solveTwoBone, camoTexture, webbingTexture, alienSkinTextures, chitinTextures, setShadows } from './lib.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -50,33 +52,7 @@ export const gunMaterials = {
 
 // ---------- винтовка (вдоль +z, приклад в начале координат) ----------
 
-export function buildRifle({ tanFurniture = false, suppressor = false } = {}) {
-  const rifle = new THREE.Group();
-  const metal = gunMaterials.metal;
-  const furniture = tanFurniture ? gunMaterials.tan : gunMaterials.polymer;
-  const add = (mesh, x, y, z, rx = 0) => { mesh.position.set(x, y, z); mesh.rotation.x = rx; rifle.add(mesh); return mesh; };
-  add(box(0.045, 0.1, 0.06, furniture, 0.012), 0, -0.02, 0.03);           // затыльник
-  add(box(0.04, 0.06, 0.17, furniture, 0.01), 0, 0.0, 0.13);              // приклад
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.12, 12).rotateX(Math.PI / 2), metal), 0, 0.02, 0.25);
-  add(box(0.042, 0.065, 0.2, metal, 0.008), 0, 0.0, 0.38);                 // нижняя часть
-  add(box(0.046, 0.05, 0.24, metal, 0.008), 0, 0.05, 0.39);                // верхняя часть
-  add(box(0.03, 0.1, 0.04, furniture, 0.01), 0, -0.07, 0.31, -0.3);        // рукоять
-  add(box(0.028, 0.16, 0.065, furniture, 0.008), 0, -0.1, 0.44, 0.2);      // магазин
-  add(box(0.056, 0.058, 0.32, metal, 0.01), 0, 0.04, 0.66);                // цевьё
-  for (let rail = 0; rail < 9; rail++) add(box(0.03, 0.008, 0.02, metal, 0.002), 0, 0.074, 0.53 + rail * 0.032);
-  add(box(0.03, 0.05, 0.05, furniture, 0.01), 0, -0.015, 0.6);             // передняя рукоять-упор
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.16, 10).rotateX(Math.PI / 2), metal), 0, 0.04, 0.88);
-  if (suppressor) add(new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.17, 14).rotateX(Math.PI / 2), metal), 0, 0.04, 1.02);
-  else add(new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.05, 10).rotateX(Math.PI / 2), metal), 0, 0.04, 0.97);
-  // прицел
-  add(box(0.03, 0.025, 0.06, metal, 0.005), 0, 0.087, 0.42);
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.11, 14).rotateX(Math.PI / 2), metal), 0, 0.115, 0.42);
-  add(new THREE.Mesh(new THREE.CircleGeometry(0.018, 14), gunMaterials.glass), 0, 0.115, 0.476);
-  add(box(0.02, 0.03, 0.04, furniture, 0.006), 0.03, 0.05, 0.72);          // фонарь
-  setShadows(rifle);
-  rifle.userData = { grip: V(0, -0.075, 0.305), support: V(-0.01, -0.03, 0.6), muzzle: V(0, 0.04, suppressor ? 1.11 : 1.0) };
-  return rifle;
-}
+// модель карабина — weapons.js
 
 // ---------- боец ----------
 

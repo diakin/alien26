@@ -2,6 +2,8 @@
 // (конусы со скруглёнными концами и эллипсоиды), объединены со сглаживанием (поле расстояний),
 // поверхность извлекается сеткой Surface Nets. Суставы получаются плавными, без шаров.
 // Чешуя — рельеф в шейдере (ячейки Вороного в координатах кости, поэтому не «плывёт» при ходьбе).
+import { buildPlasmaPistol } from './weapons.js';
+export { buildPlasmaPistol };
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { solveTwoBone, setShadows } from './lib.js';
@@ -585,21 +587,7 @@ function strap(from, to, width, normalHint, material) {
   return mesh;
 }
 // плазменный пистолет: начало координат — рукоятка в кисти, ствол вдоль +z над рукояткой
-export function buildPlasmaPistol() {
-  const materials = getGearMaterials();
-  const pistol = new THREE.Group();
-  const add = (mesh, x, y, z, rx = 0) => { mesh.position.set(x, y, z); mesh.rotation.x = rx; pistol.add(mesh); return mesh; };
-  add(gearBox(0.042, 0.1, 0.05, materials.gunDark), 0, -0.01, -0.005, -0.25);          // рукоятка
-  add(gearBox(0.05, 0.055, 0.2, materials.gun), 0, 0.065, 0.045);                       // корпус
-  add(gearBox(0.036, 0.03, 0.08, materials.glow), 0, 0.098, 0.0);                       // энергоячейка сверху
-  const barrel = add(new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.022, 0.1, 12).rotateX(Math.PI / 2), materials.gunDark), 0, 0.065, 0.19);
-  barrel.castShadow = true;
-  for (const z of [0.16, 0.2]) add(new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 14), materials.glow), 0, 0.065, z);   // кольца излучателя
-  add(gearBox(0.012, 0.035, 0.03, materials.gunDark), 0, 0.02, 0.06);                   // скоба
-  pistol.userData.muzzle = V(0, 0.065, 0.24);
-  pistol.scale.setScalar(1.2);            // крупнее на 20 %: на спрайте иначе теряется
-  return pistol;
-}
+// модель плазменного пистолета — weapons.js
 function orientPistol(pistol, barrel, upHint) {
   const forward = barrel.clone().normalize();
   const side = new THREE.Vector3().crossVectors(upHint, forward);

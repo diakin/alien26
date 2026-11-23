@@ -1089,7 +1089,9 @@
   }
   function kill(unit) {
     unit.dead = true;
-    setTimeout(function () { Sound.play(unit.kind === 'mech' ? 'crash' : 'fall', screenDistance(unit)); }, unit.kind === 'mech' ? 500 : 350);
+    var deathDistance = screenDistance(unit);
+    if (unit.kind !== 'mech') Sound.play(unit.side === 'aliens' ? 'deathAlien' : 'deathSoldier', deathDistance);   // крик сразу
+    setTimeout(function () { Sound.play(unit.kind === 'mech' ? 'crash' : 'fall', deathDistance); }, unit.kind === 'mech' ? 500 : 420);
     if (unit.inventory) {
       unit.inventory.forEach(function (entry) { dropOnGround(entry.item, unit.col, unit.row, unit.level); });
       unit.inventory = [];
@@ -1923,6 +1925,18 @@
   window.addEventListener('keyup', function (event) { keys[event.key] = false; });
 
   // ---------------- движение ----------------
+  // шаги: звук на каждой постановке ноги — дважды за цикл ходьбы (у K7 — тяжёлая стопа)
+  function footstep(unit, meters) {
+    var stepMeters = unit.frameMeters * WALK_FRAMES / 2;
+    var before = Math.floor(unit.stepDistance / stepMeters || 0);
+    unit.stepDistance = (unit.stepDistance || 0) + meters;
+    if (Math.floor(unit.stepDistance / stepMeters) !== before) footstepSound(unit, unit.kind === 'mech' ? 'stepMech' : unit.kind === 'alien' ? 'stepAlien' : 'stepSoldier');
+  }
+  function footstepSound(unit, kind) {
+    if (unit.level > view.level + 1) return;          // на скрытых верхних этажах не слышно
+    var distance = screenDistance(unit);
+    if (distance < 30) Sound.play(kind, distance);
+  }
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
     // под ответным огнём идущий стоит на клетке, пока летят пули
@@ -1935,6 +1949,8 @@
         unit.direction = next.face;
       }
       var climb = CLIMB_SPEED * Settings.values.moveSpeed * seconds;
+      // перекладина каждые 0,3 м
+      if (Math.floor(unit.elevation / 0.3) !== Math.floor((unit.elevation + (next.elevation > unit.elevation ? climb : -climb)) / 0.3)) footstepSound(unit, 'ladder');
       if (Math.abs(next.elevation - unit.elevation) <= climb) {
         unit.elevation = next.elevation;
         unit.level = next.level;
@@ -1966,6 +1982,7 @@
       if (direction >= 0) unit.direction = direction;
     }
     var stepTiles = unit.speed * Settings.values.moveSpeed * seconds / Iso.tileMeters;
+    footstep(unit, stepTiles * Iso.tileMeters);
     if (distanceTiles <= stepTiles) {
       unit.x = targetX; unit.y = targetY;
       unit.walked += distanceTiles * Iso.tileMeters;
