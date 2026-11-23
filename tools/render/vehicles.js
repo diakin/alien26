@@ -389,13 +389,19 @@ function pylon(group, materials, side, x0, x1, y, z, chord) {
 export function buildTiltrotor({ cutaway = false, rampOpen = true } = {}) {
   const clip = cutaway ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), 3.0)] : null;
   const materials = tiltrotorMaterials(clip);
+  // Слои для карты из тайлов (модель на карте повёрнута на −90°: нос к меньшим col, правый борт к большим row):
+  // floor — пол салона, рампа, сиденья, трап (рисуются до юнитов), back — левая обшивка салона и переборка кабины
+  // (дальние от камеры стенки, тоже до юнитов), group — корпус, крыша и всё остальное (после юнитов).
+  const floorGroup = new THREE.Group(), backGroup = new THREE.Group();
+  floorGroup.name = 'floor'; backGroup.name = 'back';
   const group = new THREE.Group();
+  group.name = 'shell';
   const halfWidth = 2.8, bottom = 0.25, top = 5.0, floorY = TILTROTOR.floor;
   const cabin = TILTROTOR.cabin;
 
   // днище с полом салона
-  boxMesh(group, halfWidth * 2, floorY - bottom, cabin.front - cabin.rear, materials.belly, 0, (floorY + bottom) / 2, (cabin.front + cabin.rear) / 2, 0.12);
-  boxMesh(group, cabin.right - cabin.left - 0.02, 0.03, cabin.front - cabin.rear, materials.floor, 0, floorY + 0.015, (cabin.front + cabin.rear) / 2);
+  boxMesh(floorGroup, halfWidth * 2, floorY - bottom, cabin.front - cabin.rear, materials.belly, 0, (floorY + bottom) / 2, (cabin.front + cabin.rear) / 2, 0.12).userData.solid = true;
+  boxMesh(floorGroup, cabin.right - cabin.left - 0.02, 0.03, cabin.front - cabin.rear, materials.floor, 0, floorY + 0.015, (cabin.front + cabin.rear) / 2);
   // борта до 4 м: левый целиком, правый с проёмом боковой двери
   const wallTop = 3.5, wallHeight = wallTop - bottom - 0.12;
   const wallY = bottom + 0.12 + wallHeight / 2;
@@ -419,11 +425,12 @@ export function buildTiltrotor({ cutaway = false, rampOpen = true } = {}) {
   roof.position.z = cabin.rear; group.add(roof);
   // кормовой обвод проёма
   const rimOuter = fuselageOutline(halfWidth + 0.04, bottom + 0.1, top + 0.04, 1.32, 0.3);
-  const rimInner = fuselageOutline(cabin.right, floorY, cabin.ceiling, 0.9, 0.01);
+  const rimInner = fuselageOutline(cabin.right - 0.03, floorY + 0.02, cabin.ceiling - 0.03, 0.87, 0.01);   // кант внутрь: грани не совпадают с бортами
   const rimShape = new THREE.Shape(rimOuter.map(([x, y]) => new THREE.Vector2(x, y)));
   rimShape.holes.push(new THREE.Path(rimInner.slice().reverse().map(([x, y]) => new THREE.Vector2(x, y))));
   const rim = shadowed(new THREE.Mesh(new THREE.ExtrudeGeometry(rimShape, { depth: 0.3, bevelEnabled: false, curveSegments: 4 }), materials.hullDark));
-  rim.position.z = cabin.rear; group.add(rim);
+  rim.position.z = cabin.rear; rim.userData.hollow = true; group.add(rim);       // кольцо: рамка не препятствие
+  rim.castShadow = rim.receiveShadow = false;      // тонкая рамка сама на себя даёт рябь теней
 
   // нос с кабиной пилотов: то же сечение; верх опускается скатом остекления, низ поднимается к подбородку,
   // сечение сужается к закруглённому носу
@@ -454,10 +461,10 @@ export function buildTiltrotor({ cutaway = false, rampOpen = true } = {}) {
   const archBand = glassBand.map(([x, y]) => [x * 1.004, y + 0.004]);
   loft(group, archBand, glassFront + (glassBack - glassFront) * 0.45, glassFront + (glassBack - glassFront) * 0.45 + 0.1, materials.hullDark, noseForm, 2, { bottom, top });
   // переборка с дверью в кабину (A1) — со стороны салона
-  boxMesh(group, cabin.right - cabin.left, cabin.ceiling - floorY, 0.08, materials.interior, 0, (cabin.ceiling + floorY) / 2, cabin.front - 0.04);
+  boxMesh(backGroup, cabin.right - cabin.left, cabin.ceiling - floorY, 0.08, materials.interior, 0, (cabin.ceiling + floorY) / 2, cabin.front - 0.04);
   const cockpit = TILTROTOR.cockpitDoor;
-  boxMesh(group, cockpit.right - cockpit.left - 0.2, cockpit.height, 0.06, materials.hullDark, (cockpit.left + cockpit.right) / 2, floorY + cockpit.height / 2, cabin.front - 0.09);
-  boxMesh(group, 0.25, 0.25, 0.05, materials.glass, (cockpit.left + cockpit.right) / 2, floorY + 1.6, cabin.front - 0.13);
+  boxMesh(backGroup, cockpit.right - cockpit.left - 0.2, cockpit.height, 0.06, materials.hullDark, (cockpit.left + cockpit.right) / 2, floorY + cockpit.height / 2, cabin.front - 0.09);
+  boxMesh(backGroup, 0.25, 0.25, 0.05, materials.glass, (cockpit.left + cockpit.right) / 2, floorY + 1.6, cabin.front - 0.13);
 
   // отсеки шасси по бортам и колёса
   [-1, 1].forEach((side) => {
@@ -478,34 +485,34 @@ export function buildTiltrotor({ cutaway = false, rampOpen = true } = {}) {
   [-1, 1].forEach((side) => boxMesh(rampGroup, 0.06, 0.18, rampLength, materials.yellow, side * (cabin.right - 0.03), 0.09, -rampLength / 2));
   rampGroup.position.set(0, floorY, cabin.rear);
   rampGroup.rotation.x = rampOpen ? -Math.atan2(floorY, TILTROTOR.ramp.to - TILTROTOR.ramp.from) : Math.PI / 2 - 0.15;
-  group.add(rampGroup);
+  floorGroup.add(rampGroup);
 
   // трап у боковой двери: три ступени от пола салона до земли
   const ladderX = halfWidth + 0.55, ladderWidth = door.front - door.rear - 0.15;
   for (let step = 0; step < 3; step++) {
     const stepY = floorY - (step + 1) * floorY / 3.2;
-    boxMesh(group, 0.36, 0.05, ladderWidth, materials.steel, halfWidth + 0.15 + step * 0.32, stepY, (door.rear + door.front) / 2);
+    boxMesh(floorGroup, 0.36, 0.05, ladderWidth, materials.steel, halfWidth + 0.15 + step * 0.32, stepY, (door.rear + door.front) / 2);
   }
   [door.rear + 0.1, door.front - 0.1].forEach((railZ) => tubeMesh(group, [[halfWidth + 0.05, floorY + 0.95, railZ], [halfWidth + 0.5, floorY + 0.7, railZ], [ladderX + 0.4, 0.75, railZ]], 0.025, materials.steel));
 
   // салон: панели бортов, сиденья, разметка места K7
-  [-1, 1].forEach((side) => boxMesh(group, 0.03, 2.9, cabin.front - cabin.rear - 0.2, materials.interior, side * (cabin.right - 0.015), floorY + 1.6, (cabin.front + cabin.rear) / 2));
+  [-1, 1].forEach((side) => boxMesh(side < 0 ? backGroup : group, 0.03, 2.9, cabin.front - cabin.rear - 0.2, materials.interior, side * (cabin.right - 0.015), floorY + 1.6, (cabin.front + cabin.rear) / 2));
   const cell = TILTROTOR.cells.cell;
   const rowZ = (row) => cabin.front - (row - 0.5) * cell;
   TILTROTOR.seats.forEach(([column, row]) => {
     const side = column === 'A' ? -1 : 1;
     const seatX = side * (cabin.right - 0.35), seatZ = rowZ(row);
-    boxMesh(group, 0.5, 0.1, 0.9, materials.seat, seatX, floorY + 0.48, seatZ, 0.03);
-    boxMesh(group, 0.1, 0.75, 0.9, materials.seat, side * (cabin.right - 0.08), floorY + 0.95, seatZ, 0.03);
-    boxMesh(group, 0.04, 0.45, 0.04, materials.frame, seatX - side * 0.2, floorY + 0.22, seatZ - 0.38);
-    boxMesh(group, 0.04, 0.45, 0.04, materials.frame, seatX - side * 0.2, floorY + 0.22, seatZ + 0.38);
-    boxMesh(group, 0.03, 0.6, 0.06, materials.yellow, side * (cabin.right - 0.05), floorY + 1.0, seatZ - 0.25);   // ремни
+    boxMesh(floorGroup, 0.5, 0.1, 0.9, materials.seat, seatX, floorY + 0.48, seatZ, 0.03);
+    boxMesh(floorGroup, 0.1, 0.75, 0.9, materials.seat, side * (cabin.right - 0.08), floorY + 0.95, seatZ, 0.03);
+    boxMesh(floorGroup, 0.04, 0.45, 0.04, materials.frame, seatX - side * 0.2, floorY + 0.22, seatZ - 0.38);
+    boxMesh(floorGroup, 0.04, 0.45, 0.04, materials.frame, seatX - side * 0.2, floorY + 0.22, seatZ + 0.38);
+    boxMesh(floorGroup, 0.03, 0.6, 0.06, materials.yellow, side * (cabin.right - 0.05), floorY + 1.0, seatZ - 0.25);   // ремни
   });
   const bayLeft = -cell, bayRight = cell, bayRear = rowZ(2) - cell / 2, bayFront = cabin.front;
   [[bayLeft, bayRear, bayRight, bayRear], [bayLeft, bayRear, bayLeft, bayFront - 0.1], [bayRight, bayRear, bayRight, bayFront - 0.1]].forEach(([x0, z0, x1, z1]) => {
-    boxMesh(group, Math.max(0.08, Math.abs(x1 - x0)), 0.012, Math.max(0.08, Math.abs(z1 - z0)), materials.yellow, (x0 + x1) / 2, floorY + 0.036, (z0 + z1) / 2);
+    boxMesh(floorGroup, Math.max(0.08, Math.abs(x1 - x0)), 0.012, Math.max(0.08, Math.abs(z1 - z0)), materials.yellow, (x0 + x1) / 2, floorY + 0.036, (z0 + z1) / 2);
   });
-  [[-0.8, 9.4], [0.8, 9.4], [-0.8, 7.8], [0.8, 7.8]].forEach(([ringX, ringZ]) => cylinderMesh(group, 0.07, 0.03, materials.steel, ringX, floorY + 0.045, ringZ, 'y', 12));   // швартовочные кольца
+  [[-0.8, 9.4], [0.8, 9.4], [-0.8, 7.8], [0.8, 7.8]].forEach(([ringX, ringZ]) => cylinderMesh(floorGroup, 0.07, 0.03, materials.steel, ringX, floorY + 0.045, ringZ, 'y', 12));   // швартовочные кольца
 
   // хвостовые кили и обтекатель двигателей на крыше
   [-1, 1].forEach((side) => {
@@ -530,5 +537,81 @@ export function buildTiltrotor({ cutaway = false, rampOpen = true } = {}) {
     boxMesh(group, 0.02, 0.08, 2.4, materials.yellow, side * (halfWidth + 0.01), 2.9, 7.4);
     boxMesh(group, 0.02, 0.4, 0.4, materials.white, side * (halfWidth + 0.01), 3.25, 9.2);
   });
+  // препятствия для пуль: крупные части корпуса (тонкие детали, стёкла кабины и лопасти — нет)
+  group.updateMatrixWorld(true);
+  group.traverse((node) => {
+    if (!node.isMesh) return;
+    const size = new THREE.Box3().setFromObject(node).getSize(new THREE.Vector3());
+    if (Math.min(size.x, size.y, size.z) >= 0.12 && !node.userData.hollow) node.userData.solid = true;
+  });
+  const root = new THREE.Group();
+  root.add(floorGroup, backGroup, group);
+  return root;
+}
+
+// ---------------- легковые машины для стоянки ----------------
+// Обобщённые формы без марок: внедорожник и фургон. Вдоль z, перед в +z, x поперёк, y вверх.
+export const CARS = {
+  suv: { length: 4.7, width: 1.9, height: 1.8 },
+  van: { length: 5.1, width: 2.0, height: 2.15 },
+};
+const CAR_COLORS = { white: 0xd6d8d4, graphite: 0x3a3e42, red: 0x7a2a22, olive: 0x4f5638, blue: 0x2f4a66, sand: 0xa8946a };
+
+function carWheel(group, materials, x, y, z, radius, width, outward) {
+  const tire = cylinderMesh(group, radius, width, materials.rubber, x, y, z, 'x', 28);
+  void tire;
+  cylinderMesh(group, radius * 0.62, width + 0.01, materials.rim, x + outward * 0.005, y, z, 'x', 20);
+  cylinderMesh(group, radius * 0.2, width + 0.03, materials.frame, x + outward * 0.01, y, z, 'x', 12);
+}
+
+export function buildCar({ type = 'suv', color = 'white', seed = 1 } = {}) {
+  const info = CARS[type];
+  const standard = (value, roughness = 0.45, metalness = 0.35, extra = {}) => new THREE.MeshStandardMaterial({ color: value, roughness, metalness, ...extra });
+  const materials = {
+    body: standard(CAR_COLORS[color] || CAR_COLORS.white, 0.38, 0.45),
+    trim: standard(0x1f2224, 0.7, 0.2),
+    rubber: standard(0x18181a, 0.95, 0.0),
+    rim: standard(0x9a9ea2, 0.35, 0.8),
+    frame: standard(0x2a2c2e, 0.6, 0.5),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x141c22, roughness: 0.05, metalness: 0.2, clearcoat: 1, envMapIntensity: 1.5 }),
+    lamp: standard(0xe8e4d0, 0.2, 0.3, { emissive: 0x222018 }),
+    tail: standard(0x8a1a14, 0.3, 0.2, { emissive: 0x2a0503 }),
+    dust: standard(0x8a7a5e, 0.95, 0.0),
+  };
+  const group = new THREE.Group();
+  const width = info.width, length = info.length;
+  const wheelRadius = type === 'van' ? 0.36 : 0.4;
+  const groundClear = type === 'van' ? 0.18 : 0.26;
+  if (type === 'suv') {
+    // нижняя часть кузова до линии окон: профиль сбоку
+    sideExtrude(group, [[0.0, groundClear + 0.22], [0.0, 1.0], [0.12, 1.08], [3.75, 1.1], [4.55, 1.0], [4.7, 0.86], [4.7, groundClear + 0.22], [4.45, groundClear + 0.1], [0.25, groundClear + 0.1]], width, materials.body, 0, 0.09);
+    // остекление и крыша: стёкла на всю «теплицу», стойки и крыша — цветом кузова
+    sideExtrude(group, [[0.22, 1.06], [0.32, 1.66], [2.95, 1.7], [3.62, 1.08]], width - 0.18, materials.glass, 0, 0.06);
+    sideExtrude(group, [[0.3, 1.66], [0.34, 1.78], [2.92, 1.8], [2.98, 1.68]], width - 0.12, materials.body, 0, 0.05);
+    for (const pillar of [[0.26, 0.3], [1.6, 1.68], [3.2, 3.3]]) boxMesh(group, width - 0.16, 0.62, pillar[1] - pillar[0] + 0.05, materials.body, 0, 1.39, (pillar[0] + pillar[1]) / 2 + (pillar[0] > 3 ? 0.08 : 0));
+    // багажник на крыше
+    for (const rail of [-1, 1]) boxMesh(group, 0.05, 0.05, 2.2, materials.trim, rail * (width / 2 - 0.2), 1.83, 1.6);
+  } else {
+    // фургон: высокий короб, короткий капот, окна только в кабине
+    sideExtrude(group, [[0.0, groundClear + 0.2], [0.0, 2.08], [0.1, 2.15], [4.05, 2.15], [4.25, 1.55], [4.95, 1.1], [5.1, 0.95], [5.1, groundClear + 0.2], [4.9, groundClear + 0.08], [0.2, groundClear + 0.08]], width, materials.body, 0, 0.08);
+    sideExtrude(group, [[3.6, 1.15], [3.6, 1.95], [4.02, 1.95], [4.32, 1.18]], width + 0.01, materials.glass, 0, 0.02);
+    boxMesh(group, width - 0.2, 0.7, 0.04, materials.glass, 0, 1.55, 4.27).rotation.x = -0.75;
+    boxMesh(group, 0.02, 1.7, 0.02, materials.trim, width / 2 + 0.005, 1.15, 2.2);   // шов сдвижной двери
+    boxMesh(group, 0.02, 1.7, 0.02, materials.trim, -width / 2 - 0.005, 1.15, 2.2);
+  }
+  // бамперы, фары, фонари, зеркала, решётка
+  boxMesh(group, width + 0.04, 0.22, 0.18, materials.trim, 0, groundClear + 0.3, length - 0.04, 0.05);
+  boxMesh(group, width + 0.04, 0.22, 0.16, materials.trim, 0, groundClear + 0.3, 0.05, 0.05);
+  for (const side of [-1, 1]) {
+    boxMesh(group, 0.32, 0.12, 0.05, materials.lamp, side * (width / 2 - 0.3), type === 'van' ? 0.9 : 0.9, length + 0.005, 0.02);
+    boxMesh(group, 0.18, 0.26, 0.05, materials.tail, side * (width / 2 - 0.15), type === 'van' ? 1.2 : 0.95, -0.005, 0.02);
+    boxMesh(group, 0.06, 0.12, 0.2, materials.trim, side * (width / 2 + 0.06), type === 'van' ? 1.75 : 1.2, length - (type === 'van' ? 1.35 : 1.15), 0.02);
+  }
+  boxMesh(group, width * 0.5, 0.18, 0.04, materials.frame, 0, type === 'van' ? 0.85 : 0.82, length + 0.01, 0.02);
+  // колёса и пыль на нижней кромке
+  const axles = type === 'van' ? [0.95, 4.15] : [0.9, 3.8];
+  for (const axleZ of axles) for (const side of [-1, 1]) carWheel(group, materials, side * (width / 2 - 0.12), wheelRadius, axleZ, wheelRadius, 0.26, side);
+  boxMesh(group, width + 0.02, 0.08, length - 0.3, materials.dust, 0, groundClear + 0.12, length / 2);
+  void seed;
   return group;
 }

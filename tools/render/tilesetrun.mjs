@@ -1,5 +1,5 @@
-// Рендер набора тайлов карты базы.
-//   node tilesetrun.mjs plan out_dir          — только план: список тайлов и их места (plan.json)
+// Рендер набора тайлов карты базы. Карта — переменная окружения MAP (outpost по умолчанию, big — 48×48).
+//   node tilesetrun.mjs plan out_dir          — только план: список тайлов и их места (plan.json, layout.json)
 //   node tilesetrun.mjs render out_dir [from] [to] — план и проходы тайлов (уже готовые пропускаются)
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
@@ -8,11 +8,12 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME || '/
 const page = await browser.newPage();
 page.on('pageerror', (error) => console.log('pageerror', error.message));
 page.on('console', (message) => { if (message.type() === 'error') console.log('console', message.text().slice(0, 300)); });
-await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/tileset.html`);
+await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/tileset.html?map=${process.env.MAP || 'outpost'}`);
 await page.waitForFunction(() => window.ready, null, { timeout: 600000 });
 fs.mkdirSync(output, { recursive: true });
 const plan = await page.evaluate(() => window.tilesetPlan());
 fs.writeFileSync(`${output}/plan.json`, JSON.stringify(plan));
+fs.writeFileSync(`${output}/layout.json`, JSON.stringify(await page.evaluate(() => window.tilesetLayout())));
 console.log('tiles', plan.jobs.length, 'camera', JSON.stringify(await page.evaluate(() => window.cameraCheck)));
 const save = (file, url) => fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
 if (mode === 'render') {

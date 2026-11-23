@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mulberry32, rockTextures, rockGeometry, screenTexture, setEnvIntensity } from './lib.js';
 import { toXZ, bladeGeometry, grassMaterial } from './world.js';
 import { buildLayout, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES } from './outpost_layout.js';
-import { buildArmyTruck, ARMY_TRUCK } from './vehicles.js';
+import { buildArmyTruck, ARMY_TRUCK, buildTiltrotor, buildCar, CARS } from './vehicles.js';
 import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
   concreteTextures, groundBumpTexture, groundTexture,
@@ -58,6 +58,7 @@ export const MAT = {
   darkSteel: () => standard('darkSteel', { color: 0x2c3034, roughness: 0.5, metalness: 0.6 }),
   white: () => standard('white', { color: 0xd8dad6, roughness: 0.45, metalness: 0.1 }),
   rubber: () => standard('rubber', { color: 0x1c1c1c, roughness: 0.9 }),
+  paint: () => standard('paint', { color: 0xe2ded0, roughness: 0.8, metalness: 0.0 }),
   glass: () => once('glass', () => new THREE.MeshPhysicalMaterial({ color: 0x101820, roughness: 0.08, metalness: 0.1, clearcoat: 1, envMapIntensity: 1.5 })),
   ceiling: () => standard('ceiling', { color: 0x4a4c4c, roughness: 0.8 }),
   slabEdge: () => standard('slabEdge', { color: 0x5c6062, roughness: 0.7, metalness: 0.2 }),
@@ -519,6 +520,34 @@ export function buildObject(item, viewLevel) {
       mesh.rotation.y = rng() * 6;
       break;
     }
+    case 'tiltrotor': {
+      // конвертоплан КТ-6: item.col, item.row — угол салона (c0, r0); модель повёрнута на −90° (нос к меньшим col).
+      // item.layer — один слой модели (floor | back | shell) для тайлов; без него — модель целиком
+      const model = buildTiltrotor();
+      if (item.layer) [...model.children].forEach((child) => { if (child.name !== item.layer) model.remove(child); });
+      model.rotation.y = -Math.PI / 2;
+      // сдвиг на 6 мм: грани корпуса, выровненные по клеткам, не должны лежать в плоскостях среза тайлов
+      // (иначе отсечение прорезает их через пиксель — сетка из точек)
+      model.position.set(8 * TILE - 0.006, 0, 2 * TILE + 0.006);
+      add(model);
+      break;
+    }
+    case 'car': {
+      // легковая машина вдоль рядов, перед к большим рядам; flip — перед к меньшим
+      const info = CARS[item.type] || CARS.suv;
+      const holder = new THREE.Group();
+      const model = buildCar({ type: item.type, color: item.color });
+      model.position.z = -info.length / 2;
+      holder.add(model);
+      holder.position.set(cx, 0, cz);
+      if (item.flip) holder.rotation.y = Math.PI;
+      add(holder);
+      break;
+    }
+    case 'paint':
+      // линия разметки краской по западной грани клеток
+      add(box(0.1, 0.012, depth - 0.12, MAT.paint(), 0.06, 0.006, cz));
+      break;
     case 'ladder':
       return buildLadder(item, (viewLevel + 1) * LEVEL_H + 0.95);
     case 'towerLeg':
@@ -571,12 +600,7 @@ export function facadeDetails(viewLevel, cut) {
 
 // ---------------- земля ----------------
 const LOW = -4, HIGH = SIZE + 4;
-export const zones = [
-  { rect: [1.3 * TILE, 1.3 * TILE, 12.6 * TILE, 11.7 * TILE] },
-  { rect: [14.2 * TILE, 3.0 * TILE, 20.8 * TILE, 12.8 * TILE] },
-  { rect: [19.4 * TILE, 13.4 * TILE, 22.6 * TILE, 16.8 * TILE] },
-  { circle: [4.6 * TILE, 19.0 * TILE, 3.6 * TILE] },
-];
+export const zones = layout.concrete;          // бетонные площадки задаёт разметка (outpost_layout.js)
 const markings = {
   tracks: [
     [[5.5 * TILE, 15.5 * TILE], [7 * TILE, 13.0 * TILE], [8.5 * TILE, 12.2 * TILE], [12 * TILE, 12.4 * TILE], [16 * TILE, 13.2 * TILE], [21 * TILE, 12.5 * TILE], [24 * TILE, 12 * TILE]],

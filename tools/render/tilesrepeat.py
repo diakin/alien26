@@ -1,4 +1,7 @@
-"""Проверочная большая карта: «База на плато» из тайлов, повторённая copies x copies раз.
+"""УСТАРЕЛ: game/js/maps/outpost_tiles_big.js теперь собирается из секторов (MAP=big tilesetrun.mjs + tilesetbuild.py),
+этот скрипт его перезапишет повторением базы 2×2.
+
+Проверочная большая карта: «База на плато» из тайлов, повторённая copies x copies раз.
 
   python tilesrepeat.py ../../game 2      — 48x48 клеток, game/js/maps/outpost_tiles_big.js
 

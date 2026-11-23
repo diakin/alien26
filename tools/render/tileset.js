@@ -16,6 +16,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mulberry32, tileNoise, rockGeometry, setEnvIntensity, canvasTexture } from './lib.js';
 import { bladeGeometry, grassMaterial } from './world.js';
 import { TILE, TILES, LEVELS, LEVEL_H, FLOOR } from './outpost_layout.js';
+import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
   buildWall, buildDoorLeaf, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves,
@@ -211,7 +212,8 @@ function plinthAndPlate(col, row, plate) {
 // призма клетки (и, если задано, слой уровня по высоте). Чуть шире к соседям, которые рисуются раньше
 // (меньше col и row): более поздний срез перекрывает стык, и шов не просвечивает.
 function sliceBox(slice) {
-  const y0 = slice.levelCut ? slice.level * LEVEL_H + 0.05 : -100, y1 = slice.levelCut ? (slice.level + 1) * LEVEL_H + 0.05 : 100;
+  const y0 = slice.levelCut ? slice.level * LEVEL_H + 0.05 : -100;
+  const y1 = slice.levelCut ? (slice.level + 1) * LEVEL_H + 0.05 : slice.top !== undefined ? slice.top : 100;
   return new THREE.Box3(V(slice.col * TILE - SEAM, y0, slice.row * TILE - SEAM), V((slice.col + 1) * TILE, y1, (slice.row + 1) * TILE));
 }
 function slicePlanes(slice) {
@@ -221,6 +223,7 @@ function slicePlanes(slice) {
     new THREE.Plane(V(0, 0, 1), -box.min.z), new THREE.Plane(V(0, 0, -1), box.max.z),
   ];
   if (slice.levelCut) planes.push(new THREE.Plane(V(0, 1, 0), -box.min.y), new THREE.Plane(V(0, -1, 0), box.max.y));
+  else if (slice.top !== undefined) planes.push(new THREE.Plane(V(0, -1, 0), slice.top));
   return planes;
 }
 
@@ -269,7 +272,8 @@ const plan = {
 for (let row = 0; row < TILES; row++) {
   for (let col = 0; col < TILES; col++) {
     const concrete = insideConcrete((col + 0.5) * TILE, (row + 0.5) * TILE);
-    const cover = plinthCover(col, row), plate = layout.indoor[0][row][col] === 1;
+    // плита пола — только под зданиями (на цоколе); салон конвертоплана тоже «внутри», но пол у него свой
+    const cover = plinthCover(col, row), plate = layout.indoor[0][row][col] === 1 && cover !== 'none';
     let signature;
     if (cover === 'full') signature = `ground|full|${plate}`;
     else if (cover === 'part') signature = `ground|part|${col}|${row}`;
@@ -290,7 +294,7 @@ for (let level = 0; level < LEVELS; level++) {
     for (let col = 0; col <= TILES; col++) {
       for (const orient of ['W', 'N']) {
         const wall = (orient === 'W' ? layout.wallW : layout.wallN)[level][row][col];
-        if (!wall || !wall.type) continue;
+        if (!wall || !wall.type || wall.type === 'hull') continue;      // обшивку конвертоплана рисует его модель
         const backCol = orient === 'W' ? col - 1 : col, backRow = orient === 'W' ? row : row - 1;
         const front = wall.style === 'inner' || isIndoor(level, col, row), back = wall.style === 'inner' || isIndoor(level, backCol, backRow);
         const simple = wall.type === 'rail' || wall.type === 'barrier';
@@ -331,27 +335,51 @@ for (let level = 0; level < LEVELS; level++) {
 }
 
 // предметы, лестницы, вышка, фасад — срезы по клеткам
-function addSliced(signature, part, baseLevel, levelCut, build) {
+function addSliced(signature, part, baseLevel, levelCut, build, shadow = true) {
   const probe = build();
   if (!probe) return;
   for (const slice of touchedSlices(probe, levelCut, baseLevel)) {
     const id = job(`${signature}|${slice.col - probe.userData.col0}|${slice.row - probe.userData.row0}|${slice.level}`,
-      { part, level: slice.level, col: slice.col, row: slice.row, shadow: true, slice }, build);
+      { part, level: slice.level, col: slice.col, row: slice.row, shadow, slice }, build);
     plan.objects.push([id, slice.col, slice.row, slice.level]);
   }
 }
 const RANDOM_KINDS = new Set(['console', 'desk', 'rack', 'crate', 'rock']);
+// Конвертоплан: три слоя модели — пол салона, рампа и сиденья (до юнитов), дальние стенки салона (до юнитов,
+// после пола) и корпус с крышей (после юнитов). У кусков корпуса над салоном и перед ним (col ≥ c0, row ≥ r0:
+// крыша, правый борт с дверью, корма, передние винты) есть вариант, срезанный на высоте пола салона + 0,8 м:
+// он показывается, когда уровень обзора срезан (боец внутри). Нос, левый борт и переборка стоят за салоном
+// и юнитов не закрывают — остаются целыми, как дальние стены в разрезе.
+const TILTROTOR_LAYERS = [['floor', PART.floor, false], ['back', PART.wallW, false], ['shell', PART.object, true]];
+const TILTROTOR_CUT = TILTROTOR.floor + 0.8;
+function addTiltrotor(item) {
+  for (const [layer, part, hasCut] of TILTROTOR_LAYERS) {
+    const build = () => { const group = buildObject({ ...item, layer }, LEVELS - 1); group.userData.col0 = item.col; group.userData.row0 = item.row; return group; };
+    for (const slice of touchedSlices(build(), false, item.level)) {
+      const key = `tiltrotor|${layer}|${slice.col - item.col}|${slice.row - item.row}`;
+      const id = job(key, { part, level: slice.level, col: slice.col, row: slice.row, shadow: layer !== 'floor', slice }, build);
+      if (hasCut && slice.col >= item.col && slice.row >= item.row) {
+        const cutSlice = { ...slice, top: TILTROTOR_CUT };
+        const cutId = job(key + '|cut', { part, level: slice.level, col: slice.col, row: slice.row, shadow: false, slice: cutSlice }, build);
+        plan.cutOf[id] = cutId;
+      }
+      plan.objects.push([id, slice.col, slice.row, slice.level]);
+    }
+  }
+}
 for (const item of layout.objects) {
   if (item.kind === 'towerLeg') continue;
-  const ladder = item.kind === 'ladder';
+  if (item.kind === 'tiltrotor') { addTiltrotor(item); continue; }
+  const ladder = item.kind === 'ladder', paint = item.kind === 'paint';
   const unique = ladder || RANDOM_KINDS.has(item.kind);
-  const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
-  // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней
-  addSliced(signature, ladder ? 3.2 : PART.object, item.level, ladder, () => {
+  const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
+  // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;
+  // разметка краской — как пол (юниты ходят по ней)
+  addSliced(signature, ladder ? 3.2 : paint ? PART.floor : PART.object, item.level, ladder, () => {
     const group = ladder ? buildLadder(item, LEVELS * LEVEL_H) : buildObject(item, LEVELS - 1);
     if (group) { group.userData.col0 = item.col; group.userData.row0 = item.row; }
     return group;
-  });
+  }, !paint);
 }
 layout.stairs.forEach((stair, index) => {
   addSliced(`stairs|${index}`, PART.floor, stair.level, false, () => { const group = buildStairs(stair); group.userData.col0 = 0; group.userData.row0 = 0; return group; });
@@ -361,7 +389,7 @@ layout.buildings.forEach((building, index) => {
   addSliced(`tower|${index}`, PART.object, 0, true, () => { const group = buildTower(building, LEVELS - 1); group.userData.col0 = 0; group.userData.row0 = 0; return group; });
 });
 // фасад (труба, кабель-канал, кондиционер): высота зависит от среза стен, поэтому у срезов есть срезанный вариант
-{
+if (layout.buildings.some((building) => building.name === 'hab')) {
   const build = (viewLevel, cut) => () => { const group = facadeDetails(viewLevel, cut); group.userData.col0 = 0; group.userData.row0 = 0; return group; };
   const probe = build(LEVELS - 1, false)();
   for (const slice of touchedSlices(probe, true, 0)) {
@@ -432,6 +460,11 @@ window.renderTile = (id) => {
   scene.add(group);
   const box = contentBox(group, item.slice);
   if (box.isEmpty()) { scene.remove(group); return { empty: true }; }
+  // область карты теней (±27 м) — вокруг элемента: на карте 48×48 края дальше 27 м от центра; направление то же
+  const center = box.getCenter(V(0, 0, 0));
+  sun.position.add(V(center.x, 0, center.z).sub(sun.target.position));
+  sun.target.position.set(center.x, 0, center.z);
+  sun.target.updateMatrixWorld();
   const anchorCamera = V(item.col * TILE, item.level * LEVEL_H, item.row * TILE).applyMatrix4(camera.matrixWorldInverse);
   const planes = item.slice ? slicePlanes(item.slice) : [];
   const result = {};
@@ -476,15 +509,34 @@ window.renderTile = (id) => {
   return result;
 };
 
+// рамки отдельных деталей с пометкой solid (корпус конвертоплана), каждая — по клеткам: салон внутри свободен
+function preciseBoxes(group, level) {
+  const boxes = [], round = (value) => Math.round(value * 1000) / 1000;
+  group.traverse((node) => {
+    if (!node.isMesh || !node.userData.solid) return;
+    const whole = new THREE.Box3().setFromObject(node);
+    const col0 = Math.max(0, Math.floor(whole.min.x / TILE)), col1 = Math.min(TILES - 1, Math.floor((whole.max.x - 1e-6) / TILE));
+    const row0 = Math.max(0, Math.floor(whole.min.z / TILE)), row1 = Math.min(TILES - 1, Math.floor((whole.max.z - 1e-6) / TILE));
+    for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) {
+      const box = whole.clone().intersect(new THREE.Box3(V(col * TILE, -100, row * TILE), V((col + 1) * TILE, 100, (row + 1) * TILE)));
+      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
+      boxes.push([level, col, row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
+    }
+  });
+  return boxes;
+}
+
 // Препятствия для пуль: рамки предметов по клеткам и уровням (без лестниц, вышки и мелочей фасада —
 // они тонкие или висят на стенах). [уровень, col, row, x0, z0, x1, z1, y0, y1]: x и z в клетках, y в метрах.
 function solidBoxes() {
   const boxes = [];
   for (const item of layout.objects) {
     if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
+    if (item.kind === 'paint') continue;
     const group = buildObject(item, LEVELS - 1);
     if (!group) continue;
     group.updateMatrixWorld(true);
+    if (item.kind === 'tiltrotor') { boxes.push(...preciseBoxes(group, item.level)); continue; }
     for (const slice of touchedSlices(group, false, item.level)) {
       const box = new THREE.Box3();
       group.traverse((node) => { if (node.isMesh) box.union(new THREE.Box3().setFromObject(node)); });
@@ -510,4 +562,5 @@ window.tilesetPlan = () => ({
   const colStep = pixelOf(V(TILE, 0, 0), origin), rowStep = pixelOf(V(0, 0, TILE), origin);
   window.cameraCheck = { colStep, rowStep, up: pixelOf(V(0, 1, 0), origin) };
 }
+window.tilesetLayout = () => layout;
 window.ready = true;

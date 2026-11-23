@@ -15,7 +15,7 @@
   var CLIMB_STEP = 0.6, CLIMB_FRAMES = 8;     // цикл лазания: две перекладины, 8 кадров
   var CLIMB_SHIFT = 0.15;                     // на лестнице фигура ближе к стене, клеток (перекладины в 0.44 м от центра клетки)
   var DOOR_WIDTH = 0.92, DOOR_REACH = 1.3, DOOR_SPEED = 2.5;   // проём, м; кто ближе — дверь открыта; скорость открытия
-  var WALL_BLOCKS = [false, true, true, false, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник
+  var WALL_BLOCKS = [false, true, true, false, true, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка
 
   // типы юнитов: шаг анимации (stride, м за 16 кадров) совпадает с рендером спрайтов
   var KINDS = {
@@ -241,7 +241,40 @@
       maxTimeUnits: 48, health: 180, maxHealth: 180, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
       statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'] }
   ];
-  var units = PROFILES.map(function (profile, index) { return makeUnit(profile, MAP.spawns[index]); });
+  // ещё два бойца — для карт, где отряд из шести (MAP.spawns.squad)
+  var EXTRA_SOLDIERS = [
+    { name: 'Сергей Лебедев', callsign: 'ВОРОН-5', rank: 'сержант', role: 'САНИТАР', missions: 8, camo: 'green',
+      side: 'squad', accuracy: 60, reactions: 58, strength: 40, bravery: 64, throwing: 56, armor: 10,
+      maxTimeUnits: 58, health: 44, maxHealth: 44, stamina: 68, maxStamina: 72, morale: 85, optics: 'ОЧКИ',
+      loadout: [['carbine', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'],
+        ['medkit', 'backpack'], ['medkit', 'backpack'], ['grenade', 'leftShoulder']] },
+    { name: 'Дина Абрамова', callsign: 'ВОРОН-6', rank: 'ефрейтор', role: 'СНАЙПЕР', missions: 5, camo: 'black',
+      side: 'squad', accuracy: 78, reactions: 66, strength: 30, bravery: 55, throwing: 60, armor: 8,
+      maxTimeUnits: 60, health: 36, maxHealth: 38, stamina: 60, maxStamina: 62, morale: 80, optics: 'ПНВ',
+      loadout: [['carbineM', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'belt'], ['carbineMag', 'leftLeg']] }
+  ];
+  // пришелец N: как стражи выше, здоровье и меткость немного разные
+  function alienProfile(number) {
+    var health = 50 + (number * 7) % 9;
+    return { kind: 'alien', name: 'Страж, особь ' + number, callsign: 'ЦЕЛЬ-' + number, rank: 'страж', subtitle: 'ПРИШЕЛЕЦ · УПРАВЛЯЕТ ИИ', camo: 'alien',
+      side: 'aliens', accuracy: 56 + (number * 5) % 9, reactions: 46 + (number * 3) % 9, strength: 50, bravery: 80, throwing: 50, armor: 6,
+      maxTimeUnits: 64, health: health, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
+      loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] };
+  }
+  // Состав по карте: spawns-массив — прежний порядок PROFILES (4 бойца, 2 пришельца, K7);
+  // spawns-объект { squad, mech, aliens } — столько бойцов, роботов и пришельцев, сколько точек высадки
+  function roster() {
+    var spawns = MAP.spawns;
+    if (Array.isArray(spawns)) return PROFILES.map(function (profile, index) { return makeUnit(profile, spawns[index]); });
+    var soldiers = PROFILES.filter(function (profile) { return profile.side === 'squad' && !profile.kind; }).concat(EXTRA_SOLDIERS);
+    var mech = PROFILES.filter(function (profile) { return profile.kind === 'mech'; })[0];
+    var list = [];
+    (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
+    (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+    (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
+    return list;
+  }
+  var units = roster();
   // на земле рядом с отрядом: ящик с запасом — магазины, аптечка, граната
   (function () {
     var first = units[0];
@@ -282,7 +315,7 @@
         for (var dx = 0; dx < size; dx++) {
           var cellCol = col + dx, cellRow = row + dy;
           if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover) || wreckAt(cellCol, cellRow, level)) return false;
-          if (size > 1 && stairOffset(cellCol, cellRow, level) !== 0) return false;
+          if (size > 1 && stairRun(cellCol, cellRow, level)) return false;       // на лестничный марш большой юнит не встаёт
           // внутри площадки большого юнита не должно быть стен
           if (dx > 0 && !edgeOpen(cellCol - 1, cellRow, cellCol, cellRow, level)) return false;
           if (dy > 0 && !edgeOpen(cellCol, cellRow - 1, cellCol, cellRow, level)) return false;
@@ -315,7 +348,11 @@
     if (runTo && !alongRun(runTo, deltaCol, deltaRow)) return false;
     if (deltaCol && deltaRow) {
       if (nextLevel !== level) return false;
-      if (stairOffset(col, row, level) || stairOffset(nextCol, nextRow, level) || stairOffset(col + deltaCol, row, level) || stairOffset(col, row + deltaRow, level)) return false;
+      // по диагонали — только по ровному полу: не через лестничные марши и без перепада между четырьмя клетками
+      // (поднятый ровный пол, как в салоне конвертоплана, — можно)
+      if (stairRun(col, row, level) || stairRun(nextCol, nextRow, level) || stairRun(col + deltaCol, row, level) || stairRun(col, row + deltaRow, level)) return false;
+      var floorHeight = stairOffset(col, row, level);
+      if (stairOffset(nextCol, nextRow, level) !== floorHeight || stairOffset(col + deltaCol, row, level) !== floorHeight || stairOffset(col, row + deltaRow, level) !== floorHeight) return false;
       if (!free(col + deltaCol, row, level) || !free(col, row + deltaRow, level)) return false;
       return stepEdgesOpen(col, row, deltaCol, deltaRow, level);
     }

@@ -1,6 +1,8 @@
 """Собирает набор тайлов карты базы из проходов рендера (tilesetrun.mjs) и пишет данные для игры.
 
   python tilesetbuild.py tiles_dir ../../game [shadow_strength]
+  MAP=big python tilesetbuild.py tiles_dir ../../game   — карта 48×48 из секторов (tilesetrun.mjs с MAP=big):
+      атлас в game/assets/maps/outpost_big/, карта в game/js/maps/outpost_tiles_big.js, проходимость — из layout.json
 
 Из каждого тайла: цвет + маска (суперсэмплинг 2x) -> RGBA x1, тень на земле -> маска тени x1.
 Тайлы раскладываются в атлас game/assets/maps/outpost_tiles/tiles.png, тени — в shadows.png.
@@ -14,7 +16,9 @@ from PIL import Image
 
 TILES_DIR, GAME_DIR = sys.argv[1], sys.argv[2]
 SHADOW_STRENGTH = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5
-OUT_ASSETS = os.path.join(GAME_DIR, 'assets/maps/outpost_tiles')
+MAP_NAME = os.environ.get('MAP', 'outpost')
+ASSET_FOLDER = 'assets/maps/outpost_tiles' if MAP_NAME == 'outpost' else 'assets/maps/outpost_' + MAP_NAME
+OUT_ASSETS = os.path.join(GAME_DIR, ASSET_FOLDER)
 os.makedirs(OUT_ASSETS, exist_ok=True)
 
 plan_data = json.load(open(os.path.join(TILES_DIR, 'plan.json')))
@@ -197,39 +201,83 @@ minimap = overview.resize((width // 4, height // 4), Image.LANCZOS)
 minimap.save(os.path.join(OUT_ASSETS, 'minimap.jpg'), quality=85)
 
 # ---------------- данные карты для игры ----------------
-old_text = open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), encoding='utf-8').read()
-old_map = json.loads(re.search(r'var MAP = (\{.*\});', old_text, re.S).group(1))
 field = {
     'width': width, 'height': height, 'tile': projection['tile'], 'tiles': GRID, 'ppm': projection['pixelsPerMeter'],
     'origin': list(origin), 'colStep': [origin[0] + STEP_X, origin[1] + STEP_Y], 'rowStep': [origin[0] - STEP_X, origin[1] + STEP_Y],
     'up': [origin[0], origin[1] - projection['upPixels']],
 }
-game_map = {key: value for key, value in old_map.items() if key != 'variants'}
-game_map['minimap'] = 'assets/maps/outpost_tiles/minimap.jpg'
-game_map['combat'] = False            # своя база: мирная обстановка, бойцы стоят «вольно»
+WALL_CODES = {None: 0, 'wall': 1, 'window': 2, 'door': 3, 'rail': 4, 'parapet': 5, 'barrier': 6, 'hull': 7}
+
+
+def map_from_layout(layout):
+    """Проходимость, стены, двери, лестницы и точки высадки — из разметки (как outpostbuild.py)."""
+    tiles, levels = layout['TILES'], layout['LEVELS']
+    flat = lambda grid, size, convert=lambda value: value: [[convert(grid[level][row][col]) for row in range(size) for col in range(size)] for level in range(levels)]
+    blocked = [[0] * (tiles * tiles) for _ in range(levels)]
+    for item in layout['objects']:
+        if not item.get('blocks', True):
+            continue
+        for row in range(item['row'], item['row'] + item['rows']):
+            for col in range(item['col'], item['col'] + item['cols']):
+                blocked[item['level']][row * tiles + col] = 1
+    for level, col, row in layout.get('blockedCells', []):
+        blocked[level][row * tiles + col] = 1
+    doors = []
+    for level in range(levels):
+        for row in range(tiles + 1):
+            for col in range(tiles + 1):
+                for orient, grid in (('W', layout['wallW']), ('N', layout['wallN'])):
+                    wall = grid[level][row][col]
+                    if wall and wall['type'] == 'door':
+                        doors.append([col, row, level, 0 if orient == 'W' else 1])
+    return {
+        'name': layout['name'], 'combat': layout['combat'], 'tiles': tiles, 'levels': levels, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
+        'floor': flat(layout['floor'], tiles),
+        'offset': flat(layout['offset'], tiles, lambda value: round(value, 3)),
+        'wallW': flat(layout['wallW'], tiles + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
+        'wallN': flat(layout['wallN'], tiles + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
+        'indoor': flat(layout['indoor'], tiles),
+        'blocked': blocked,
+        'doors': doors,
+        'stairs': [[stair['level'], stair['col'], stair['row'], stair['dirCol'], stair['dirRow'], stair['count']] for stair in layout['stairs']],
+        'links': [{'from': link['from'], 'to': link['to'], 'cost': link['cost'], 'kind': link['kind']} for link in layout['links']],
+        'spawns': layout['spawns'],
+    }
+
+
+if MAP_NAME == 'outpost':
+    old_text = open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), encoding='utf-8').read()
+    old_map = json.loads(re.search(r'var MAP = (\{.*\});', old_text, re.S).group(1))
+    game_map = {key: value for key, value in old_map.items() if key != 'variants'}
+    game_map['combat'] = False            # своя база: мирная обстановка, бойцы стоят «вольно»
+else:
+    game_map = map_from_layout(json.load(open(os.path.join(TILES_DIR, 'layout.json'))))
+game_map['minimap'] = ASSET_FOLDER + '/minimap.jpg'
 # препятствия для пуль: рамки предметов [уровень, col, row, x0, z0, x1, z1, y0, y1] (x, z в клетках, y в метрах)
 game_map['solids'] = plan_data['solids']
 door_tiles = []
-for door in old_map['doors']:
+for door in game_map['doors']:
     orient = 'W' if door[3] == 0 else 'N'
     match = next(item for item in plan['doors'] if item[0] == door[0] and item[1] == door[1] and item[2] == door[2] and item[3] == orient)
     door_tiles.append(match[4])
 game_map['tileset'] = {
-    'image': 'assets/maps/outpost_tiles/tiles.png', 'shadows': 'assets/maps/outpost_tiles/shadows.png',
+    'image': ASSET_FOLDER + '/tiles.png', 'shadows': ASSET_FOLDER + '/shadows.png',
     'shadowStrength': SHADOW_STRENGTH, 'levelPixels': LEVEL_PIXELS,
     'list': tile_list,
     'ground': plan['ground'], 'floor': plan['floor'], 'wallW': plan['wallW'], 'wallN': plan['wallN'],
     'objects': plan['objects'], 'doors': door_tiles,
 }
-with open(os.path.join(GAME_DIR, 'js/maps/outpost_tiles.js'), 'w', encoding='utf-8') as output:
-    output.write('// Сгенерировано tools/render/tilesetbuild.py: карта «База на плато», собирается из тайлов.\n')
+map_file = 'js/maps/outpost_tiles.js' if MAP_NAME == 'outpost' else 'js/maps/outpost_tiles_' + MAP_NAME + '.js'
+with open(os.path.join(GAME_DIR, map_file), 'w', encoding='utf-8') as output:
+    output.write('// Сгенерировано tools/render/tilesetbuild.py: карта «' + game_map['name'] + '», собирается из тайлов.\n')
     output.write('var FIELD = ' + json.dumps(field) + ';\n')
     output.write('var MAP = ' + json.dumps(game_map, separators=(',', ':')) + ';\n')
 
-# те же препятствия — в карту пререндера (outpost.js собирается outpostbuild.py без 3D-сцены)
-old_text = re.sub(r'"solids":\[\[.*?\]\],', '', old_text, count=1)
-old_text = old_text.replace('var MAP = {', 'var MAP = {"solids":' + json.dumps(plan_data['solids'], separators=(',', ':')) + ',', 1)
-with open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), 'w', encoding='utf-8') as output:
-    output.write(old_text)
+if MAP_NAME == 'outpost':
+    # те же препятствия — в карту пререндера (outpost.js собирается outpostbuild.py без 3D-сцены)
+    old_text = re.sub(r'"solids":\[\[.*?\]\],', '', old_text, count=1)
+    old_text = old_text.replace('var MAP = {', 'var MAP = {"solids":' + json.dumps(plan_data['solids'], separators=(',', ':')) + ',', 1)
+    with open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), 'w', encoding='utf-8') as output:
+        output.write(old_text)
 
 print('tiles', len(sprites), 'shadows', len(shadows), 'atlas', atlas.size, 'shadow atlas', shadow_atlas.size, 'map', (width, height))
