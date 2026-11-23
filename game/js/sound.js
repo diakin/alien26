@@ -6,6 +6,7 @@ var Sound = (function () {
   'use strict';
 
   var audio = null, effectsGain = null, ambienceGain = null, musicGain = null, noiseBuffer = null;
+  var timeOffset = 0;                    // сдвиг начала звука (для рендера без звуковой карты)
   function volume(key) { return window.Settings ? Settings.values[key] / 100 : 0.6; }
 
   function start() {
@@ -13,8 +14,7 @@ var Sound = (function () {
     var AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
     audio = new AudioContextClass();
-    effectsGain = audio.createGain();
-    effectsGain.connect(audio.destination);
+    effectsGain = createEffectsBus(audio, audio.destination);
     ambienceGain = audio.createGain();
     ambienceGain.connect(audio.destination);
     musicGain = audio.createGain();
@@ -27,9 +27,25 @@ var Sound = (function () {
     startWind();
     if (window.Music) Music.attach(audio, musicGain);
   }
+  // шина эффектов: громкость и мягкий ограничитель — до 0,7 линейно (тихие звуки не меняются),
+  // выше пики плавно скругляются к 1, чтобы одновременные выстрелы и взрывы не давали жёсткого перегруза
+  function createEffectsBus(context, destination) {
+    var gain = context.createGain();
+    var shaper = context.createWaveShaper();
+    var curve = new Float32Array(2049), knee = 0.7;
+    for (var index = 0; index < curve.length; index++) {
+      var input = (index / (curve.length - 1)) * 4 - 2, size = Math.abs(input);
+      var output = size <= knee ? size : knee + (1 - knee) * Math.tanh((size - knee) / (1 - knee));
+      curve[index] = input < 0 ? -output : output;
+    }
+    shaper.curve = curve;
+    shaper.oversample = '2x';
+    gain.connect(shaper); shaper.connect(destination);
+    return gain;
+  }
   function applyVolumes() {
     if (!audio) return;
-    effectsGain.gain.value = volume('soundVolume') * 0.8;
+    effectsGain.gain.value = volume('soundVolume') * 0.9;
     ambienceGain.gain.value = volume('ambienceVolume') * 0.5;
     musicGain.gain.value = volume('musicVolume');
   }
@@ -43,7 +59,7 @@ var Sound = (function () {
     var filter = audio.createBiquadFilter();
     filter.type = filterType; filter.frequency.value = frequency;
     var gain = audio.createGain();
-    var time = audio.currentTime + (when || 0);
+    var time = audio.currentTime + timeOffset + (when || 0);
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.exponentialRampToValueAtTime(peak, time + attack);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + attack + decay);
@@ -53,7 +69,7 @@ var Sound = (function () {
   }
   function tone(type, from, to, duration, peak, when) {
     var oscillator = audio.createOscillator(), gain = audio.createGain();
-    var time = audio.currentTime + (when || 0);
+    var time = audio.currentTime + timeOffset + (when || 0);
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(from, time);
     oscillator.frequency.exponentialRampToValueAtTime(to, time + duration);
@@ -66,7 +82,7 @@ var Sound = (function () {
 
   // голос: пила через полосовые фильтры-форманты (гласная), высота плавно падает, дрожание голоса
   function voice(from, to, duration, formants, peak, vibratoRate, vibratoDepth, type) {
-    var time = audio.currentTime;
+    var time = audio.currentTime + timeOffset;
     var source = audio.createOscillator();
     source.type = type || 'sawtooth';
     source.frequency.setValueAtTime(from, time);
@@ -96,19 +112,26 @@ var Sound = (function () {
     if (!audio || volume('soundVolume') <= 0) return;
     var far = Math.max(0.25, 1 - (distance || 0) / 40);
     if (kind === 'bullet') {
-      noise(0.25, 'bandpass', 1800, 0.9 * far, 0.002, 0.12);
-      noise(0.3, 'lowpass', 400, 0.6 * far, 0.002, 0.2);
+      // выстрел: резкий щелчок (2–5 кГц, на них слух чувствительнее всего), хлопок корпуса и короткий отзвук
+      noise(0.2, 'bandpass', jitter(2300, 0.15), 2.0 * far, 0.002, 0.1);
+      noise(0.08, 'highpass', 4200, 0.8 * far, 0.001, 0.05);
+      noise(0.3, 'lowpass', 500, 0.9 * far, 0.002, 0.22);
+      noise(0.6, 'bandpass', 900, 0.25 * far, 0.02, 0.5, 0.03);
     } else if (kind === 'plasma') {
-      tone('sawtooth', 1400, 180, 0.28, 0.25 * far);
-      tone('sine', 900, 120, 0.32, 0.3 * far);
+      tone('sawtooth', 1400, 180, 0.28, 0.7 * far);
+      tone('sine', 900, 120, 0.32, 0.6 * far);
+      noise(0.2, 'bandpass', 3200, 0.35 * far, 0.002, 0.14);
     } else if (kind === 'shell') {
-      noise(0.5, 'lowpass', 600, 1.0 * far, 0.003, 0.35);
-      tone('sine', 120, 40, 0.3, 0.6 * far);
+      noise(0.5, 'lowpass', 600, 1.3 * far, 0.003, 0.35);
+      noise(0.2, 'bandpass', 1400, 1.4 * far, 0.002, 0.12);
+      noise(0.08, 'highpass', 3500, 0.5 * far, 0.001, 0.05);
+      tone('sine', 120, 40, 0.3, 0.7 * far);
     } else if (kind === 'impact') {
       noise(0.12, 'highpass', 2500, 0.25 * far, 0.002, 0.06);
     } else if (kind === 'explosion') {
       noise(1.6, 'lowpass', 320, 1.0 * far, 0.005, 1.3);
-      noise(0.6, 'bandpass', 900, 0.5 * far, 0.002, 0.4);
+      noise(0.6, 'bandpass', 900, 1.0 * far, 0.002, 0.4);
+      noise(0.5, 'highpass', 2500, 0.3 * far, 0.002, 0.35);
       tone('sine', 90, 28, 0.9, 0.8 * far);
     } else if (kind === 'fall') {
       noise(0.3, 'lowpass', 250, 0.5 * far, 0.01, 0.22);
@@ -128,17 +151,21 @@ var Sound = (function () {
       noise(0.7, 'highpass', 3000, 0.18 * far, 0.02, 0.6);
     } else if (kind === 'stepSoldier') {
       // ботинок: глухой удар и хруст гравия
-      noise(0.08, 'lowpass', jitter(260, 0.3), 0.32 * far, 0.004, 0.06);
-      noise(0.05, 'highpass', jitter(3200, 0.3), 0.06 * far, 0.002, 0.035, 0.01);
+      noise(0.08, 'lowpass', jitter(260, 0.3), 0.9 * far, 0.004, 0.06);
+      noise(0.06, 'bandpass', jitter(900, 0.3), 0.9 * far, 0.003, 0.045);
+      noise(0.05, 'highpass', jitter(3200, 0.3), 0.4 * far, 0.002, 0.035, 0.01);
     } else if (kind === 'stepAlien') {
       // мягкая лапа и стук когтей
-      noise(0.08, 'lowpass', jitter(180, 0.3), 0.22 * far, 0.008, 0.07);
-      for (var claw = 0; claw < 2; claw++) noise(0.02, 'bandpass', jitter(4200, 0.2), 0.07 * far, 0.001, 0.015, 0.02 + claw * 0.025);
+      noise(0.08, 'lowpass', jitter(180, 0.3), 1.0 * far, 0.008, 0.07);
+      noise(0.07, 'bandpass', jitter(700, 0.3), 0.9 * far, 0.006, 0.05);
+      for (var claw = 0; claw < 2; claw++) noise(0.02, 'bandpass', jitter(4200, 0.2), 0.6 * far, 0.001, 0.015, 0.02 + claw * 0.025);
     } else if (kind === 'stepMech') {
       // тяжёлая стопа: удар, низкий гул и шипение гидравлики
-      noise(0.25, 'lowpass', 140, 0.75 * far, 0.004, 0.2);
-      tone('sine', jitter(62, 0.1), 34, 0.28, 0.55 * far);
-      noise(0.3, 'bandpass', 2400, 0.08 * far, 0.05, 0.2, 0.08);
+      noise(0.25, 'lowpass', 140, 1.2 * far, 0.004, 0.2);
+      tone('sine', jitter(62, 0.1), 34, 0.28, 0.8 * far);
+      noise(0.1, 'bandpass', jitter(650, 0.2), 1.2 * far, 0.002, 0.08);          // лязг металла о грунт
+      tone('triangle', jitter(310, 0.1), 260, 0.15, 0.2 * far);
+      noise(0.3, 'bandpass', 2400, 0.3 * far, 0.05, 0.2, 0.08);
     } else if (kind === 'ladder') {
       // перекладина: металлический звон
       tone('triangle', jitter(950, 0.1), 900, 0.12, 0.08 * far);
@@ -168,5 +195,21 @@ var Sound = (function () {
     source.start(); lfo.start(); sweep.start();
   }
 
-  return { play: play, start: start };
+  // рендер звуков без звуковой карты (для проверки громкости): список [вид, время в секундах, расстояние]
+  function renderOffline(events, seconds) {
+    var saved = [audio, effectsGain, noiseBuffer];
+    var offline = new OfflineAudioContext(2, Math.ceil(44100 * seconds), 44100);
+    audio = offline;
+    effectsGain = createEffectsBus(offline, offline.destination);
+    effectsGain.gain.value = volume('soundVolume') * 0.9;
+    noiseBuffer = offline.createBuffer(1, offline.sampleRate * 2, offline.sampleRate);
+    var data = noiseBuffer.getChannelData(0);
+    for (var index = 0; index < data.length; index++) data[index] = Math.random() * 2 - 1;
+    events.forEach(function (event) { timeOffset = event[1]; play(event[0], event[2] || 0); });
+    timeOffset = 0;
+    audio = saved[0]; effectsGain = saved[1]; noiseBuffer = saved[2];
+    return offline.startRendering();
+  }
+
+  return { play: play, start: start, renderOffline: renderOffline };
 })();
