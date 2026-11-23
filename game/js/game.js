@@ -311,11 +311,9 @@
   }
 
   var DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-  function findPath(mover, goal) {
-    var free = isFreeFor(mover);
-    if (!free(goal.col, goal.row, goal.level)) return null;
-    var goalKey = nodeKey(goal.col, goal.row, goal.level);
-    function neighbours(key, visit) {
+  // соседи узла для поиска пути: visit(ключ, стоимость шага, лестница)
+  function neighbourFunction(mover, free) {
+    return function neighbours(key, visit) {
       var node = keyNode(key);
       for (var index = 0; index < DIRECTIONS.length; index++) {
         var nextCol = node.col + DIRECTIONS[index][0], nextRow = node.row + DIRECTIONS[index][1];
@@ -335,14 +333,22 @@
           if (node.col === top[0] && node.row === top[1] && node.level === top[2] && free(bottom[0], bottom[1], bottom[2])) visit(nodeKey(bottom[0], bottom[1], bottom[2]), link.cost, { link: link, up: false });
         });
       }
-    }
+    };
+  }
+  function findPath(mover, goal) {
+    var free = isFreeFor(mover);
+    if (!free(goal.col, goal.row, goal.level)) return null;
+    var goalKey = nodeKey(goal.col, goal.row, goal.level);
+    var neighbours = neighbourFunction(mover, free);
     function heuristic(key) {
       var node = keyNode(key);
       var dx = Math.abs(node.col - goal.col), dy = Math.abs(node.row - goal.row);
       return COST.step * (dx + dy) + (COST.diagonal - 2 * COST.step) * Math.min(dx, dy) + Math.abs(node.level - goal.level) * 2;
     }
     var raw = PathFinder.find(nodeKey(mover.col, mover.row, mover.level), goalKey, neighbours, heuristic, 30000);
-    if (!raw) return null;
+    return raw ? stepsFromRaw(raw) : null;
+  }
+  function stepsFromRaw(raw) {
     // шаги для движения: у лестницы — подъём на месте и шаг на площадку (или наоборот)
     var steps = [];
     raw.forEach(function (item) {
@@ -1144,10 +1150,9 @@
   // идёт ли юнит в свой ход (тогда по нему возможен ответный огонь)
   function ownPhase(unit) { return (unit.side === 'aliens') === (phase === 'aliens'); }
 
-  // ---------------- ход пришельцев: простой ИИ ----------------
-  // Каждый пришелец по очереди: видит бойца (прямая линия огня свободна, в пределах дальности) — стреляет,
-  // пока хватает ОД; не видит — подходит к ближайшему бойцу короткими перебежками (до двух за ход),
-  // оставляя ОД на выстрел навскидку. В мирной обстановке пришельцы ничего не делают.
+  // ---------------- ход пришельцев: ИИ ----------------
+  // Каждый пришелец по очереди принимает решения (aiDecide), пока может: стреляет, уходит в укрытие, занимает позицию
+  // или скрытно подходит. В мирной обстановке пришельцы ничего не делают.
   var aiQueue = [], aiWaitUntil = 0;
   function watchUnit(unit) {
     if (!Settings.values.followAliens) return;
@@ -1162,7 +1167,8 @@
   function startAlienPhase() {
     phase = 'aliens';
     setPhaseLabel();
-    units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; } });
+    units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; unit.aiShots = 0; } });
+    approachField = null;                          // отряд мог переместиться: поле путей строится заново
     aiQueue = units.filter(function (unit) { return unit.side === 'aliens'; });
     aiWaitUntil = performance.now() + 500;
     say(combat ? 'Ход пришельцев' : 'Ход пришельцев: мирная обстановка');
@@ -1190,40 +1196,186 @@
     result.sort(function (first, second) { return first.distance - second.distance; });
     return result;
   }
-  function aiMove(alien, reserve) {
+
+  // ---- ИИ пришельцев: укрытия, расстояние по путям, стрельба с отходом ----
+  // Клетки, куда пришелец может дойти за свои ОД (Дейкстра по тем же шагам, что и поиск пути; юниты мешают).
+  function reachable(mover, budget) {
+    var free = isFreeFor(mover), neighbours = neighbourFunction(mover, free);
+    var startKey = nodeKey(mover.col, mover.row, mover.level);
+    var cost = {}, parent = {}, stepCost = {}, stepExtra = {}, done = {}, open = [startKey];
+    cost[startKey] = 0;
+    while (open.length) {
+      var bestIndex = 0;
+      for (var index = 1; index < open.length; index++) if (cost[open[index]] < cost[open[bestIndex]]) bestIndex = index;
+      var current = open[bestIndex];
+      open[bestIndex] = open[open.length - 1]; open.pop();
+      if (done[current]) continue;
+      done[current] = true;
+      neighbours(current, function (next, step, extra) {
+        var total = cost[current] + step;
+        if (total > budget || (cost[next] !== undefined && cost[next] <= total)) return;
+        cost[next] = total; parent[next] = current; stepCost[next] = step; stepExtra[next] = extra;
+        open.push(next);
+      });
+    }
+    return {
+      keys: Object.keys(cost).map(Number), cost: cost,
+      path: function (key) {
+        var raw = [];
+        for (var node = key; node !== startKey; node = parent[node]) raw.unshift({ key: node, cost: stepCost[node], extra: stepExtra[node] });
+        return stepsFromRaw(raw);
+      }
+    };
+  }
+  // Расстояние до ближайшего бойца по настоящим путям (в ОД; юниты не мешают): по нему пришелец приближается,
+  // и каждый шаг действительно сокращает путь — без хождения туда-обратно вокруг препятствий.
+  var approachField = null;
+  function buildApproachField() {
+    var walker = { size: 1 }, neighbours = neighbourFunction(walker, function (col, row, level) { return walkable(col, row, level); });
+    var field = {}, open = [];
+    units.forEach(function (unit) {
+      if (unit.side !== 'squad') return;
+      for (var dy = 0; dy < unit.size; dy++) for (var dx = 0; dx < unit.size; dx++) { var key = nodeKey(unit.col + dx, unit.row + dy, unit.level); field[key] = 0; open.push(key); }
+    });
+    // волна с ведром по стоимости (шаги 4, 6, лестницы — целые)
+    var buckets = [open], distance = 0;
+    while (distance < buckets.length && distance < 2000) {
+      var list = buckets[distance] || [];
+      for (var index = 0; index < list.length; index++) {
+        var key = list[index];
+        if (field[key] !== distance) continue;
+        neighbours(key, function (next, step) {
+          var total = distance + step;
+          if (field[next] !== undefined && field[next] <= total) return;
+          field[next] = total;
+          (buckets[total] = buckets[total] || []).push(next);
+        });
+      }
+      distance++;
+    }
+    approachField = field;
+  }
+  function fieldSteps(key) { var value = approachField && approachField[key]; return value === undefined ? 99 : value / COST.step; }
+
+  function cellBlocked(col, row, level) {
+    return !inside(col, row) || !walkable(col, row, level) || !!combatWorld.solids[level * GRID * GRID + row * GRID + col];
+  }
+  // Сколько бойцов видят пришельца на клетке (свободна прямая линия огня от их ствола, в пределах дальности)
+  // и по кому он сам сможет стрелять оттуда.
+  function exposureAt(alien, node) {
+    var elevation = elevationOf(node.col, node.row, node.level);
+    var body = { x: node.col + 0.5, y: node.row + 0.5, h: elevation + alien.height * 0.62 };
+    var seen = 0, shootable = [];
+    var ownWeapon = weaponOf(alien);
+    units.forEach(function (unit) {
+      if (unit.side !== 'squad') return;
+      var weapon = weaponOf(unit);
+      var from = muzzleOf(unit, body);
+      var distance = Combat.distanceMeters(combatWorld, from, body);
+      if (distance > Math.max(weapon ? weapon.range : 0, ownWeapon ? ownWeapon.range : 0)) return;
+      var line = Combat.trace(combatWorld, from, body, distance, unit);
+      if (line.kind !== 'none' && !(line.kind === 'unit' && line.unit === alien)) return;
+      if (weapon && distance <= weapon.range) seen++;
+      if (ownWeapon && distance <= ownWeapon.range) shootable.push({ unit: unit, distance: distance });
+    });
+    return { seen: seen, shootable: shootable };
+  }
+  // укрытие: стены и препятствия на гранях клетки со стороны ближайшего бойца
+  function coverAt(node) {
     var nearest = null, best = Infinity;
     units.forEach(function (unit) {
       if (unit.side !== 'squad') return;
-      var distance = Math.abs(unit.x - alien.x) + Math.abs(unit.y - alien.y) + Math.abs(unit.level - alien.level) * 4;
+      var distance = Math.abs(unit.x - node.col - 0.5) + Math.abs(unit.y - node.row - 0.5);
       if (distance < best) { best = distance; nearest = unit; }
     });
-    if (!nearest) return false;
-    // клетки вокруг цели, ближние к ней первыми
-    var candidates = [];
-    for (var radius = 1; radius <= 4; radius++) {
-      for (var dy = -radius; dy <= radius; dy++) for (var dx = -radius; dx <= radius; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
-        var col = nearest.col + dx, row = nearest.row + dy;
-        if (col < 0 || row < 0 || col >= GRID || row >= GRID) continue;
-        candidates.push({ col: col, row: row, level: nearest.level, order: radius * 100 + Math.abs(col - alien.col) + Math.abs(row - alien.row) });
+    if (!nearest) return 0;
+    var towardCol = nearest.x - node.col - 0.5, towardRow = nearest.y - node.row - 0.5;
+    var length = Math.sqrt(towardCol * towardCol + towardRow * towardRow) || 1;
+    var cover = 0;
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (direction) {
+      if ((direction[0] * towardCol + direction[1] * towardRow) / length < 0.35) return;
+      var col = node.col + direction[0], row = node.row + direction[1];
+      if (!edgeOpen(node.col, node.row, col, row, node.level) || cellBlocked(col, row, node.level)) cover++;
+    });
+    return cover;
+  }
+  // ожидаемый урон по цели: шанс × (урон оружия − броня цели); раненые и без брони — приоритетнее
+  function targetValue(alien, target, mode) {
+    var weapon = weaponOf(alien), chance = Combat.hitChance(alien, mode, target.distance) / 100;
+    var damage = Math.max(4, weapon.damage - (target.unit.armor || 0));
+    return chance * damage * (1.6 - 0.6 * target.unit.health / target.unit.maxHealth);
+  }
+  // Решение пришельца на текущий момент: { fire } | { move } | null — ход закончен.
+  // 1. Ранен (здоровье меньше 40 %) — отходит туда, где его не видно.
+  // 2. Видит цель — стреляет (выгоднейшая цель, прицельно, если после выстрела хватит ОД уйти в укрытие),
+  //    после выстрелов уходит из-под огня, если может.
+  // 3. Не видит — выбирает клетку: позицию для стрельбы (видно немногим, есть укрытие, 4–10 клеток до бойца)
+  //    или подход скрытно (не видно никому, ближе к отряду по пути). Остаток ОД — на ответный огонь.
+  function aiDecide(alien) {
+    var weapon = weaponOf(alien);
+    if (!weapon) return null;
+    var modes = weapon.modes, snapIndex = 0;
+    modes.forEach(function (mode, index) { if (mode.cost < modes[snapIndex].cost) snapIndex = index; });
+    var hurt = alien.health < alien.maxHealth * 0.4;
+    var reach = reachable(alien, alien.timeUnits);
+    var here = nodeKey(alien.col, alien.row, alien.level);
+    var cache = {};
+    var info = function (key) {
+      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(alien, node); cache[key] = { key: key, node: node, seen: exposure.seen, shootable: exposure.shootable, cover: coverAt(node), cost: reach.cost[key] || 0 }; }
+      return cache[key];
+    };
+    // ближайшая по ОД клетка, где пришельца никто не видит
+    var hideSpot = function (budget) {
+      var keys = reach.keys.filter(function (key) { return key !== here && reach.cost[key] <= budget; }).sort(function (first, second) { return reach.cost[first] - reach.cost[second]; });
+      for (var index = 0; index < keys.length && index < 90; index++) { var item = info(keys[index]); if (item.seen === 0) return item; }
+      return null;
+    };
+    var moveTo = function (item, reason) { return item && item.key !== here ? { move: reach.path(item.key), reason: reason } : null; };
+
+    var targets = alien.ammo > 0 && !hurt ? visibleTargets(alien) : [];
+    if (targets.length) {
+      var best = null;
+      targets.forEach(function (target) {
+        var value = targetValue(alien, target, modes[0]);
+        if (!best || value > best.value) best = { target: target, value: value };
+      });
+      var turn = turnCostTo(alien, best.target.point);
+      var hide = hideSpot(alien.timeUnits);
+      var reserve = hide ? hide.cost : 0;
+      var choice = null;
+      if (alien.timeUnits - modes[0].cost - turn >= reserve) choice = 0;
+      else if (alien.timeUnits - modes[snapIndex].cost - turn >= reserve) choice = snapIndex;
+      else if (!alien.aiShots && alien.timeUnits >= modes[snapIndex].cost + turn) choice = snapIndex;   // хотя бы один выстрел
+      if (choice !== null) return { fire: { unit: best.target.unit, point: best.target.point }, mode: choice };
+      if (hide) return moveTo(hide, 'укрытие');
+      return null;
+    }
+    if (alien.aiMoves >= 3) return null;
+
+    // оценка клеток: сначала грубо по пути и укрытию, видимость — только у лучших (трассировка дорогая)
+    var currentSteps = fieldSteps(here);
+    var rough = reach.keys.map(function (key) {
+      var node = keyNode(key), steps = fieldSteps(key);
+      var score = hurt ? steps : -Math.abs(steps - 7) * 1.2 - Math.max(0, steps - currentSteps) * 2 + coverAt(node) * 2;
+      return { key: key, score: score - reach.cost[key] * 0.02 };
+    }).sort(function (first, second) { return second.score - first.score; });
+    var candidates = rough.slice(0, 140).map(function (entry) { return entry.key; });
+    if (candidates.indexOf(here) < 0) candidates.push(here);
+    var choiceItem = null, choiceScore = -Infinity;
+    candidates.forEach(function (key) {
+      var item = info(key), steps = fieldSteps(key), left = alien.timeUnits - item.cost, score;
+      if (hurt) {
+        score = (item.seen === 0 ? 60 : -40 * item.seen) + steps * 1.5 + item.cover * 4;
+      } else {
+        var canShoot = item.shootable.length > 0 && left >= modes[snapIndex].cost + 2;
+        var firing = canShoot ? 45 - 22 * Math.max(0, item.seen - 1) + item.cover * 12 - Math.abs(steps - 7) * 1.5 + left * 0.25 : -Infinity;
+        var sneaking = item.seen === 0 ? 20 + item.cover * 6 - steps * 2.2 : 5 - 30 * item.seen - steps * 2;
+        score = Math.max(firing, sneaking);
       }
-    }
-    candidates.sort(function (first, second) { return first.order - second.order; });
-    for (var index = 0; index < candidates.length && index < 40; index++) {
-      var path = findPath(alien, candidates[index]);
-      if (!path || !path.length) continue;
-      var saved = alien.timeUnits;
-      alien.timeUnits = Math.max(0, saved - reserve);
-      var steps = Math.min(6, affordableSteps(alien, path));
-      alien.timeUnits = saved;
-      if (!steps) return false;
-      path = path.slice(0, steps);
-      alien.timeUnits -= pathCost(alien, path);
-      alien.path = path;
-      watchUnit(alien);
-      return true;
-    }
-    return false;
+      if (key === here) score += 1;                    // при равенстве — остаться
+      if (score > choiceScore) { choiceScore = score; choiceItem = item; }
+    });
+    return moveTo(choiceItem, hurt ? 'отход' : choiceItem && choiceItem.shootable.length ? 'позиция' : 'подход');
   }
   function updateAI(now) {
     if (phase !== 'aliens' || now < aiWaitUntil || shots.length) return;
@@ -1232,20 +1384,21 @@
     while (aiQueue.length && (aiQueue[0].dead || units.indexOf(aiQueue[0]) < 0)) aiQueue.shift();
     var alien = aiQueue[0];
     if (!alien) { finishAlienPhase(); return; }
-    var weapon = weaponOf(alien);
-    var targets = weapon && alien.ammo > 0 ? visibleTargets(alien) : [];
-    if (targets.length) {
-      var target = { unit: targets[0].unit, point: targets[0].point };
-      var turnCost = turnCostTo(alien, target.point);
-      var modeIndex = alien.timeUnits >= weapon.modes[0].cost + turnCost ? 0 : 1;
-      if (weapon.modes[modeIndex] && alien.timeUnits >= weapon.modes[modeIndex].cost + turnCost) {
-        watchUnit(alien);
-        fire(alien, target, modeIndex);
-        aiWaitUntil = now + 450 / Settings.values.aiSpeed;
-        return;
-      }
-    } else if (weapon && alien.aiMoves < 2 && aiMove(alien, cheapestCost(alien))) {
+    if (!approachField) buildApproachField();
+    var decision = aiDecide(alien);
+    if (decision && decision.fire) {
+      watchUnit(alien);
+      fire(alien, decision.fire, decision.mode);
+      alien.aiShots = (alien.aiShots || 0) + 1;
+      aiWaitUntil = now + 450 / Settings.values.aiSpeed;
+      return;
+    }
+    if (decision && decision.move && decision.move.length) {
+      alien.timeUnits -= pathCost(alien, decision.move);
+      alien.path = decision.move;
       alien.aiMoves++;
+      alien.aiLast = decision.reason;
+      watchUnit(alien);
       aiWaitUntil = now + 200 / Settings.values.aiSpeed;
       return;
     }
@@ -2404,7 +2557,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, groundItems: groundItems, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
