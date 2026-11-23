@@ -552,9 +552,9 @@
   var CHUNK = 512, CHUNK_LIMIT = 64;
   var chunks = new Map();
   function drawChunks(current) {
-    target = { x: camera.x, y: camera.y, width: canvas.width, height: canvas.height };
-    var firstX = Math.floor(camera.x / CHUNK), lastX = Math.floor((camera.x + canvas.width - 1) / CHUNK);
-    var firstY = Math.floor(camera.y / CHUNK), lastY = Math.floor((camera.y + canvas.height - 1) / CHUNK);
+    target = { x: camera.x, y: camera.y, width: viewWidth, height: viewHeight };
+    var firstX = Math.floor(camera.x / CHUNK), lastX = Math.floor((camera.x + viewWidth - 1) / CHUNK);
+    var firstY = Math.floor(camera.y / CHUNK), lastY = Math.floor((camera.y + viewHeight - 1) / CHUNK);
     var viewKey = current.key + (showGrid ? 'g' : '');
     tileStats.chunksBuilt = 0;
     for (var chunkY = firstY; chunkY <= lastY; chunkY++) {
@@ -645,24 +645,36 @@
 
   // камера: пиксель фона, который виден в левом верхнем углу окна
   var camera = { x: 0, y: 0 };
+  // расстояние от центра экрана в клетках (для громкости)
+  function screenDistance(point) {
+    var screen = Iso.toScreen(point.x, point.y, point.elevation || point.h || 0);
+    return Math.sqrt(Math.pow(screen.x - camera.x - viewWidth / 2, 2) + Math.pow(screen.y - camera.y - viewHeight / 2, 2)) / 61;
+  }
   function centerOn(col, row, elevation) {
     var point = Iso.toScreen(col, row, elevation || 0);
     centerOnPixel(point.x, point.y);
   }
   function centerOnPixel(x, y) {
-    camera.x = x - canvas.width / 2;
-    camera.y = y - canvas.height / 2;
+    camera.x = x - viewWidth / 2;
+    camera.y = y - viewHeight / 2;
     clampCamera();
   }
   function clampCamera() {
-    camera.x = Math.max(-200, Math.min(FIELD.width - canvas.width + 200, camera.x));
-    camera.y = Math.max(-200, Math.min(FIELD.height - canvas.height + 200, camera.y));
+    camera.x = Math.max(-200, Math.min(FIELD.width - viewWidth + 200, camera.x));
+    camera.y = Math.max(-200, Math.min(FIELD.height - viewHeight + 200, camera.y));
   }
 
+  // Вид — в CSS-пикселях (viewWidth × viewHeight); холст — в renderScale раз меньше (настройка «разрешение отрисовки»):
+  // всё рисуется в координатах вида, масштаб задаётся преобразованием контекста в начале кадра.
+  var viewWidth = window.innerWidth, viewHeight = 600, renderScale = 1;
   function resize() {
     if (window.Panel) window.Panel.layout();
-    canvas.width = window.innerWidth;
-    canvas.height = Math.max(200, window.innerHeight - (panelElement ? panelElement.offsetHeight : 0));
+    viewWidth = window.innerWidth;
+    viewHeight = Math.max(200, window.innerHeight - (panelElement ? panelElement.offsetHeight : 0));
+    canvas.width = Math.round(viewWidth * renderScale);
+    canvas.height = Math.round(viewHeight * renderScale);
+    canvas.style.width = viewWidth + 'px';
+    canvas.style.height = viewHeight + 'px';
     clampCamera();
   }
   window.addEventListener('resize', resize);
@@ -842,6 +854,7 @@
   }
   function explode(point, now) {
     var anchor = { x: point.x, y: point.y, elevation: point.h, level: point.level };
+    Sound.play('explosion', screenDistance(point));
     particles.push({ kind: 'blast', corpse: anchor, x: 0, y: -6, born: now, life: 420 });
     emitSparks(anchor, now, [0, -8], 26, false);
     for (var puff = 0; puff < 9; puff++) emitSmoke(anchor, now + puff * 40, [(Math.random() - 0.5) * 30, -6 - Math.random() * 10], true);
@@ -1036,6 +1049,7 @@
     shot.from = from;
     shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter);
     shot.duration = Math.max(60, Combat.distanceMeters(combatWorld, from, shot.result.point) / SHOT_SPEED[shot.weapon.projectile] * 1000);
+    Sound.play(shot.weapon.projectile, screenDistance(shot.shooter));
   }
   function updateShots(now) {
     shots.forEach(function (shot) {
@@ -1049,6 +1063,7 @@
   function impact(shot, now) {
     var result = shot.result;
     flashes.push({ point: result.point, kind: shot.weapon.projectile, start: now, until: now + 320 });
+    Sound.play('impact', screenDistance(result.point));
     if (result.kind !== 'unit' || result.unit.dead) return;
     var target = result.unit;
     var amount = Combat.damage(shot.weapon, target.armor, Math.random);
@@ -1059,6 +1074,7 @@
   }
   function kill(unit) {
     unit.dead = true;
+    setTimeout(function () { Sound.play(unit.kind === 'mech' ? 'crash' : 'fall', screenDistance(unit)); }, unit.kind === 'mech' ? 500 : 350);
     if (unit.inventory) {
       unit.inventory.forEach(function (entry) { dropOnGround(entry.item, unit.col, unit.row, unit.level); });
       unit.inventory = [];
@@ -1134,6 +1150,7 @@
   // оставляя ОД на выстрел навскидку. В мирной обстановке пришельцы ничего не делают.
   var aiQueue = [], aiWaitUntil = 0;
   function watchUnit(unit) {
+    if (!Settings.values.followAliens) return;
     centerOn(unit.x, unit.y, unit.elevation);
     var level = followLevel(unit);
     setView(level, isIndoor(unit.col, unit.row, unit.level) || isIndoor(unit.col, unit.row, level));
@@ -1224,16 +1241,16 @@
       if (weapon.modes[modeIndex] && alien.timeUnits >= weapon.modes[modeIndex].cost + turnCost) {
         watchUnit(alien);
         fire(alien, target, modeIndex);
-        aiWaitUntil = now + 450;
+        aiWaitUntil = now + 450 / Settings.values.aiSpeed;
         return;
       }
     } else if (weapon && alien.aiMoves < 2 && aiMove(alien, cheapestCost(alien))) {
       alien.aiMoves++;
-      aiWaitUntil = now + 200;
+      aiWaitUntil = now + 200 / Settings.values.aiSpeed;
       return;
     }
     aiQueue.shift();
-    aiWaitUntil = now + 350;
+    aiWaitUntil = now + 350 / Settings.values.aiSpeed;
   }
 
   // кадр падения или лежащего тела
@@ -1367,6 +1384,7 @@
       if (now >= corpse.nextArc) {
         // короткое замыкание: иногда две-три вспышки подряд
         emitSparks(corpse, now, pick(wires), 5 + Math.floor(Math.random() * 10), true);
+        Sound.play('spark', screenDistance(corpse));
         corpse.nextArc = now + (Math.random() < 0.35 ? 90 + Math.random() * 80 : 350 + Math.random() * 1300);
       }
     });
@@ -1520,6 +1538,7 @@
       var age = (now - flash.start) / (flash.until - flash.start);
       var screen = screenOf(flash.point);
       if (flash.text) {
+        if (!Settings.values.damageNumbers) return;
         context.font = 'bold 15px Arial, sans-serif'; context.textAlign = 'center';
         context.fillStyle = 'rgba(0, 0, 0, ' + (0.7 * (1 - age)) + ')';
         context.fillText(flash.text, screen.x + 1, screen.y - age * 26 + 1);
@@ -1725,7 +1744,7 @@
     keys[event.key] = true;
     if (event.key === 'i' || event.key === 'I' || event.key === 'ш' || event.key === 'Ш') { openInventory(); if (window.Inventory && Inventory.isOpen()) event.stopImmediatePropagation(); return; }
     if (event.key === 'Escape') { if (window.Panel && Panel.closeMenu()) return; if (throwing) { throwing = null; updateHover(); } else if (aiming) cancelAim(); else selectUnit(null); }
-    if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') showGrid = !showGrid;
+    if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') Settings.set('showGrid', !showGrid);
     if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
     if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
@@ -1748,7 +1767,7 @@
         unit.segmentLength = 1;
         unit.direction = next.face;
       }
-      var climb = CLIMB_SPEED * seconds;
+      var climb = CLIMB_SPEED * Settings.values.moveSpeed * seconds;
       if (Math.abs(next.elevation - unit.elevation) <= climb) {
         unit.elevation = next.elevation;
         unit.level = next.level;
@@ -1779,7 +1798,7 @@
       var direction = Iso.directionOf(deltaX, deltaY);
       if (direction >= 0) unit.direction = direction;
     }
-    var stepTiles = unit.speed * seconds / Iso.tileMeters;
+    var stepTiles = unit.speed * Settings.values.moveSpeed * seconds / Iso.tileMeters;
     if (distanceTiles <= stepTiles) {
       unit.x = targetX; unit.y = targetY;
       unit.walked += distanceTiles * Iso.tileMeters;
@@ -1964,14 +1983,13 @@
       } });
     }
     // клетка под курсором
-    if (hoverTile) {
-      var size = selected ? selected.size : 1;
-      var hoverCorners = Iso.tileCorners(hoverTile.col, hoverTile.row, elevationOf(hoverTile.col, hoverTile.row, hoverTile.level), size);
-      var reachable = busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level);
-      items.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.4), rect: quadRect(hoverCorners, 3), draw: function () {
+    var hover = hoverStyle();
+    if (hover) {
+      var hoverCorners = Iso.tileCorners(hover.tile.col, hover.tile.row, elevationOf(hover.tile.col, hover.tile.row, hover.tile.level), hover.size);
+      items.push({ depth: depthKey(hover.tile.col, hover.tile.row, hover.tile.level, 1.4), rect: quadRect(hoverCorners, 4), draw: function () {
         quadPath(hoverCorners);
-        context.fillStyle = reachable ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 90, 70, 0.25)'; context.fill();
-        context.strokeStyle = reachable ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 110, 90, 0.95)'; context.lineWidth = 2; context.stroke();
+        context.fillStyle = hover.color.replace(/[\d.]+\)$/, hover.kind === 'tile' ? '0.22)' : '0.2)'); context.fill();
+        context.strokeStyle = hover.color; context.lineWidth = hover.kind === 'tile' ? 2 : 3; context.stroke();
       } });
     }
     return items;
@@ -1998,14 +2016,39 @@
   }
 
   // рамка-курсор: клетка на полу и такая же над ней, соединённые рёбрами
-  function drawBox(tile, color, part, size) {
+  // стиль рамки курсора по тому, что под ней
+  function hoverStyle() {
+    if (!hoverTile) return null;
+    var unit = unitAt(hoverTile.col, hoverTile.row, hoverTile.level);
+    if (unit && unit.side === 'squad') return { tile: { col: unit.col, row: unit.row, level: unit.level }, size: unit.size, color: 'rgba(255, 214, 58, 0.98)', width: 3.2, kind: 'own' };
+    if (unit && unit.side === 'aliens') return { tile: { col: unit.col, row: unit.row, level: unit.level }, size: unit.size, color: 'rgba(255, 140, 36, 0.98)', width: 3.2, kind: 'enemy', unit: unit };
+    var reachable = busy() || (hoverPath && hoverAffordable > 0);
+    return { tile: hoverTile, size: selected ? selected.size : 1, color: reachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)', width: 1.4, kind: 'tile' };
+  }
+  // значок прицела над врагом под курсором
+  function drawEnemyHover(style) {
+    if (!style || style.kind !== 'enemy') return;
+    var foot = Iso.toScreen(style.unit.x, style.unit.y, style.unit.elevation);
+    var x = foot.x - camera.x, y = foot.y - camera.y - Math.max(style.unit.height, BOX_HEIGHT) * Iso.pixelsPerMeterUp - 26;
+    context.save();
+    context.strokeStyle = 'rgba(255, 140, 36, 0.98)'; context.lineWidth = 2.4;
+    context.shadowColor = 'rgba(0, 0, 0, 0.7)'; context.shadowBlur = 3;
+    context.beginPath();
+    context.arc(x, y, 10, 0, Math.PI * 2);
+    context.moveTo(x - 16, y); context.lineTo(x - 5, y); context.moveTo(x + 5, y); context.lineTo(x + 16, y);
+    context.moveTo(x, y - 16); context.lineTo(x, y - 5); context.moveTo(x, y + 5); context.lineTo(x, y + 16);
+    context.stroke();
+    context.restore();
+  }
+  function drawBox(tile, color, part, size, width) {
     size = size || 1;
     var base = elevationOf(tile.col, tile.row, tile.level);
     var height = size > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
     var bottom = Iso.tileCorners(tile.col, tile.row, base, size), top = Iso.tileCorners(tile.col, tile.row, base + height, size);
     context.save();
-    context.lineWidth = 1.6;
+    context.lineWidth = width || 1.6;
     context.strokeStyle = color;
+    context.lineCap = 'round';
     function edge(first, second) {
       context.beginPath();
       context.moveTo(first.x - camera.x, first.y - camera.y);
@@ -2113,26 +2156,26 @@
   }
 
   function render() {
+    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    context.imageSmoothingEnabled = renderScale < 1;
     context.fillStyle = '#141210';
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillRect(0, 0, viewWidth, viewHeight);
     if (TILESET) { renderTiles(); return; }
     // показываем вариант, как только он готов; до этого — прежний
     var wanted = variants[variantKey(view.level, view.cut)];
     if (wanted && wanted.ready) shownVariant = wanted;
     if (shownVariant && shownVariant.background.complete) context.drawImage(shownVariant.background, -Math.round(camera.x), -Math.round(camera.y));
 
-    var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level));
-    var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
     // рамка-куб — это только курсор мыши; выбранного бойца отмечает стрелка.
     // Для робота рамка охватывает всю его площадку 2x2.
-    var boxSize = selected ? selected.size : 1;
+    var hover = hoverStyle();
     // объекты по глубине: диагональ клетки (col + row), затем уровень, затем часть клетки
     var drawList = [];
     var rects = [];
     staticOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     floorOverlays().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
     corpseItems().forEach(function (item) { rects.push(item.rect); drawList.push(item); });
-    if (hoverTile) drawList.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
+    if (hover) drawList.push({ depth: depthKey(hover.tile.col, hover.tile.row, hover.tile.level, 1.45), draw: function () { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); } });
     drawList.push({ depth: -1, draw: drawPath });
     units.forEach(function (unit) {
       if (unit.level > view.level) return;          // выше уровня обзора — не видно
@@ -2164,7 +2207,7 @@
 
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
-    if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
+    if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawAimMarker();
     drawParticles();
     drawThrows();
@@ -2179,15 +2222,13 @@
     var current = tileView(view.level, view.cut);
     if (!tileImage.complete || !shadowImage.complete) return;
     drawChunks(current);
-    var hoverReachable = hoverTile && (busy() || (hoverPath && hoverAffordable > 0) || unitAt(hoverTile.col, hoverTile.row, hoverTile.level));
-    var hoverColor = hoverReachable ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 90, 70, 0.9)';
-    var boxSize = selected ? selected.size : 1;
+    var hover = hoverStyle();
 
     var dynamic = floorOverlays().concat(corpseItems());
-    if (hoverTile) {
-      var base = elevationOf(hoverTile.col, hoverTile.row, hoverTile.level), boxHeight = boxSize > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
-      var boxCorners = Iso.tileCorners(hoverTile.col, hoverTile.row, base, boxSize).concat(Iso.tileCorners(hoverTile.col, hoverTile.row, base + boxHeight, boxSize));
-      dynamic.push({ depth: depthKey(hoverTile.col, hoverTile.row, hoverTile.level, 1.45), rect: quadRect(boxCorners, 3), draw: function () { drawBox(hoverTile, hoverColor, 'back', boxSize); } });
+    if (hover) {
+      var base = elevationOf(hover.tile.col, hover.tile.row, hover.tile.level), boxHeight = hover.size > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
+      var boxCorners = Iso.tileCorners(hover.tile.col, hover.tile.row, base, hover.size).concat(Iso.tileCorners(hover.tile.col, hover.tile.row, base + boxHeight, hover.size));
+      dynamic.push({ depth: depthKey(hover.tile.col, hover.tile.row, hover.tile.level, 1.45), rect: quadRect(boxCorners, 4), draw: function () { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); } });
     }
     units.forEach(function (unit) {
       if (unit.level > view.level) return;
@@ -2241,7 +2282,7 @@
     drawPath();
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
-    if (hoverTile) { drawBox(hoverTile, hoverColor, 'front', boxSize); drawDropLine(hoverTile); }
+    if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawAimMarker();
     drawParticles();
     drawThrows();
@@ -2288,7 +2329,7 @@
     statsOf: function (unit) { return { weight: carriedWeight(unit), overload: overload(unit) }; },
     inventoryCost: function (unit, itemId, toSlot) { var found = findItem(unit, itemId); return found ? Items.moveCost(found.entry.slot, toSlot) : null; },
     inventoryMove: function (unit, itemId, toSlot, x, y) { return moveItem(unit, itemId, toSlot, x, y); },
-    viewSize: function () { return { width: canvas.width, height: canvas.height }; },
+    viewSize: function () { return { width: viewWidth, height: viewHeight }; },
     // замер отрисовки: средняя длительность кадра и число нарисованных кусков (для проверки карты из тайлов)
     benchmark: function (frames) {
       var started = performance.now();
@@ -2345,6 +2386,13 @@
     if (window.Panel) window.Panel.update();
   }
 
+  Settings.onChange(function (values, key) {
+    showGrid = values.showGrid || (!key && !!MAP.grid);
+    var help = document.getElementById('help');
+    if (help) help.style.display = values.showHelp ? '' : 'none';
+    if (values.renderScale !== renderScale) { renderScale = values.renderScale; resize(); }
+    if (key === 'fullscreen') setTimeout(resize, 200);
+  });
   resize();
   setView(selected.level, false);
   centerOn(selected.x, selected.y - 2);
