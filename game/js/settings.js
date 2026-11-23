@@ -10,7 +10,7 @@ var Settings = (function () {
     { key: 'aiSpeed', label: 'Скорость хода пришельцев', type: 'range', min: 0.5, max: 3, step: 0.25, value: 1, format: function (value) { return '×' + value.toFixed(2).replace(/0$/, ''); } },
     { key: 'followAliens', label: 'Камера следит за пришельцами в их ход', type: 'check', value: true },
     { key: 'damageNumbers', label: 'Цифры урона над целью', type: 'check', value: true },
-    { key: 'inspectAliens', label: 'Просмотр пришельцев: щелчок показывает его на панели', type: 'check', value: true },
+    { key: 'inspectAliens', label: 'Просмотр пришельцев: Ctrl+щелчок или ПКМ по метке', type: 'check', value: true },
     { group: 'ЗВУК' },
     { key: 'soundVolume', label: 'Громкость звуков', type: 'range', min: 0, max: 100, step: 5, value: 70, format: function (value) { return value + '%'; } },
     { key: 'musicVolume', label: 'Громкость музыки', type: 'range', min: 0, max: 100, step: 5, value: 45, format: function (value) { return value + '%'; } },

@@ -19,13 +19,15 @@ var Panel = (function () {
     next: 'M-9,-8 l8,8 l-8,8 M1,-8 l8,8 l-8,8',
     up: 'M0,-10 l-8,8 h5 v9 h6 v-9 h5 z',
     down: 'M0,10 l-8,-8 h5 v-9 h6 v9 h5 z',
-    endTurn: 'M-8,-10 v20 M-8,-10 h15 l-4,5 l4,5 h-15'
+    endTurn: 'M-8,-10 v20 M-8,-10 h15 l-4,5 l4,5 h-15',
+    focus: 'M0,-4 a4,4 0 1 0 0.1,0 M0,-13 v6 M0,7 v6 M-13,0 h6 M7,0 h6 M-9,-9 l3,3 M9,-9 l-3,3 M-9,9 l3,-3 M9,9 l-3,-3'
   };
   var BUTTONS = [
     { id: 'step', label: 'ШАГ', key: '1' },
     { id: 'kneel', label: 'ПРИСЕСТЬ', key: '2' },
     { id: 'reload', label: 'ЗАРЯДИТЬ', key: '4' },
     { id: 'gear', label: 'СНАРЯЖ.', key: '6' },
+    { id: 'focus', label: 'К БОЙЦУ', key: 'C' },
     { id: 'next', label: 'ДАЛЕЕ', key: '7' },
     { id: 'up', label: 'ВЫШЕ', key: '8' },
     { id: 'down', label: 'НИЖЕ', key: '9' },
@@ -64,9 +66,10 @@ var Panel = (function () {
     '.hand-reserve { font: 9px Consolas, "DejaVu Sans Mono", monospace; color: #8a959c; margin-bottom: 3px; }',
     '.panel-inner .stats { left: 694px; top: 18px; width: 320px; cursor: pointer; }',
     '.panel-inner .stats:hover .unit-name { color: #ffd28a; }',
-    '.panel-inner .actions { left: 1034px; top: 30px; width: 230px; }',
-    '.panel-inner .action-grid { grid-template-columns: repeat(4, 50px); column-gap: 10px; row-gap: 14px; }',
-    '.panel-inner .action-box { width: 50px; height: 50px; }',
+    '.panel-inner .actions { left: 1022px; top: 30px; width: 250px; }',
+    '.panel-inner .action-grid { grid-template-columns: repeat(5, 46px); column-gap: 5px; row-gap: 14px; }',
+    '.panel-inner .action-box { width: 46px; height: 50px; }',
+    '.panel-inner .action-label { letter-spacing: 0.2px; font-size: 8.5px; }',
     '.panel-inner .action:last-child .action-label { transform: none; }',
     '.no-unit .hand > * { visibility: hidden; }',
     '.viewing .portrait, .viewing .hand { border-color: #c0462e; }',
@@ -360,6 +363,51 @@ var Panel = (function () {
     canvas.dataset.key = !view.ready || view.ready() ? key : '';
   }
 
+  // ---------------- метки врагов в поле зрения выбранного бойца ----------------
+  // Красные квадраты с номерами справа над панелью (1 — ближайший). Щелчок — взять в прицел (панель остаётся
+  // на бойце), правая кнопка — показать пришельца на панели (настройка «Просмотр пришельцев»).
+  // Наведение подсвечивает врага на карте; метка цели в прицеле — с жёлтой рамкой.
+  var markerStyle = document.createElement('style');
+  markerStyle.textContent = [
+    '#enemy-marks { position: fixed; right: 14px; z-index: 6; display: flex; flex-direction: column-reverse; gap: 6px; font-family: Arial, sans-serif; user-select: none; }',
+    '#enemy-marks .mark { width: 30px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer;',
+    '  background: linear-gradient(180deg, #c23a22, #8a2212); border: 2px solid #3a0c06; color: #ffe2a0; font: bold 15px Consolas, "DejaVu Sans Mono", monospace;',
+    '  box-shadow: 0 2px 6px rgba(0,0,0,0.5); }',
+    '#enemy-marks .mark:hover { border-color: #ff9a5a; }',
+    '#enemy-marks .mark.aimed { border-color: #ffd23a; box-shadow: 0 0 0 2px #ffd23a, 0 2px 6px rgba(0,0,0,0.5); }'
+  ].join('\n');
+  document.head.appendChild(markerStyle);
+  var marks = document.createElement('div');
+  marks.id = 'enemy-marks';
+  document.body.appendChild(marks);
+  var marksKey = '', marksUnits = [];
+  marks.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+  marks.addEventListener('mousedown', function (event) {
+    var node = event.target.closest('.mark');
+    if (!node) return;
+    event.preventDefault(); event.stopPropagation();
+    var unit = marksUnits[Number(node.getAttribute('data-index'))];
+    if (event.button === 2) Game.inspectUnit(unit);
+    else if (event.button === 0) Game.aimAt(unit);
+  });
+  marks.addEventListener('mouseover', function (event) {
+    var node = event.target.closest('.mark');
+    Game.markedEnemy = node ? marksUnits[Number(node.getAttribute('data-index'))] : null;
+  });
+  marks.addEventListener('mouseleave', function () { Game.markedEnemy = null; });
+  function updateMarkers() {
+    var list = Game.spotted || [];
+    marks.style.bottom = (root.getBoundingClientRect().height + 12) + 'px';
+    var key = list.map(function (entry) { return Game.units.indexOf(entry.unit) + (entry.unit === Game.aimTarget ? 'a' : ''); }).join(',');
+    if (key === marksKey) return;
+    marksKey = key;
+    marksUnits = list.map(function (entry) { return entry.unit; });
+    marks.innerHTML = list.map(function (entry, index) {
+      return '<div class="mark' + (entry.unit === Game.aimTarget ? ' aimed' : '') + '" data-index="' + index + '" title="' +
+        entry.unit.name + ' · ' + Math.round(entry.distance) + ' м · щелчок — прицел, ПКМ — на панель">' + (index + 1) + '</div>';
+    }).join('');
+  }
+
   function update() {
     var unit = Game.shown;
     var viewing = !!unit && unit !== Game.selected;
@@ -369,6 +417,7 @@ var Panel = (function () {
     setText('toast', Game.message);
     setClass(element('toast'), 'visible', !!Game.message);
     drawMinimap();
+    updateMarkers();
     if (!unit) {
       setText('unit-name', 'Боец не выбран');
       setText('unit-sub', 'Выберите бойца щелчком или клавишей Пробел');

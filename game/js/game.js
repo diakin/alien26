@@ -1250,6 +1250,72 @@
     if (selected) { viewFollow(selected); centerOn(selected.x, selected.y, selected.elevation); }
     updateHover();
   }
+  // ---- враги в поле зрения выбранного бойца (метки с номерами над панелью) ----
+  // Видит — если ничто не заслоняет прямую от глаз бойца до корпуса или головы пришельца, не дальше SIGHT_METERS.
+  // Номера по расстоянию: 1 — ближайший. Список обновляется 4 раза в секунду.
+  var SIGHT_METERS = 40;
+  var spotted = { list: [], at: 0 };
+  var markedEnemy = null;             // враг, на метку которого наведена мышь — подсвечивается на карте
+  function canSee(viewer, target) {
+    var eye = { x: viewer.x, y: viewer.y, h: viewer.elevation + (viewer.kneeling ? 1.0 : Math.min(viewer.height, 2.4) * 0.9) };
+    var points = [targetPointOf(target), { x: target.x, y: target.y, h: target.elevation + target.height * 0.9 }];
+    for (var index = 0; index < points.length; index++) {
+      var distance = Combat.distanceMeters(combatWorld, eye, points[index]);
+      if (distance > SIGHT_METERS) return null;
+      // свои бойцы на линии взгляда не заслоняют: луч продолжается за ними
+      var start = eye, ignore = viewer;
+      for (var hops = 0; hops < 4; hops++) {
+        var rest = Combat.distanceMeters(combatWorld, start, points[index]);
+        var line = Combat.trace(combatWorld, start, points[index], rest + 0.3, ignore);
+        if (line.kind === 'unit' && line.unit === target) return distance;
+        if (line.kind !== 'unit' || line.unit.side !== 'squad') break;
+        start = line.point; ignore = line.unit;
+      }
+    }
+    return null;
+  }
+  function updateSpotted(now) {
+    if (now < spotted.at) return;
+    spotted.at = now + 250;
+    var viewer = selected;
+    if (!viewer || viewer.dead || viewer.side !== 'squad') { spotted.list = []; return; }
+    var list = [];
+    units.forEach(function (unit) {
+      if (unit.side !== 'aliens' || unit.dead) return;
+      var distance = canSee(viewer, unit);
+      if (distance !== null) list.push({ unit: unit, distance: distance });
+    });
+    list.sort(function (first, second) { return first.distance - second.distance; });
+    spotted.list = list;
+  }
+  // прицел по метке: панель остаётся на бойце; если враг за краем экрана — камера сдвигается, чтобы видеть обоих
+  function aimAt(unit) {
+    if (!unit || unit.dead || phase !== 'squad' || !selected || busy()) return;
+    if (!weaponOf(selected)) { say('Нет оружия'); return; }
+    throwing = null; aiming = true; aimTarget = unit;
+    var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
+    var screenX = foot.x - camera.x, screenY = foot.y - camera.y, margin = 80;
+    if (screenX < margin || screenX > viewWidth - margin || screenY < margin || screenY > viewHeight - margin) {
+      centerOn((selected.x + unit.x) / 2, (selected.y + unit.y) / 2, (selected.elevation + unit.elevation) / 2);
+    }
+    updateHover();
+  }
+  function drawMarkedEnemy() {
+    if (!markedEnemy || markedEnemy.dead) return;
+    var tile = { col: markedEnemy.col, row: markedEnemy.row, level: markedEnemy.level };
+    drawBox(tile, 'rgba(255, 140, 36, 0.98)', 'back', 1, 3.2);
+    drawBox(tile, 'rgba(255, 140, 36, 0.98)', 'front', 1, 3.2);
+    drawEnemyHover({ kind: 'enemy', unit: markedEnemy });
+  }
+  // фокус на бойца: камера к выбранному, уровень обзора и срез стен — по нему, на панели — он
+  function focusSelected() {
+    if (!selected) { say('Боец не выбран'); return; }
+    inspected = null;
+    viewFollow(selected);
+    centerOn(selected.x, selected.y, selected.elevation);
+    updateHover();
+  }
+
   // ---- музыка (js/music.js): общая тема, пока тихо; боевая — если стреляли в этот или прошлый ход
   // либо живые пришелец и боец ближе 25 м видят друг друга (ничто не заслоняет линию от ствола до корпуса) ----
   var lastShotTurn = -10, musicCheckAt = 0, CONTACT_METERS = 25;
@@ -1940,7 +2006,7 @@
       // выстрел по юниту, по взятому в прицел врагу или по точке над клеткой; враг остаётся в прицеле
       var target = aimTargetUnderMouse();
       if (!target || busy()) return;
-      if (target.unit && target.unit.side === 'aliens') { aimTarget = target.unit; inspect(target.unit); }
+      if (target.unit && target.unit.side === 'aliens') aimTarget = target.unit;          // панель остаётся на бойце
       fire(selected, target, selected.fireMode);
       updateHover();
       return;
@@ -1951,8 +2017,10 @@
     if (clickedUnit) {
       if (clickedUnit.side === 'squad') selectUnit(clickedUnit, false);
       else {
-        inspect(clickedUnit);                                             // показать на панели (если включено)
-        if (selected && weaponOf(selected) && !busy()) { aiming = true; aimTarget = clickedUnit; }   // щелчок по врагу — взять в прицел
+        // щелчок по врагу — взять в прицел (панель и камера остаются на бойце);
+        // Ctrl+щелчок или боец без оружия — показать пришельца на панели (настройка «Просмотр пришельцев»)
+        if (!event.ctrlKey && selected && weaponOf(selected) && !busy()) { aiming = true; aimTarget = clickedUnit; }
+        else inspect(clickedUnit);
         updateHover();
       }
       return;
@@ -1997,6 +2065,7 @@
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
     if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
     if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') setCombat(!combat);
+    if (event.key === 'c' || event.key === 'C' || event.key === 'с' || event.key === 'С') focusSelected();
     if (event.key === ' ' || event.key === 'Tab') { event.preventDefault(); selectNext(); }
     if (ACTION_KEYS[event.key]) Game.action(ACTION_KEYS[event.key]);
     if (window.Inventory && Inventory.isOpen()) event.stopImmediatePropagation();   // клавиша открыла окно — оно её не получает
@@ -2502,6 +2571,7 @@
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
+    drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
     drawThrows();
@@ -2577,6 +2647,7 @@
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
+    drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
     drawThrows();
@@ -2597,6 +2668,11 @@
     get view() { return view; },
     get combat() { return combat; },
     get aiming() { return aiming; },
+    get aimTarget() { return aimTarget; },
+    get spotted() { return spotted.list; },
+    aimAt: aimAt,
+    inspectUnit: function (unit) { inspect(unit); },
+    set markedEnemy(unit) { markedEnemy = unit; },
     get phase() { return phase; },
     modesOf: modesOf,
     cheapestCost: cheapestCost,
@@ -2644,6 +2720,7 @@
       else if (name === 'gear') openInventory();
       else if (name === 'up') { if (view.level < LEVELS - 1) setView(view.level + 1, view.cut); }
       else if (name === 'down') { if (view.level > 0) setView(view.level - 1, view.cut); }
+      else if (name === 'focus') focusSelected();
       else say('Пока не работает');
       updateHover();
     }
@@ -2669,6 +2746,7 @@
     updateWrecks(now);
     updateAI(now);
     updateMusic(now);
+    updateSpotted(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
     if (phase === 'squad' && selected && followLevel(selected) !== followedLevel) viewFollow(selected);
     // боец вошёл в помещение или вышел из него — стены срезаются или восстанавливаются
