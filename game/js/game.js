@@ -747,14 +747,16 @@
     if (!unit.inventory) {
       if (slot !== 'rightHand' || !unit.weaponType) return null;
       return { key: 'mech:' + unit.ammo + ':' + unit.reserve, name: unit.weapon, note: unit.weaponNote, rounds: unit.ammo, capacity: unit.magazine, reserve: unit.reserve,
-        draw: function (context, x, y, width, height) { Items.drawImage(context, 'assets/ui/weapon_mech.png', [57, 138, 303, 53], x, y, width, height); } };
+        draw: function (context, x, y, width, height) { Items.drawImage(context, 'assets/ui/weapon_mech.png', [57, 138, 303, 53], x, y, width, height); },
+        ready: function () { var image = Items.imageOf('assets/ui/weapon_mech.png'); return image.complete && image.naturalWidth > 0; } };
     }
     var entry = handEntry(unit, slot);
     if (!entry) return null;
     var info = Items.info(entry.item), weapon = !!info.weapon;
     var reserve = weapon ? unit.inventory.filter(function (other) { return other.item.type === info.ammo; }).length : null;
     return { key: entry.item.id + ':' + entry.item.rounds + ':' + reserve, name: info.name, note: info.note, rounds: entry.item.rounds, capacity: weapon ? Items.capacity(entry.item) : null, reserve: reserve,
-      draw: function (context, x, y, width, height) { Items.drawItem(context, entry.item, x, y, width, height); } };
+      draw: function (context, x, y, width, height) { Items.drawItem(context, entry.item, x, y, width, height); },
+      ready: function () { if (!info.image) return true; var image = Items.imageOf(info.image); return image.complete && image.naturalWidth > 0; } };
   }
   function throwCost(unit) { return Math.round(unit.maxTimeUnits * 0.25); }
   function throwRange(unit) { return 6 + (unit.strength || 30) / 3; }            // метры
@@ -2314,6 +2316,7 @@
   // ---------------- цикл ----------------
   var lastTime = performance.now();
   function frame(now) {
+    window.requestAnimationFrame(frame);          // сразу: ошибка в кадре не останавливает игру
     var seconds = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
     var scroll = 700 * seconds;
@@ -2340,7 +2343,6 @@
     if (wasMoving) updateHover();
     render();
     if (window.Panel) window.Panel.update();
-    window.requestAnimationFrame(frame);
   }
 
   resize();

@@ -350,8 +350,9 @@ var Panel = (function () {
     context.filter = 'drop-shadow(0 0 1px rgba(235,240,242,0.85))';
     view.draw(context, 8, 8, canvas.width - 16, canvas.height - 16);
     context.restore();
-    // картинка могла ещё не загрузиться: тогда перерисовать на следующем кадре
-    canvas.dataset.key = context.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data[3] || !view.name ? key : '';
+    // картинка оружия могла ещё не загрузиться: тогда перерисовать на следующем кадре.
+    // Пиксели холста не читаются: при открытии из файла (file://) холст с картинкой «заражён» и getImageData запрещён.
+    canvas.dataset.key = !view.ready || view.ready() ? key : '';
   }
 
   function update() {
