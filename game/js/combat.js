@@ -65,9 +65,14 @@ var Combat = (function () {
         });
       });
     }
+    // рамка записывается в клетку на каждом уровне, который она задевает по высоте: пуля ищет препятствия
+    // по уровню своей высоты, а предмет уровня 0 может быть выше 2,5 м (крыша конвертоплана, кунг грузовика, фонарь)
     boxes.forEach(function (box) {
-      var key = box[0] * grid * grid + box[2] * grid + box[1];
-      (solids[key] = solids[key] || []).push(box);
+      var lowest = Math.max(box[0], Math.floor(box[7] / levelHeight)), highest = Math.min(levels - 1, Math.floor((box[8] - 1e-6) / levelHeight));
+      for (var level = Math.min(lowest, box[0]); level <= Math.max(highest, box[0]); level++) {
+        var key = level * grid * grid + box[2] * grid + box[1];
+        (solids[key] = solids[key] || []).push(box);
+      }
     });
     return {
       grid: grid, levels: levels, levelHeight: levelHeight, tile: map.tile || 1.25, stride: stride, map: map, solids: solids,
