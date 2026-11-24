@@ -1,0 +1,352 @@
+[
+{
+"name": "civboy_idle",
+"options": {
+"civilian": "boy",
+"pose": "idle"
+}
+},
+{
+"name": "civboy_cower",
+"options": {
+"civilian": "boy",
+"pose": "cower"
+}
+},
+{
+"name": "civboy_walk_f0",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civboy_walk_f1",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civboy_walk_f2",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civboy_walk_f3",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civboy_walk_f4",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civboy_walk_f5",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civboy_walk_f6",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civboy_walk_f7",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civboy_walk_f8",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civboy_walk_f9",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civboy_walk_f10",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civboy_walk_f11",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civboy_walk_f12",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civboy_walk_f13",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civboy_walk_f14",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civboy_walk_f15",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civboy_fall_f0",
+"options": {
+"civilian": "boy",
+"fall": 0.1429
+}
+},
+{
+"name": "civboy_fall_f1",
+"options": {
+"civilian": "boy",
+"fall": 0.2857
+}
+},
+{
+"name": "civboy_fall_f2",
+"options": {
+"civilian": "boy",
+"fall": 0.4286
+}
+},
+{
+"name": "civboy_fall_f3",
+"options": {
+"civilian": "boy",
+"fall": 0.5714
+}
+},
+{
+"name": "civboy_fall_f4",
+"options": {
+"civilian": "boy",
+"fall": 0.7143
+}
+},
+{
+"name": "civboy_fall_f5",
+"options": {
+"civilian": "boy",
+"fall": 0.8571
+}
+},
+{
+"name": "civboy_dead",
+"options": {
+"civilian": "boy",
+"dead": true
+}
+},
+{
+"name": "civgirl_idle",
+"options": {
+"civilian": "girl",
+"pose": "idle"
+}
+},
+{
+"name": "civgirl_cower",
+"options": {
+"civilian": "girl",
+"pose": "cower"
+}
+},
+{
+"name": "civgirl_walk_f0",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civgirl_walk_f1",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civgirl_walk_f2",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civgirl_walk_f3",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civgirl_walk_f4",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civgirl_walk_f5",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civgirl_walk_f6",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civgirl_walk_f7",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civgirl_walk_f8",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civgirl_walk_f9",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civgirl_walk_f10",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civgirl_walk_f11",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civgirl_walk_f12",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civgirl_walk_f13",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civgirl_walk_f14",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civgirl_walk_f15",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civgirl_fall_f0",
+"options": {
+"civilian": "girl",
+"fall": 0.1429
+}
+},
+{
+"name": "civgirl_fall_f1",
+"options": {
+"civilian": "girl",
+"fall": 0.2857
+}
+},
+{
+"name": "civgirl_fall_f2",
+"options": {
+"civilian": "girl",
+"fall": 0.4286
+}
+},
+{
+"name": "civgirl_fall_f3",
+"options": {
+"civilian": "girl",
+"fall": 0.5714
+}
+},
+{
+"name": "civgirl_fall_f4",
+"options": {
+"civilian": "girl",
+"fall": 0.7143
+}
+},
+{
+"name": "civgirl_fall_f5",
+"options": {
+"civilian": "girl",
+"fall": 0.8571
+}
+},
+{
+"name": "civgirl_dead",
+"options": {
+"civilian": "girl",
+"dead": true
+}
+}
+]

@@ -21,8 +21,14 @@
   var KINDS = {
     soldier: { size: 1, speed: 1.5, stride: 1.32, height: 1.85, pickWidth: 26, canKneel: true },
     alien: { size: 1, speed: 1.5, stride: 1.2, height: 2.0, pickWidth: 26, canKneel: false },
-    mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false, groundOnly: true }
+    mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false, groundOnly: true },
+    // гражданские (civilian.js): шаг 0,7 м, цикл 1,4 м; у детей модель меньше в 0,65 раза
+    civilian: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true },
+    child: { size: 1, speed: 1.1, stride: 0.92, height: 1.2, pickWidth: 18, canKneel: true }
   };
+  // боец или машина отряда (не гражданский)
+  function isFighter(unit) { return unit.side === 'squad' && unit.kind !== 'civilian' && unit.kind !== 'child'; }
+  function isCivilian(unit) { return unit.kind === 'civilian' || unit.kind === 'child'; }
 
   // стоимость действий в очках действия (ОД)
   var COST = { kneel: 4, stand: 8, turnStep: 1, reload: 15, step: 4, diagonal: 6, stairs: 2 };
@@ -267,6 +273,20 @@
   // spawns-объект { squad, mech, aliens } — столько бойцов, роботов и пришельцев, сколько точек высадки
   // режим страницы (?mode=manage): мирная база — без пришельцев, обстановка мирная, меню базы (js/basemenu.js)
   var PAGE_MODE = (function () { var match = /[?&]mode=([a-z]+)/.exec(location.search); return match ? match[1] : ''; })();
+  // Задание карты (MAP.mission): спасение — гражданские, учёный (vip), таймер портала (timeLimit, с), место портала
+  var MISSION = MAP.mission || null;
+  function civilianProfile(person, number) {
+    var child = !!person.child;
+    return {
+      kind: child ? 'child' : 'civilian', name: person.name, camo: 'civ' + person.kind, side: 'civilians', vip: !!person.vip, child: child,
+      callsign: person.vip ? 'УЧЁНЫЙ' : (child ? 'РЕБЁНОК-' : 'ГРАЖД-') + number,
+      rank: person.vip ? 'важная персона' : child ? 'ребёнок' : 'гражданский', role: person.vip ? 'ВАЖНАЯ ПЕРСОНА' : 'ГРАЖДАНСКИЙ',
+      subtitle: 'ГРАЖДАНСКИЙ · БЕЗ ОРУЖИЯ', missions: 0,
+      accuracy: 0, reactions: 20, strength: child ? 10 : 22, bravery: 25, throwing: 20, armor: 0,
+      maxTimeUnits: child ? 44 : 50, health: child ? 22 : 30, maxHealth: child ? 22 : 30, stamina: 50, maxStamina: 50, morale: 40, optics: '—',
+      loadout: []
+    };
+  }
   function roster() {
     var spawns = MAP.spawns;
     if (Array.isArray(spawns)) return PROFILES.map(function (profile, index) { return makeUnit(profile, spawns[index]); });
@@ -276,6 +296,16 @@
     (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
     (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
     if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
+    // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
+    if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
+      var adults = 0, children = 0;
+      MISSION.civilians.forEach(function (person) {
+        var number = person.vip ? 0 : person.child ? ++children : ++adults;
+        var unit = makeUnit(civilianProfile(person, number), [person.col, person.row, person.level, person.dir]);
+        unit.kneeling = true;
+        list.push(unit);
+      });
+    }
     return list;
   }
   var units = roster();
@@ -538,11 +568,13 @@
   // Запись тайла: [x, y, w, h, ax, ay, часть, срез, sx, sy, sw, sh, sax, say]; anchor — угол клетки на полу уровня.
   // Срез — номер тайла того же элемента, срезанного до пояса (стены и фасад текущего уровня в режиме «стены срезаны»).
   var TILESET = MAP.tileset || null;
-  var tileImage = null, shadowImage = null, shadowCanvas = null, groundPieces = null, tileViews = {};
+  // атлас может быть разбит на страницы (большие карты): TILESET.images, TILESET.shadowImages; номер страницы — в записи тайла
+  var tileImage = null, shadowImage = null, tileImages = [], shadowImages = [], shadowCanvas = null, groundPieces = null, tileViews = {};
   var tileStats = { ground: 0, shadows: 0, pieces: 0 };
   if (TILESET) {
-    tileImage = Assets.image(TILESET.image, Assets.URGENT);
-    shadowImage = Assets.image(TILESET.shadows, Assets.URGENT);
+    tileImages = (TILESET.images || [TILESET.image]).map(function (source) { return Assets.image(source, Assets.URGENT); });
+    shadowImages = (TILESET.shadowImages || [TILESET.shadows]).map(function (source) { return Assets.image(source, Assets.URGENT); });
+    tileImage = tileImages[0]; shadowImage = shadowImages[0];
     shadowCanvas = document.createElement('canvas');
   }
   // кусок картинки тайла на месте клетки: прямоугольник в пикселях карты и в атласе
@@ -554,6 +586,7 @@
     return {
       x: Math.round(corner.x - entry[offset + 4]), y: Math.round(corner.y - entry[offset + 5]),
       width: entry[offset + 2], height: entry[offset + 3], sx: entry[offset], sy: entry[offset + 1],
+      page: entry[shadow ? 15 : 14] || 0,
       depth: depthKey(col, row, level, part === undefined ? entry[6] : part)
     };
   }
@@ -589,7 +622,7 @@
     doors.forEach(function (door, index) {
       if (door.level > viewLevel) return;
       var piece = tilePiece(cutTile(TILESET.doors[index], door.level, viewLevel, cut), door.col, door.row, door.level);
-      if (piece) doorEntries.push([index, piece.x, piece.y, piece.width, piece.height, piece.sx, piece.sy]);
+      if (piece) doorEntries.push([index, piece.x, piece.y, piece.width, piece.height, piece.sx, piece.sy, piece.page]);
     });
     tileViews[key] = { key: key, pieces: pieces, shadows: shadows, doors: doorEntries };
     return tileViews[key];
@@ -649,6 +682,7 @@
     return chunk;
   }
   function drawTilePiece(image, piece) {
+    if (piece.page) image = tileImages[piece.page];
     context.drawImage(image, piece.sx, piece.sy, piece.width, piece.height, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y), piece.width, piece.height);
   }
   // земля и тени на ней: рисуются до всего остального, тени — одним слоем (объединение, без наложения)
@@ -667,7 +701,7 @@
     shadowContext.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
     current.shadows.forEach(function (piece) {
       if (!visibleRect(piece)) return;
-      shadowContext.drawImage(shadowImage, piece.sx, piece.sy, piece.width, piece.height, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y), piece.width, piece.height);
+      shadowContext.drawImage(shadowImages[piece.page] || shadowImage, piece.sx, piece.sy, piece.width, piece.height, piece.x - Math.round(camera.x), piece.y - Math.round(camera.y), piece.width, piece.height);
       tileStats.shadows++;
     });
     // тень только на земле карты: за краем карты её нет
@@ -1191,8 +1225,118 @@
       if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad'; })[0] || null;
       else selectNext();
     }
+    if (unit.vip) say(unit.name + ' погиб');
     if (!units.some(function (other) { return other.side === 'aliens'; })) { say('Пришельцы уничтожены'); endMission('cleared'); }
-    else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('wiped'); }
+    else if (!units.some(function (other) { return isFighter(other) && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('wiped'); }
+  }
+
+  // ---------------- гражданские: присоединение к отряду ----------------
+  // Гражданский (сторона civilians) прячется и не ходит. Когда боец или машина отряда встаёт на соседнюю клетку
+  // (по стороне или по диагонали, без стены между ними), гражданский переходит в отряд: им можно управлять, оружия нет.
+  function adjacentOpen(col, row, otherCol, otherRow, level) {
+    var deltaCol = otherCol - col, deltaRow = otherRow - row;
+    if (Math.abs(deltaCol) > 1 || Math.abs(deltaRow) > 1 || (!deltaCol && !deltaRow)) return false;
+    if (!deltaCol || !deltaRow) return edgeOpen(col, row, otherCol, otherRow, level);
+    return (edgeOpen(col, row, otherCol, row, level) && edgeOpen(otherCol, row, otherCol, otherRow, level)) ||
+      (edgeOpen(col, row, col, otherRow, level) && edgeOpen(col, otherRow, otherCol, otherRow, level));
+  }
+  function rescueNear(rescuer) {
+    if (!isFighter(rescuer) || rescuer.dead) return;
+    units.forEach(function (person) {
+      if (person.side !== 'civilians' || person.dead || person.level !== rescuer.level) return;
+      for (var deltaRow = 0; deltaRow < rescuer.size; deltaRow++) for (var deltaCol = 0; deltaCol < rescuer.size; deltaCol++) {
+        if (!adjacentOpen(rescuer.col + deltaCol, rescuer.row + deltaRow, person.col, person.row, person.level)) continue;
+        person.side = 'squad';
+        person.timeUnits = phase === 'squad' ? turnTimeUnits(person) : 0;
+        say(person.name + (person.child ? ' — с отрядом' : ': присоединился к отряду') + ', ведите к конвертоплану');
+        if (window.Panel) window.Panel.update();
+        return;
+      }
+    });
+  }
+
+  // ---------------- таймер портала ----------------
+  // Часы задания идут в реальном времени, пока вкладка открыта и задание не кончилось. Когда время выходит,
+  // открывается портал (MISSION.portal) и рядом с ним появляются крупные силы пришельцев.
+  var PORTAL_WAVE = 10;
+  var portal = MISSION && MISSION.portal && MISSION.timeLimit ? { col: MISSION.portal[0], row: MISSION.portal[1], level: MISSION.portal[2] || 0, limit: MISSION.timeLimit * 1000, open: false, openedAt: 0 } : null;
+  var missionClock = { elapsed: 0, last: performance.now() };
+  function updateMissionClock(now) {
+    var delta = now - missionClock.last;
+    missionClock.last = now;
+    if (!portal || mission.over || document.hidden || delta > 1000 || PAGE_MODE === 'manage') return;
+    missionClock.elapsed += delta;
+    if (!portal.open && missionClock.elapsed >= portal.limit) openPortal(now);
+  }
+  function openPortal(now) {
+    portal.open = true; portal.openedAt = now;
+    var placed = 0, number = startUnits.filter(function (unit) { return unit.side === 'aliens'; }).length;
+    for (var radius = 0; radius < 8 && placed < PORTAL_WAVE; radius++) {
+      for (var deltaRow = -radius; deltaRow <= radius && placed < PORTAL_WAVE; deltaRow++) for (var deltaCol = -radius; deltaCol <= radius && placed < PORTAL_WAVE; deltaCol++) {
+        if (Math.max(Math.abs(deltaCol), Math.abs(deltaRow)) !== radius) continue;
+        var col = portal.col + deltaCol, row = portal.row + deltaRow;
+        if (!inside(col, row) || !isFreeFor(null)(col, row, portal.level)) continue;
+        var alien = makeUnit(alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
+        alien.timeUnits = 0;
+        units.push(alien); startUnits.push(alien);
+        placed++;
+      }
+    }
+    setCombat(true);
+    say('Открылся портал: прибыли ' + placed + ' пришельцев');
+  }
+  function timerText() {
+    if (!portal) return '';
+    if (portal.open) return 'ПОРТАЛ ОТКРЫТ';
+    var left = Math.max(0, Math.ceil((portal.limit - missionClock.elapsed) / 1000));
+    var minutes = Math.floor(left / 60), seconds = left % 60;
+    return 'ПОРТАЛ ЧЕРЕЗ ' + (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+  }
+  var timerShown = '';
+  function updateTimerLabel() {
+    if (!portal) return;
+    var label = document.getElementById('portal-timer');
+    if (!label) {
+      var plate = document.getElementById('turn');
+      if (!plate) return;
+      label = document.createElement('div');
+      label.id = 'portal-timer'; label.className = 'situation alert mono';
+      plate.appendChild(label);
+    }
+    var text = timerText();
+    var rescued = units.filter(function (unit) { return isCivilian(unit) && unit.side === 'squad'; }).length;
+    var total = startUnits.filter(isCivilian).length;
+    text += ' · С ОТРЯДОМ ' + rescued + ' ИЗ ' + total;
+    if (text !== timerShown) { label.textContent = text; timerShown = text; }
+  }
+  // портал: до открытия — слабое кольцо, которое растёт со временем; после — светящийся вихрь
+  function drawPortal(now) {
+    if (!portal || portal.level > view.level) return;
+    var center = Iso.toScreen(portal.col + 0.5, portal.row + 0.5, elevationOf(portal.col, portal.row, portal.level) + 0.05);
+    var x = center.x - camera.x, y = center.y - camera.y;
+    var cell = Iso.toScreen(portal.col + 1.5, portal.row + 0.5, 0).x - Iso.toScreen(portal.col + 0.5, portal.row + 0.5, 0).x;
+    var fraction = Math.min(1, missionClock.elapsed / portal.limit);
+    context.save();
+    if (!portal.open) {
+      var radius = cell * (0.6 + fraction * 1.4);
+      context.globalAlpha = 0.25 + 0.2 * Math.sin(now / 300) * fraction + fraction * 0.3;
+      context.strokeStyle = '#b05cff'; context.lineWidth = 2 + fraction * 3;
+      context.beginPath(); context.ellipse(x, y, radius, radius * 35 / 61, 0, 0, Math.PI * 2); context.stroke();
+    } else {
+      var size = cell * 2.4;
+      for (var ring = 0; ring < 5; ring++) {
+        var spin = now / 400 + ring * 1.3, scale = 1 - ring * 0.16;
+        var gradient = context.createRadialGradient(x, y, 0, x, y, size * scale);
+        gradient.addColorStop(0, 'rgba(240, 200, 255, 0.5)'); gradient.addColorStop(0.6, 'rgba(150, 60, 240, 0.25)'); gradient.addColorStop(1, 'rgba(90, 20, 160, 0)');
+        context.fillStyle = gradient;
+        context.beginPath(); context.ellipse(x, y, size * scale, size * scale * 35 / 61, Math.sin(spin) * 0.1, 0, Math.PI * 2); context.fill();
+      }
+      context.strokeStyle = 'rgba(220, 160, 255, 0.85)'; context.lineWidth = 3;
+      context.beginPath(); context.ellipse(x, y, size, size * 35 / 61, 0, now / 500, now / 500 + Math.PI * 1.6); context.stroke();
+      context.beginPath(); context.moveTo(x, y); context.lineTo(x, y - cell * 3);
+      context.strokeStyle = 'rgba(200, 140, 255, ' + (0.3 + 0.2 * Math.sin(now / 200)) + ')'; context.lineWidth = cell * 0.6; context.stroke();
+    }
+    context.restore();
   }
 
   // ---------------- конец задания и итоги ----------------
@@ -1361,7 +1505,7 @@
     var lost = function (test) { return startUnits.filter(function (unit) { return test(unit) && unit.dead; }); };
     var evacuated = mission.evacuated || [];
     var leftBehind = function (test) { return kind === 'evac' ? units.filter(function (unit) { return test(unit) && evacuated.indexOf(unit) < 0; }) : []; };
-    var isSoldier = function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; };
+    var isSoldier = function (unit) { return isFighter(unit) && unit.kind !== 'mech'; };
     var isRobot = function (unit) { return unit.kind === 'mech'; };
     var aliens = startUnits.filter(function (unit) { return unit.side === 'aliens'; });
     var killedAliens = lost(function (unit) { return unit.side === 'aliens'; });
@@ -1369,6 +1513,14 @@
     var robotsDead = lost(isRobot), robotsLeft = leftBehind(isRobot);
     var result = kind === 'cleared' ? 'good' : kind === 'wiped' ? 'bad'
       : killedAliens.length * 2 >= aliens.length && soldiersDead.length + soldiersLeft.length < killedAliens.length ? 'good' : 'bad';
+    // гражданские: при зачистке спасены все живые, при эвакуации — улетевшие
+    var civilians = startUnits.filter(isCivilian);
+    var civiliansRescued = kind === 'cleared' ? civilians.filter(function (unit) { return !unit.dead; }) : kind === 'evac' ? evacuated.filter(isCivilian) : [];
+    var civiliansDead = civilians.filter(function (unit) { return unit.dead; });
+    var vip = civilians.filter(function (unit) { return unit.vip; })[0] || null;
+    var vipRescued = !!vip && civiliansRescued.indexOf(vip) >= 0;
+    // задание спасения: «хорошо» — учёный спасён и уничтожено не меньше половины пришельцев (или все)
+    if (MISSION && MISSION.kind === 'rescue') result = vipRescued && (kind === 'cleared' || killedAliens.length * 2 >= aliens.length) ? 'good' : 'bad';
     var counts = {}, order = [];
     var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
     var lists = [];
@@ -1391,7 +1543,13 @@
       soldiersTotal: startUnits.filter(isSoldier).length,
       robotsLost: robotsDead.map(person), robotsLeft: robotsLeft.map(person),
       robotsTotal: startUnits.filter(isRobot).length,
-      evacuated: evacuated.length
+      evacuated: evacuated.filter(function (unit) { return !isCivilian(unit); }).length,
+      rescue: MISSION && MISSION.kind === 'rescue' ? {
+        civiliansTotal: civilians.length, civiliansRescued: civiliansRescued.map(person), civiliansDead: civiliansDead.map(person),
+        childrenTotal: civilians.filter(function (unit) { return unit.child; }).length,
+        childrenRescued: civiliansRescued.filter(function (unit) { return unit.child; }).length,
+        vip: vip ? person(vip) : null, vipRescued: vipRescued, vipDead: !!vip && vip.dead, portalOpen: !!(portal && portal.open)
+      } : null
     };
   }
 
@@ -2466,6 +2624,7 @@
       unit.path.shift();
       unit.segmentLength = 0;
       if (!unit.path.length) { unit.walked = 0; if (unit === selected) viewFollow(unit); }
+      rescueNear(unit);
       if (ownPhase(unit)) reactionCheck(unit);
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
@@ -2901,6 +3060,7 @@
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
+    drawPortal(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -2914,7 +3074,7 @@
   // а за рамку ничего не выходит, поэтому ближние куски вне группы не страдают.
   function renderTiles() {
     var current = tileView(view.level, view.cut);
-    if (!Assets.ready(tileImage) || !Assets.ready(shadowImage)) return;
+    if (!tileImages.every(Assets.ready) || !shadowImages.every(Assets.ready)) return;
     drawChunks(current);
     var hover = hoverStyle();
 
@@ -2934,7 +3094,7 @@
       if (!door || door.open > 0.995) return;
       var cutLevel = view.cut ? view.level : -1;
       dynamic.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), rect: { x: entry[1], y: entry[2], width: entry[3], height: entry[4] },
-        draw: function () { drawDoor(tileImage, entry, cutLevel); } });
+        draw: function () { drawDoor(tileImages[entry[7] || 0], entry, cutLevel); } });
     });
 
     // группы по перекрытию: рамка группы — общий прямоугольник её элементов
@@ -2978,6 +3138,7 @@
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
+    drawPortal(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -3080,6 +3241,8 @@
     updateAI(now);
     updateGather();
     updateMission(now);
+    updateMissionClock(now);
+    updateTimerLabel();
     updateMusic(now);
     updateSpotted(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
@@ -3139,7 +3302,8 @@
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
+    missionClock: missionClock, get portal() { return portal; },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
-    centerOn: centerOn, variantReady: function () { if (TILESET) return Assets.ready(tileImage); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
+    centerOn: centerOn, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

@@ -7,7 +7,13 @@ var Globe = (function () {
 
   var DEGREE = Math.PI / 180;
   var PANEL_WIDTH = 250;
-  var MISSION = { name: 'ПОСАДКА У БАЗЫ', lat: 47.5, lon: 68.0, page: 'tiles_big.html' };   // большая карта: отряд в конвертоплане
+  // задания на глобусе: щелчок по метке выбирает задание, «Начать задание» открывает его карту
+  var MISSIONS = [
+    { name: 'ПОСАДКА У БАЗЫ', title: 'Посадка у базы', place: 'Квадрат 47-Б', signal: 'посадка неизвестного объекта', lat: 47.5, lon: 68.0, page: 'tiles_big.html' },
+    { name: 'СПАСЕНИЕ В ГОРОДЕ', title: 'Спасение в центре города', place: 'Санкт-Петербург, центр', signal: 'пришельцы похищают людей, в хранилище банка — учёный',
+      lat: 59.94, lon: 30.31, page: 'city.html' }
+  ];
+  var MISSION = MISSIONS[0];
   // своя база — в горе Ямантау (Южный Урал, 54°15′ с. ш., 58°06′ в. д.)
   // page — карта базы и меню управления; attack — тестовый бой на той же карте
   var BASE = { name: 'БАЗА «ЯМАНТАУ»', lat: 54.255, lon: 58.103, page: 'base.html?mode=manage', attack: 'base.html' };
@@ -219,8 +225,9 @@ var Globe = (function () {
     context.restore();
   }
 
-  function drawMission(now) {
-    var point = projectLatLon(MISSION.lat, MISSION.lon);
+  function drawMission(now) { MISSIONS.forEach(function (item) { drawMissionMark(item, now); }); }
+  function drawMissionMark(item, now) {
+    var point = projectLatLon(item.lat, item.lon);
     if (point.depth < 0.05) return;
     var pulse = (now % 1400) / 1400;
     context.save();
@@ -239,10 +246,10 @@ var Globe = (function () {
     context.moveTo(point.x, point.y + 7); context.lineTo(point.x, point.y + 12);
     context.stroke();
     context.font = 'bold 11px Arial, sans-serif';
-    var label = MISSION.name, labelWidth = context.measureText(label).width + 12;
+    var label = item.name, labelWidth = context.measureText(label).width + 12;
     context.fillStyle = 'rgba(10, 13, 15, 0.82)';
     context.fillRect(point.x + 16, point.y - 22, labelWidth, 18);
-    context.strokeStyle = '#e8a33a'; context.lineWidth = 1;
+    context.strokeStyle = item === MISSION ? '#ffd28a' : '#6a5a40'; context.lineWidth = item === MISSION ? 1.5 : 1;
     context.strokeRect(point.x + 16.5, point.y - 21.5, labelWidth - 1, 17);
     context.fillStyle = '#ffd28a';
     context.textBaseline = 'middle';
@@ -329,8 +336,10 @@ var Globe = (function () {
   }
   canvas.addEventListener('mousedown', function (event) {
     if (event.button !== 0) return;
-    var point = projectLatLon(MISSION.lat, MISSION.lon);
-    if (point.depth > 0.05 && Math.hypot(event.offsetX - point.x, event.offsetY - point.y) < 14) { flyTo(MISSION.lat, MISSION.lon); return; }
+    for (var index = 0; index < MISSIONS.length; index++) {
+      var point = projectLatLon(MISSIONS[index].lat, MISSIONS[index].lon);
+      if (point.depth > 0.05 && Math.hypot(event.offsetX - point.x, event.offsetY - point.y) < 14) { selectMission(MISSIONS[index]); flyTo(MISSION.lat, MISSION.lon); return; }
+    }
     var basePoint = projectLatLon(BASE.lat, BASE.lon);
     if (basePoint.depth > 0.05 && Math.hypot(event.offsetX - basePoint.x, event.offsetY - basePoint.y) < 12) { flyTo(BASE.lat, BASE.lon); return; }
     drag = { x: event.clientX, y: event.clientY, time: performance.now() };
@@ -416,7 +425,17 @@ var Globe = (function () {
     var absolute = Math.abs(value), degrees = Math.floor(absolute), minutes = Math.round((absolute - degrees) * 60);
     return degrees + '°' + two(minutes) + '′ ' + (value >= 0 ? positive : negative);
   }
-  document.getElementById('mission-coords').textContent = formatCoordinate(MISSION.lat, 'с. ш.', 'ю. ш.') + ', ' + formatCoordinate(MISSION.lon, 'в. д.', 'з. д.');
+  // карточка выбранного задания
+  function selectMission(item) {
+    MISSION = item;
+    document.getElementById('mission-name').textContent = item.title;
+    document.getElementById('mission-place').textContent = item.place;
+    document.getElementById('mission-signal').textContent = item.signal;
+    document.getElementById('mission-coords').textContent = formatCoordinate(item.lat, 'с. ш.', 'ю. ш.') + ', ' + formatCoordinate(item.lon, 'в. д.', 'з. д.');
+    dirty = true;
+  }
+  selectMission(MISSION);
+  document.getElementById('mission-next').addEventListener('click', function () { selectMission(MISSIONS[(MISSIONS.indexOf(MISSION) + 1) % MISSIONS.length]); flyTo(MISSION.lat, MISSION.lon); });
   updateClock();
   setInterval(updateClock, 1000);
 

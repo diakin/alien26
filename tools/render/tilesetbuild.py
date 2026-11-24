@@ -66,6 +66,31 @@ def build_shadow(job_id, frame):
     return sprite, (-frame['left'] - bbox[0], -frame['top'] - bbox[1])
 
 
+def pack_pages(images, max_width=2048, max_height=8192, gap=1):
+    """Раскладка полками по страницам высотой не больше max_height (большие карты: один атлас был бы слишком
+    высоким для браузера). Возвращает список атласов и позиции (страница, x, y)."""
+    order = sorted(range(len(images)), key=lambda index: -images[index].height)
+    positions = [None] * len(images)
+    page, x, y, shelf = 0, 0, 0, 0
+    heights = []
+    for index in order:
+        image = images[index]
+        if x + image.width > max_width:
+            x, y, shelf = 0, y + shelf + gap, 0
+        if y + image.height > max_height:
+            heights.append(y + shelf if x else y)
+            page, x, y, shelf = page + 1, 0, 0, 0
+        positions[index] = (page, x, y)
+        x += image.width + gap
+        shelf = max(shelf, image.height)
+    heights.append(y + shelf)
+    atlases = [Image.new('RGBA', (max_width, max(1, height)), (0, 0, 0, 0)) for height in heights]
+    for index, image in enumerate(images):
+        page, x, y = positions[index]
+        atlases[page].paste(image, (x, y))
+    return atlases, positions
+
+
 def pack(images, max_width=2048, gap=1):
     """Раскладка полками по убыванию высоты. Возвращает атлас и позиции."""
     order = sorted(range(len(images)), key=lambda index: -images[index].height)
@@ -99,26 +124,40 @@ for job in jobs:
             shadows[job['id']] = shadow
 
 sprite_ids = sorted(sprites)
-atlas, positions = pack([sprites[job_id][0] for job_id in sprite_ids])
-sprite_at = {job_id: positions[index] for index, job_id in enumerate(sprite_ids)}
 shadow_ids = sorted(shadows)
-shadow_atlas, shadow_positions = pack([shadows[job_id][0] for job_id in shadow_ids])
+# атлас страницами по 2048 × 8192: один длинный атлас большой карты браузер может не показать
+atlases, positions = pack_pages([sprites[job_id][0] for job_id in sprite_ids])
+sprite_at = {job_id: positions[index] for index, job_id in enumerate(sprite_ids)}
+shadow_atlases, shadow_positions = pack_pages([shadows[job_id][0] for job_id in shadow_ids])
 shadow_at = {job_id: shadow_positions[index] for index, job_id in enumerate(shadow_ids)}
-atlas.save(os.path.join(OUT_ASSETS, 'tiles.png'), optimize=True)
-shadow_atlas.save(os.path.join(OUT_ASSETS, 'shadows.png'), optimize=True)
+page_name = lambda base, page: base + ('' if page == 0 else str(page)) + '.png'
+for old_file in os.listdir(OUT_ASSETS):
+    if re.fullmatch(r'(tiles|shadows)\d+\.png', old_file):
+        os.remove(os.path.join(OUT_ASSETS, old_file))
+for page, image in enumerate(atlases):
+    image.save(os.path.join(OUT_ASSETS, page_name('tiles', page)), optimize=True)
+for page, image in enumerate(shadow_atlases):
+    image.save(os.path.join(OUT_ASSETS, page_name('shadows', page)), optimize=True)
+atlas, shadow_atlas = atlases[0], shadow_atlases[0]
 
-# номер тайла в игре = номер в плане; запись: [x, y, w, h, ax, ay, часть, срез, sx, sy, sw, sh, sax, say]
+# номер тайла в игре = номер в плане; запись: [x, y, w, h, ax, ay, часть, срез, sx, sy, sw, sh, sax, say, страница, страница тени]
 tile_list = []
 for job in jobs:
     job_id = job['id']
-    entry = [-1, 0, 0, 0, 0, 0, job['part'], plan['cutOf'].get(str(job_id), -1), -1, 0, 0, 0, 0, 0]
+    entry = [-1, 0, 0, 0, 0, 0, job['part'], plan['cutOf'].get(str(job_id), -1), -1, 0, 0, 0, 0, 0, 0, 0]
     if job_id in sprites:
         image, anchor = sprites[job_id]
-        entry[0:6] = [*sprite_at[job_id], image.width, image.height, anchor[0], anchor[1]]
+        page, x, y = sprite_at[job_id]
+        entry[0:6] = [x, y, image.width, image.height, anchor[0], anchor[1]]
+        entry[14] = page
     if job_id in shadows:
         image, anchor = shadows[job_id]
-        entry[8:14] = [*shadow_at[job_id], image.width, image.height, anchor[0], anchor[1]]
+        page, x, y = shadow_at[job_id]
+        entry[8:14] = [x, y, image.width, image.height, anchor[0], anchor[1]]
+        entry[15] = page
     tile_list.append(entry)
+if len(atlases) == 1 and len(shadow_atlases) == 1:
+    tile_list = [entry[:14] for entry in tile_list]          # одна страница: прежний формат
 
 # ---------------- размещение на карте ----------------
 placements = []          # (тайл, col, row, level, слой) — для границ и общего вида
@@ -243,6 +282,8 @@ def map_from_layout(layout):
         'links': [{'from': link['from'], 'to': link['to'], 'cost': link['cost'], 'kind': link['kind']} for link in layout['links']],
         'spawns': layout['spawns'],
         'extraction': layout.get('extraction'),
+        'mission': layout.get('mission'),
+        'caption': layout.get('caption'),
     }
 
 
@@ -263,6 +304,8 @@ for door in game_map['doors']:
     door_tiles.append(match[4])
 game_map['tileset'] = {
     'image': ASSET_FOLDER + '/tiles.png', 'shadows': ASSET_FOLDER + '/shadows.png',
+    'images': [ASSET_FOLDER + '/' + page_name('tiles', page) for page in range(len(atlases))],
+    'shadowImages': [ASSET_FOLDER + '/' + page_name('shadows', page) for page in range(len(shadow_atlases))],
     'shadowStrength': SHADOW_STRENGTH, 'levelPixels': LEVEL_PIXELS,
     'list': tile_list,
     'ground': plan['ground'], 'floor': plan['floor'], 'wallW': plan['wallW'], 'wallN': plan['wallN'],
@@ -281,4 +324,4 @@ if MAP_NAME == 'outpost':
     with open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), 'w', encoding='utf-8') as output:
         output.write(old_text)
 
-print('tiles', len(sprites), 'shadows', len(shadows), 'atlas', atlas.size, 'shadow atlas', shadow_atlas.size, 'map', (width, height))
+print('tiles', len(sprites), 'shadows', len(shadows), 'atlas pages', [image.size for image in atlases], 'shadow pages', [image.size for image in shadow_atlases], 'map', (width, height))

@@ -22,6 +22,7 @@
   #start:hover { color: #000; background: linear-gradient(180deg, #ffc35e, #d89028); }
   .menu { display: grid; grid-template-columns: 1fr; gap: 5px; }
   .menu button.test { border-style: dashed; color: #e8a090; }
+  .card button.small { margin-top: 8px; width: 100%; height: 22px; font-size: 10px; }
   .clock { border: 1px solid #3a454b; background: #0a1013; text-align: center; padding: 6px 4px 7px; }
   .clock .time { font: bold 28px Consolas, "DejaVu Sans Mono", monospace; color: #9fd7ee; letter-spacing: 1px; }
   .clock .time small { font-size: 15px; color: #6fa9c0; }
@@ -61,10 +62,11 @@
   </div>
   <div class="card">
     <div class="caption">ЗАДАНИЕ</div>
-    <div class="name">Посадка у базы</div>
+    <div class="name" id="mission-name">Посадка у базы</div>
     <div class="line" id="mission-place">Квадрат 47-Б</div>
     <div class="line" id="mission-coords"></div>
-    <div class="line"><span class="signal">● СИГНАЛ</span> — посадка неизвестного объекта</div>
+    <div class="line"><span class="signal">● СИГНАЛ</span> — <span id="mission-signal">посадка неизвестного объекта</span></div>
+    <button id="mission-next" class="small" title="Следующее задание (щелчок по метке на глобусе — тоже выбор)">ДРУГОЕ ЗАДАНИЕ ▸</button>
   </div>
   <button id="start">НАЧАТЬ ЗАДАНИЕ</button>
   <div class="menu">

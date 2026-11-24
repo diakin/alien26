@@ -25,6 +25,9 @@ export const CIVILIANS = {
   scientist: { top: 0x3c5a84, legs: 0x3a3a3e, shoes: 0x26221e, hair: 0x9a9690, skin: 0xcca088, build: 0.97, hairStyle: 'short', coat: 0xe2e2dc, glasses: true },
   engineer: { top: 0x2c4a74, legs: 0x2c4a74, shoes: 0x2a2620, hair: 0x3a2c20, skin: 0xbe9070, build: 1, hairStyle: 'short', vest: 0xc4d02a, helmet: 0xe8e8e2, boots: true, tablet: true },
   worker: { top: 0xb8581c, legs: 0xb8581c, shoes: 0x2a2620, hair: 0x2a2018, skin: 0xb88a6a, build: 1.04, hairStyle: 'short', helmet: 0xe0b020, boots: true, gloves: 0x3a3a34, belt: true },
+  // дети (около 8–10 лет): та же модель, уменьшенная в child раз, голова крупнее (×headScale)
+  boy: { top: 0x3c7a44, legs: 0x34507a, shoes: 0x8a2a22, hair: 0x6a4424, skin: 0xd8ae92, build: 0.94, hairStyle: 'short', child: 0.66, headScale: 1.28 },
+  girl: { top: 0xd0708e, legs: 0x5a4a8a, shoes: 0xe0dcd4, hair: 0x9a6a3a, skin: 0xe0b89c, build: 0.9, hairStyle: 'long', female: true, child: 0.64, headScale: 1.28 },
 };
 
 let fabricNormal = null;
@@ -113,7 +116,7 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   const pelvisQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.lean * 0.3, spec.twist * 0.5, 0, 'YXZ'));
   const local = (x, y, z, origin = pelvis, quat = torsoQuat) => V(x, y, z).applyQuaternion(quat).add(origin);
   const hipLocal = (x, y, z) => local(x, y, z, pelvis, pelvisQuat);
-  const female = kind === 'woman';
+  const female = kind === 'woman' || !!look.female;
   const coverall = kind === 'engineer' || kind === 'worker';
   const upper = materials.top;
 
@@ -151,6 +154,7 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   }
 
   // голова
+  const headStart = person.children.length;
   const neckBase = local(0, 0.56, 0);
   const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.head[0], 0, spec.head[2])).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, spec.head[1], 0)));
   const headCenter = neckBase.clone().add(V(0, 0.15, 0.02).applyQuaternion(headQuat));
@@ -180,6 +184,15 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
     const brim = placed(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.012, 22), materials.helmet), headLocal(0, 0.035, 0.02), headQuat);
     brim.scale.set(0.95, 1, 1.1); brim.castShadow = true;
     placed(box(0.02, 0.02, 0.2, materials.helmet, 0.008), headLocal(0, 0.155, 0), headQuat);   // гребень
+  }
+
+  // у детей голова крупнее: части головы (кроме шеи) увеличены вокруг её центра
+  if (look.headScale) {
+    person.children.slice(headStart + 1).forEach((part) => {
+      part.position.sub(headCenter).multiplyScalar(look.headScale).add(headCenter);
+      part.scale.multiplyScalar(look.headScale);
+      part.updateMatrix();
+    });
   }
 
   // руки
@@ -241,6 +254,15 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
 
   setShadows(person);
   person.userData = { head: headCenter.clone(), joints };
+  if (look.child) {
+    // ребёнок: вся фигура меньше; суставы и голова — в тех же координатах после уменьшения
+    const holder = new THREE.Group();
+    person.scale.setScalar(look.child);
+    holder.add(person);
+    const scaleAll = (point) => point.clone().multiplyScalar(look.child);
+    holder.userData = { head: scaleAll(headCenter), joints: Object.fromEntries(Object.entries(joints).map(([key, value]) => [key, Array.isArray(value) ? value.map(scaleAll) : scaleAll(value)])) };
+    return holder;
+  }
   return person;
 }
 
