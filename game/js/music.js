@@ -742,62 +742,121 @@ var Music = (function () {
     }
   };
 
-  // «Штурм»: 100 ударов (не так часто, как прежняя ритмичная), 32 такта. Бас восьмыми с акцентами 3+3+2,
-  // бочка и малый барабан вполсилы (малый на третью долю), арпеджио восьмыми мягким треугольником.
-  // Первый проход — короткие аккорды-удары, второй — мелодия перекличкой коротких фраз.
-  var ASSAULT_CHORDS = [
-    { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [57, 60, 64] }, { bass: 29, pad: [57, 60, 65] }, { bass: 31, pad: [55, 59, 62] },
-    { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [57, 60, 64] }, { bass: 26, pad: [57, 62, 65] }, { bass: 28, pad: [56, 59, 64] },
-    { bass: 29, pad: [57, 60, 65] }, { bass: 31, pad: [55, 59, 62] }, { bass: 33, pad: [57, 60, 64] }, { bass: 28, pad: [55, 60, 64] },
-    { bass: 26, pad: [57, 62, 65] }, { bass: 29, pad: [57, 60, 65] }, { bass: 28, pad: [57, 59, 64] }, { bass: 28, pad: [56, 59, 64] }
+  // «Штурм» (при контакте): фон, как «Тень» и «Высадка», без мерного ритма, но резче. 66 ударов, 32 такта (≈116 с).
+  // Каждые 4 такта — новый диссонирующий кластер над гулом (малая секунда, тритон, Е с малой ноной) у струнных
+  // тремоло; поверх — в неровных местах резкие удары (литавра, низкий аккорд, металл), короткие аккорды-уколы,
+  // крещендо медных к смене блока, дробь литавры и нарастание шума к концу части, «сонар» и стеклянные призвуки.
+  // Тональность ля минор — как у «Высадки», переход при контакте не рвёт музыку.
+  var ASSAULT_BLOCKS = [
+    { bass: 33, notes: [57, 58, 64] },        // A: ля, си-бемоль, ми — малая секунда
+    { bass: 33, notes: [57, 60, 63] },        // A: ля, до, ми-бемоль — тритон
+    { bass: 29, notes: [56, 60, 65] },        // F: соль-диез, до, фа
+    { bass: 28, notes: [56, 59, 65] },        // E: соль-диез, си, фа — малая нона
+    { bass: 33, notes: [57, 58, 64] },
+    { bass: 26, notes: [57, 62, 63] },        // D: ля, ре, ми-бемоль
+    { bass: 34, notes: [58, 62, 64] },        // Bb: си-бемоль, ре, ми — тритон
+    { bass: 28, notes: [56, 59, 62, 65] }     // E7 с малой ноной — тянет обратно в ля
   ];
-  var ASSAULT_MELODY = [
-    [0, 0, 76, 1], [0, 1, 74, 0.5], [0, 1.5, 72, 0.5], [0, 2, 71, 1], [0, 3, 72, 1], [1, 0, 69, 3],
-    [2, 0, 72, 1], [2, 1, 74, 1], [2, 2, 76, 2], [3, 0, 74, 2], [3, 2, 71, 2],
-    [4, 0, 76, 1], [4, 1, 77, 0.5], [4, 1.5, 76, 0.5], [4, 2, 74, 1], [4, 3, 72, 1], [5, 0, 76, 3],
-    [6, 0, 77, 1.5], [6, 1.5, 76, 0.5], [6, 2, 74, 2], [7, 0, 71, 2], [7, 2, 68, 2],
-    [8, 0, 72, 1], [8, 1, 74, 1], [8, 2, 77, 2], [9, 0, 79, 2], [9, 2, 74, 2],
-    [10, 0, 76, 1.5], [10, 1.5, 72, 0.5], [10, 2, 69, 2], [11, 0, 72, 2], [11, 2, 76, 2],
-    [12, 0, 77, 1], [12, 1, 76, 1], [12, 2, 74, 1], [12, 3, 72, 1], [13, 0, 72, 2], [13, 2, 77, 2],
-    [14, 0, 76, 2], [14, 2, 74, 1], [14, 3, 71, 1], [15, 0, 68, 4]
+  // события: [такт, доля, вид, нота, громкость, панорама]
+  var ASSAULT_EVENTS = [
+    [0, 0, 'hit', 0, 0.42, 0], [0, 2.5, 'metal', 43, 0.36, -0.6], [1, 1, 'stab', 0, 0.1, 0.3], [1, 3, 'ping', 86, 0.08, 0.5],
+    [2, 0, 'glass', 84, 0.028, -0.4], [2, 2, 'stab', 0, 0.09, -0.3], [3, 0, 'brass', 0, 0.05, 0],
+    [4, 0, 'hit', 0, 0.42, 0], [4, 1.5, 'metal', 40, 0.4, 0.6], [5, 0.5, 'stab', 0, 0.09, 0.2], [5, 2.5, 'stab', 0, 0.08, -0.2],
+    [6, 2, 'ping', 89, 0.08, -0.5], [6, 3, 'metal', 46, 0.32, 0.4], [7, 0, 'roll', 0, 0.22, 0],
+    [8, 0, 'hit', 0, 0.42, 0], [9, 1, 'glass', 83, 0.028, 0.5], [9, 2.5, 'stab', 0, 0.09, 0.3], [10, 0, 'metal', 41, 0.4, 0.6],
+    [10, 3, 'stab', 0, 0.08, -0.3], [11, 0, 'brass', 0, 0.05, 0],
+    [12, 0, 'hit', 0, 0.42, 0], [12, 2, 'metal', 44, 0.36, -0.5], [13, 1.5, 'stab', 0, 0.09, 0.2], [14, 0, 'ping', 87, 0.08, 0.4],
+    [14, 2, 'stab', 0, 0.08, -0.2], [15, 0, 'swell', 0, 0.07, 0], [15, 0, 'roll', 0, 0.24, 0],
+    [16, 0, 'hit', 0, 0.44, 0], [16, 3, 'metal', 39, 0.4, 0.5], [17, 2, 'stab', 0, 0.09, -0.3], [18, 0.5, 'glass', 79, 0.03, -0.3],
+    [18, 2.5, 'stab', 0, 0.08, 0.3], [19, 0, 'brass', 0, 0.05, 0],
+    [20, 0, 'hit', 0, 0.42, 0], [21, 1, 'metal', 45, 0.36, -0.6], [21, 3, 'stab', 0, 0.09, 0.2], [22, 1.5, 'ping', 90, 0.08, 0.5],
+    [23, 0, 'roll', 0, 0.22, 0],
+    [24, 0, 'hit', 0, 0.42, 0], [24, 2, 'stab', 0, 0.09, -0.2], [25, 1, 'metal', 42, 0.4, 0.6], [26, 0, 'glass', 84, 0.028, 0.4],
+    [26, 2.5, 'stab', 0, 0.08, -0.3], [27, 0, 'brass', 0, 0.05, 0],
+    [28, 0, 'hit', 0, 0.44, 0], [28, 1.5, 'metal', 47, 0.32, -0.4], [29, 2, 'stab', 0, 0.09, 0.3], [30, 0, 'ping', 86, 0.08, -0.5],
+    [30, 3, 'metal', 40, 0.4, 0.5], [31, 0, 'swell', 0, 0.07, 0], [31, 0, 'roll', 0, 0.26, 0]
   ];
-  var ASSAULT_BASS = [0, 0, 12, 0, 0, 12, 7, 0];
+  // струнные тремоло: пилы через фильтр, громкость дрожит с частотой rate
+  function tremolo(kit, notes, time, duration, peak, rate) {
+    if (muted(kit, 'pad')) return;
+    var context = kit.context;
+    var lowpass = filter(context, 'lowpass', 1300, 0.7);
+    var shake = context.createGain(); shake.gain.value = 0.55;
+    var wobble = oscillator(context, 'sine', rate), depth = context.createGain();
+    depth.gain.value = 0.45;
+    wobble.connect(depth); depth.connect(shake.gain);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, 1.5, Math.max(0, duration - 1.5), 2.5, peak);
+    notes.forEach(function (note, index) {
+      [-7, 7].forEach(function (cents) {
+        var voice = oscillator(context, 'sawtooth', midiFrequency(note), cents + index * 3);
+        voice.connect(lowpass);
+        voice.start(time); voice.stop(end);
+      });
+    });
+    wobble.start(time); wobble.stop(end);
+    lowpass.connect(shake); shake.connect(envelope);
+    route(kit, envelope, 1, 0.55, 0.1, 0);
+  }
+  // медные крещендо: низкий аккорд нарастает весь такт, фильтр открывается, в конце — резкий обрыв
+  function brassSwell(kit, notes, time, duration, peak) {
+    if (muted(kit, 'stab')) return;
+    var context = kit.context;
+    var lowpass = filter(context, 'lowpass', 300, 1.2);
+    lowpass.frequency.setValueAtTime(300, time);
+    lowpass.frequency.exponentialRampToValueAtTime(2200, time + duration);
+    var envelope = context.createGain();
+    envelope.gain.setValueAtTime(0, time);
+    envelope.gain.linearRampToValueAtTime(peak, time + duration);
+    envelope.gain.linearRampToValueAtTime(0, time + duration + 0.12);
+    notes.forEach(function (note) {
+      [-6, 6].forEach(function (cents) {
+        var voice = oscillator(context, 'sawtooth', midiFrequency(note), cents);
+        voice.connect(lowpass);
+        voice.start(time); voice.stop(time + duration + 0.2);
+      });
+    });
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, 0.4, 0, 0);
+  }
+  // дробь литавры: удары чаще и громче к концу
+  function timpaniRoll(kit, time, duration, peak) {
+    var count = 14;
+    for (var hit = 0; hit < count; hit++) {
+      var fraction = hit / count;
+      drum(kit, time + duration * Math.sqrt(fraction), 64, peak * (0.25 + 0.75 * fraction), 0.5, 0);
+    }
+  }
+  function assaultEvent(kit, entry, at, barLength, block) {
+    var kind = entry[2];
+    if (kind === 'hit') {
+      drum(kit, at, 58, entry[4], 1.4, 0);
+      stab(kit, block.notes.map(function (note) { return note - 12; }), at, 0.12);
+      metal(kit, 38, at + 0.02, entry[4] * 0.7, 0);
+    } else if (kind === 'stab') stab(kit, block.notes.map(function (note) { return note + 12; }), at, entry[4]);
+    else if (kind === 'brass') brassSwell(kit, block.notes.map(function (note) { return note - 12; }), at, barLength, entry[4]);
+    else if (kind === 'roll') timpaniRoll(kit, at, barLength, entry[4]);
+    else if (kind === 'metal') metal(kit, entry[3], at, entry[4], entry[5]);
+    else if (kind === 'ping') ping(kit, entry[3], at, entry[4], entry[5]);
+    else if (kind === 'glass') glass(kit, entry[3], at, barLength * 2, entry[4], entry[5]);
+    else if (kind === 'swell') swell(kit, at, barLength, entry[4]);
+  }
   var ASSAULT = {
-    name: 'assault', tempo: 100, bars: 32, echo: 0.75 * 60 / 100, level: 1.0,
+    name: 'assault', tempo: 66, bars: 32, echo: 0.75, level: 1.3,
     scheduleBar: function (kit, bar, absoluteBar, time) {
-      var beat = 60 / this.tempo, sixteenth = beat / 4, barLength = beat * 4;
-      var chord = ASSAULT_CHORDS[bar % 16], second = bar >= 16;
-      pad(kit, chord.pad, time, barLength + 0.02, { cutoff: 1000, peak: 0.028, attack: 0.4, release: 0.8, detune: 8, reverb: 0.4 });
-      for (var eighth = 0; eighth < 8; eighth++) {
-        var accent = eighth === 0 || eighth === 3 || eighth === 6;
-        pulseBass(kit, chord.bass + 12 + ASSAULT_BASS[eighth], time + eighth * beat / 2, beat * 0.4, accent ? 0.14 : 0.08);
+      var beat = 60 / this.tempo, barLength = beat * 4;
+      var block = ASSAULT_BLOCKS[Math.floor(bar / 4)];
+      // гул, кластер и тремоло — на 4 такта с перекрытием; при входе с середины блока — сразу, на остаток блока
+      if (bar % 4 === 0 || absoluteBar === 0) {
+        var length = (4 - bar % 4) * barLength + 2;
+        deepDrone(kit, block.bass + 12, time, length, 0.16);
+        shade(kit, block.notes, time, length, 0.05);
+        tremolo(kit, block.notes.map(function (note) { return note + 12; }), time, length, 0.022, 7 + (bar % 8 ? 1.5 : 0));
       }
-      if (absoluteBar >= 1) {
-        for (var step = 0; step < 16; step++) {
-          var at = time + step * sixteenth;
-          if (step === 0 || step === 6 || step === 10) kick(kit, at, step === 0 ? 0.42 : 0.3);
-          if (step === 8) snare(kit, at, 0.32);
-          if (step === 14 && bar % 2) snare(kit, at, 0.1);
-          if (step % 4 === 2) hat(kit, at, 0.09, 0.035, 0.25);
-        }
-        if (bar % 4 === 0) drum(kit, time, 80, 0.28, 0.7, 0);
-        if (bar % 8 === 7) [190, 160, 130, 100].forEach(function (frequency, index) { drum(kit, time + (12 + index) * sixteenth, frequency, 0.2, 0.3, 0.3 - index * 0.2); });
-      }
-      var tones = [chord.pad[0], chord.pad[1], chord.pad[2], chord.pad[1]];
-      for (var pulse = 0; pulse < 8; pulse++) {
-        pluck(kit, tones[pulse % 4] + 12, time + pulse * beat / 2, { type: 'triangle', peak: second ? 0.06 : 0.09, decay: 0.22, cutoff: 1700, reverb: 0.25, echo: 0.2, pan: pulse % 2 ? 0.35 : -0.35 });
-      }
-      if (!second && absoluteBar >= 2 && bar % 2 === 1) {
-        stab(kit, chord.pad.map(function (note) { return note + 12; }), time + 6 * sixteenth, 0.1);
-        stab(kit, chord.pad.map(function (note) { return note + 12; }), time + 14 * sixteenth, 0.08);
-      }
-      if (second) {
-        ASSAULT_MELODY.forEach(function (entry) {
-          if (entry[0] !== bar - 16) return;
-          lead(kit, entry[2], time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.06, cutoff: 1800, attack: 0.03, release: 0.3, vibrato: 0.004, vibratoRate: 5.2, reverb: 0.4, echo: 0.22 });
-        });
-      }
-      if (bar === 15 || bar === 31) riser(kit, time, barLength, 0.05);
+      ASSAULT_EVENTS.forEach(function (entry) {
+        if (entry[0] === bar) assaultEvent(kit, entry, time + entry[1] * beat, barLength, block);
+      });
     }
   };
 
