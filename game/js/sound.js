@@ -1,7 +1,8 @@
 // Звуки, синтезированные в браузере (Web Audio), без файлов: выстрел карабина, плазма, автопушка, попадание,
 // взрыв гранаты, крики при гибели (боец — стон, пришелец — визг), падение тела, шаги бойцов, пришельцев и K7,
 // лязг перекладин лестницы. Фон — шум ветра (регулятор «фон»). Музыка — js/music.js, звучит через musicGain.
-// Браузер разрешает звук только после действия игрока, поэтому звук включается на первый щелчок или клавишу.
+// Звук включается сразу при открытии страницы. Если браузер не разрешает звук без действия игрока (контекст
+// создаётся приостановленным), он возобновляется на первый щелчок, касание или клавишу.
 var Sound = (function () {
   'use strict';
 
@@ -49,8 +50,14 @@ var Sound = (function () {
     ambienceGain.gain.value = volume('ambienceVolume') * 0.5;
     musicGain.gain.value = volume('musicVolume');
   }
-  window.addEventListener('mousedown', start, true);
-  window.addEventListener('keydown', start, true);
+  // возобновить приостановленный контекст: браузер разрешает это только в обработчике действия игрока
+  function unlock() {
+    if (!audio) start();
+    if (audio && audio.state === 'suspended') audio.resume();
+  }
+  ['pointerdown', 'mousedown', 'keydown', 'touchend'].forEach(function (name) { window.addEventListener(name, unlock, true); });
+  // попытка сразу: если игрок уже действовал на этом сайте (например, нажал кнопку на глобусе), браузер может разрешить
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
   if (window.Settings) Settings.onChange(function (values, key) { if (!key || key === 'soundVolume' || key === 'musicVolume' || key === 'ambienceVolume') applyVolumes(); });
 
   function noise(duration, filterType, frequency, peak, attack, decay, when) {
@@ -211,5 +218,5 @@ var Sound = (function () {
     return offline.startRendering();
   }
 
-  return { play: play, start: start, renderOffline: renderOffline };
+  return { play: play, start: start, renderOffline: renderOffline, get state() { return audio ? audio.state : 'none'; } };
 })();

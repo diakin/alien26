@@ -265,6 +265,8 @@
   }
   // Состав по карте: spawns-массив — прежний порядок PROFILES (4 бойца, 2 пришельца, K7);
   // spawns-объект { squad, mech, aliens } — столько бойцов, роботов и пришельцев, сколько точек высадки
+  // режим страницы (?mode=manage): мирная база — без пришельцев, обстановка мирная, меню базы (js/basemenu.js)
+  var PAGE_MODE = (function () { var match = /[?&]mode=([a-z]+)/.exec(location.search); return match ? match[1] : ''; })();
   function roster() {
     var spawns = MAP.spawns;
     if (Array.isArray(spawns)) return PROFILES.map(function (profile, index) { return makeUnit(profile, spawns[index]); });
@@ -273,7 +275,7 @@
     var list = [];
     (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
     (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
-    (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
+    if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
     return list;
   }
   var units = roster();
@@ -470,7 +472,7 @@
   // Обстановка: мирная — бойцы на своей базе или на посту, стоящие юниты в стойке «вольно» (если у набора
   // спрайтов она есть); боевая — стойка с оружием наготове. Задаётся картой (MAP.combat), по умолчанию боевая;
   // переключается клавишей T.
-  var combat = MAP.combat !== false;
+  var combat = MAP.combat !== false && PAGE_MODE !== 'manage';
   var indoorWatch = { unit: null, state: '' };   // помещение выбранного бойца: смена — срез стен
   var followedLevel = -1;             // уровень обзора, под который он подстроен по выбранному юниту (followLevel)
   var variants = {};
