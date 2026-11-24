@@ -1,6 +1,9 @@
-// Музыка, синтезированная в браузере (Web Audio), без файлов. Две темы:
-//   calm   — «Застава»: общая, ре минор, 76 ударов в минуту, 32 такта (около 100 с по кругу);
-//   battle — «Контакт»: тактическая, ми минор с фригийской II ступенью, 112 ударов в минуту, 32 такта (около 69 с).
+// Музыка, синтезированная в браузере (Web Audio), без файлов. Темы:
+//   calm    — «Застава»: общая, ре минор, 76 ударов в минуту, 32 такта (около 100 с по кругу);
+//   shade   — «Тень»: тактическая, фон для боя без мелодии и ритма (как в UFO), 128 с по кругу;
+//   contact — та же «Тень» в варианте контакта с врагом: глухой пульс, чаще удары по металлу;
+//   battle  — «Контакт» (ритмичная, прежняя): ми минор с фригийской II ступенью, 112 ударов в минуту, 32 такта (около 69 с).
+// Настроение из game.js: calm — мирная обстановка, tactical — бой без контакта, battle — контакт или стрельба.
 // Ноты планируются потактово чуть заранее (lookahead), поэтому темп не зависит от частоты кадров игры.
 // Смена темы — плавный переход: старая затихает за 3 с, новая нарастает за 2 с.
 // Music.setMood(имя) задаёт тему по обстановке (из game.js); настройка «Музыка» может закрепить одну тему.
@@ -465,7 +468,224 @@ var Music = (function () {
     }
   };
 
-  var THEMES = { calm: CALM, battle: BATTLE };
+  // ---------------- фоновые инструменты (тема «Тень») ----------------
+  // глубокий гул: синус и чуть расстроенный треугольник, долгий подъём и спад, фильтр медленно «дышит»
+  function deepDrone(kit, note, time, duration, peak) {
+    if (muted(kit, 'bass')) return;
+    var context = kit.context, frequency = midiFrequency(note);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, 3, Math.max(0, duration - 3), 3.5, peak);
+    var lowpass = filter(context, 'lowpass', 260, 0.7);
+    var breathe = oscillator(context, 'sine', 0.07), breatheDepth = context.createGain();
+    breatheDepth.gain.value = 120;
+    breathe.connect(breatheDepth); breatheDepth.connect(lowpass.frequency);
+    [['sine', 0, 1], ['triangle', 7, 0.45], ['triangle', -9, 0.3]].forEach(function (voice) {
+      var source = oscillator(context, voice[0], voice[0] === 'sine' ? frequency : frequency * 2, voice[1]);
+      var level = context.createGain();
+      level.gain.value = voice[2];
+      source.connect(level); level.connect(lowpass);
+      source.start(time); source.stop(end);
+    });
+    breathe.start(time); breathe.stop(end);
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, 0.25, 0, 0);
+  }
+  // тёмный кластер: тихие синусы и треугольники с медленной атакой, без чёткой атаки; ноты разведены по панораме
+  function shade(kit, notes, time, duration, peak) {
+    if (muted(kit, 'pad')) return;
+    var context = kit.context;
+    notes.forEach(function (note, index) {
+      var envelope = context.createGain();
+      envelope.gain.value = 0;
+      var end = sustainEnvelope(envelope.gain, time + index * 0.6, 4, Math.max(0, duration - 4 - index * 0.6), 4, peak);
+      var lowpass = filter(context, 'lowpass', 900, 0.5);
+      var wobble = oscillator(context, 'sine', 0.11 + index * 0.03), wobbleDepth = context.createGain();
+      wobbleDepth.gain.value = midiFrequency(note) * 0.004;
+      wobble.connect(wobbleDepth);
+      ['triangle', 'sine'].forEach(function (type, voiceIndex) {
+        var source = oscillator(context, type, midiFrequency(note), voiceIndex ? 5 : -5);
+        wobbleDepth.connect(source.frequency);
+        source.connect(lowpass);
+        source.start(time); source.stop(end);
+      });
+      wobble.start(time); wobble.stop(end);
+      lowpass.connect(envelope);
+      route(kit, envelope, 0.7, 0.8, 0, (index - (notes.length - 1) / 2) * 0.5);
+    });
+  }
+  // далёкий удар по металлу: негармонические призвуки, приглушён, почти весь в реверберации
+  function metal(kit, note, time, peak, pan) {
+    if (muted(kit, 'metal')) return;
+    var context = kit.context, frequency = midiFrequency(note);
+    var lowpass = filter(context, 'lowpass', 1800, 0.7);
+    var envelope = context.createGain();
+    envelope.gain.value = 1;
+    [[1, 1, 2.6], [2.41, 0.5, 1.8], [3.87, 0.3, 1.2], [5.6, 0.18, 0.7], [7.2, 0.1, 0.4]].forEach(function (partial) {
+      var voice = oscillator(context, 'sine', frequency * partial[0] * vary(1, 0.01));
+      var level = context.createGain();
+      var end = percussiveEnvelope(level.gain, time, 0.004, partial[2], peak * partial[1]);
+      voice.connect(level); level.connect(lowpass);
+      voice.start(time); voice.stop(end);
+    });
+    var click = noiseSource(kit, time, 0.06), clickBand = filter(context, 'bandpass', 1400, 3), clickLevel = context.createGain();
+    percussiveEnvelope(clickLevel.gain, time, 0.002, 0.05, peak * 0.5);
+    click.connect(clickBand); clickBand.connect(clickLevel); clickLevel.connect(lowpass);
+    lowpass.connect(envelope);
+    route(kit, envelope, 0.35, 1, 0.3, pan);
+  }
+  // «сонар»: короткий высокий синус с долгим эхом
+  function ping(kit, note, time, peak, pan) {
+    if (muted(kit, 'ping')) return;
+    var context = kit.context;
+    var voice = oscillator(context, 'sine', midiFrequency(note));
+    var envelope = context.createGain();
+    var end = percussiveEnvelope(envelope.gain, time, 0.01, 0.9, peak);
+    voice.connect(envelope);
+    voice.start(time); voice.stop(end);
+    route(kit, envelope, 0.6, 0.6, 0.7, pan);
+  }
+  // ветер в шахтах: шум через узкую полосу, которая медленно ползёт вверх и вниз
+  function draft(kit, time, duration, peak, from, to) {
+    if (muted(kit, 'wind')) return;
+    var context = kit.context;
+    var source = context.createBufferSource();
+    source.buffer = kit.noise; source.loop = true;
+    var band = filter(context, 'bandpass', from, 6);
+    band.frequency.setValueAtTime(from, time);
+    band.frequency.exponentialRampToValueAtTime(to, time + duration * 0.55);
+    band.frequency.exponentialRampToValueAtTime(from * 0.8, time + duration);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, duration * 0.4, duration * 0.2, duration * 0.4, peak);
+    source.connect(band); band.connect(envelope);
+    source.start(time, Math.random()); source.stop(end);
+    route(kit, envelope, 0.6, 0.7, 0, Math.sin(time) * 0.6);
+  }
+  // стеклянный призвук: высокий синус с дрожанием громкости, еле слышный
+  function glass(kit, note, time, duration, peak, pan) {
+    if (muted(kit, 'glass')) return;
+    var context = kit.context;
+    var voice = oscillator(context, 'sine', midiFrequency(note));
+    var tremolo = oscillator(context, 'sine', 5.3), tremoloDepth = context.createGain(), level = context.createGain();
+    tremoloDepth.gain.value = 0.5; level.gain.value = 0.5;
+    tremolo.connect(tremoloDepth); tremoloDepth.connect(level.gain);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, duration * 0.45, duration * 0.1, duration * 0.45, peak);
+    voice.connect(level); level.connect(envelope);
+    voice.start(time); tremolo.start(time); voice.stop(end); tremolo.stop(end);
+    route(kit, envelope, 0.4, 0.9, 0.4, pan);
+  }
+  // глухой пульс (как сердце): два низких удара с падением высоты — «тук-тук»
+  function heartbeat(kit, time, peak) {
+    if (muted(kit, 'heart')) return;
+    var context = kit.context;
+    [[0, 1], [0.26, 0.7]].forEach(function (beat) {
+      var at = time + beat[0];
+      // синус даёт низ, треугольник октавой выше — чтобы удар был слышен и на маленьких колонках
+      var lowpass = filter(context, 'lowpass', 320);
+      var envelope = context.createGain();
+      var end = percussiveEnvelope(envelope.gain, at, 0.012, 0.28, peak * beat[1]);
+      [['sine', 1, 1], ['triangle', 2, 0.5]].forEach(function (voiceInfo) {
+        var voice = oscillator(context, voiceInfo[0], 62 * voiceInfo[1]), level = context.createGain();
+        voice.frequency.setValueAtTime(62 * voiceInfo[1], at);
+        voice.frequency.exponentialRampToValueAtTime(38 * voiceInfo[1], at + 0.18);
+        level.gain.value = voiceInfo[2];
+        voice.connect(level); level.connect(lowpass);
+        voice.start(at); voice.stop(end);
+      });
+      lowpass.connect(envelope);
+      route(kit, envelope, 1, 0.15, 0, 0);
+    });
+  }
+  // низкий гул, нарастающий к смене части
+  function swell(kit, time, duration, peak) {
+    if (muted(kit, 'wind')) return;
+    var context = kit.context;
+    var source = context.createBufferSource();
+    source.buffer = kit.noise; source.loop = true;
+    var lowpass = filter(context, 'lowpass', 90, 1.5);
+    lowpass.frequency.setValueAtTime(90, time);
+    lowpass.frequency.exponentialRampToValueAtTime(420, time + duration);
+    var envelope = context.createGain();
+    envelope.gain.setValueAtTime(0, time);
+    envelope.gain.linearRampToValueAtTime(peak, time + duration * 0.92);
+    envelope.gain.linearRampToValueAtTime(0, time + duration + 0.6);
+    source.connect(lowpass); lowpass.connect(envelope);
+    source.start(time, Math.random()); source.stop(time + duration + 0.7);
+    route(kit, envelope, 1, 0.4, 0, 0);
+  }
+
+  // ---------------- тема «Тень» (тактическая, фон) ----------------
+  // Фон для боя, как в UFO: без мелодии и ритма, 60 ударов в минуту, такт 4 с, 32 такта (128 с по кругу).
+  // Каждые 4 такта — новый тёмный кластер над гулом ми (малая секунда, тритон, увеличенное трезвучие);
+  // поверх — редкие далёкие удары по металлу, «сонар», ветер в шахтах, стеклянные призвуки.
+  // Вариант «Контакт» (враг рядом или стрельба): тот же фон плюс глухой пульс, чаще удары и нарастание к смене части.
+  var SHADE_BLOCKS = [
+    { bass: 28, notes: [47, 52, 53] },        // E: си, ми, фа — малая секунда
+    { bass: 28, notes: [47, 52, 55] },        // E: ми минор
+    { bass: 24, notes: [48, 51, 55] },        // C: до минор
+    { bass: 29, notes: [48, 53, 56] },        // F: фа минор (фригийская ступень)
+    { bass: 28, notes: [46, 52, 55] },        // E: си-бемоль — тритон
+    { bass: 28, notes: [50, 53, 58] },        // E: ре, фа, си-бемоль над ми
+    { bass: 24, notes: [47, 51, 55] },        // C: си, ре-диез, соль — увеличенное
+    { bass: 28, notes: [47, 52, 53] }
+  ];
+  // события по тактам: [такт, доля, вид, нота, громкость, панорама]
+  var SHADE_EVENTS = [
+    [1, 2.5, 'ping', 88, 0.1, 0.5], [2, 1, 'metal', 43, 0.48, -0.6], [3, 0, 'draft', 300, 0.14, 1100],
+    [5, 3, 'metal', 40, 0.39, 0.7], [6, 1.5, 'glass', 83, 0.03, -0.4], [7, 2, 'ping', 91, 0.08, -0.5],
+    [9, 0.5, 'metal', 46, 0.36, 0.3], [10, 2, 'draft', 220, 0.12, 900], [11, 3.5, 'metal', 41, 0.45, -0.7],
+    [13, 1, 'glass', 84, 0.025, 0.5], [14, 2.5, 'ping', 86, 0.08, 0.3], [15, 0, 'swell', 0, 0.07, 0],
+    [17, 2, 'metal', 44, 0.42, 0.6], [18, 0, 'draft', 260, 0.14, 1300], [19, 3, 'glass', 79, 0.03, -0.3],
+    [21, 1.5, 'ping', 89, 0.09, -0.6], [22, 3, 'metal', 39, 0.48, -0.4], [24, 0, 'glass', 83, 0.025, 0.4],
+    [25, 2.5, 'metal', 45, 0.36, 0.7], [26, 0, 'draft', 200, 0.12, 800], [27, 1, 'ping', 87, 0.08, 0.6],
+    [29, 3, 'metal', 42, 0.45, -0.6], [30, 1.5, 'glass', 84, 0.027, -0.5], [31, 0, 'swell', 0, 0.07, 0]
+  ];
+  // дополнительные события варианта «Контакт»
+  var CONTACT_EVENTS = [
+    [0, 3, 'metal', 38, 0.36, 0.4], [4, 1.5, 'metal', 47, 0.3, -0.5], [7, 0, 'swell', 0, 0.084, 0], [8, 2.5, 'ping', 84, 0.1, -0.4],
+    [12, 0.5, 'metal', 40, 0.39, 0.6], [16, 3, 'metal', 43, 0.33, -0.3], [20, 1, 'ping', 86, 0.1, 0.5], [23, 0, 'swell', 0, 0.084, 0],
+    [24, 2.5, 'metal', 37, 0.39, -0.6], [28, 1, 'metal', 46, 0.3, 0.5]
+  ];
+  function shadeEvent(kit, entry, at, barLength) {
+    var kind = entry[2];
+    if (kind === 'metal') metal(kit, entry[3], at, entry[4], entry[5]);
+    else if (kind === 'ping') ping(kit, entry[3], at, entry[4], entry[5]);
+    else if (kind === 'glass') glass(kit, entry[3], at, barLength * 2, entry[4], entry[5]);
+    else if (kind === 'draft') draft(kit, at, barLength * 2.5, entry[4], entry[3], entry[5]);
+    else if (kind === 'swell') swell(kit, at, barLength, entry[4]);
+  }
+  function shadeTheme(name, contact) {
+    return {
+      name: name, tempo: 60, bars: 32,
+      echo: 0.75,
+      level: 1.4,              // общий уровень темы: фон тише общей темы примерно на 4 дБ, но не теряется под звуками боя
+      scheduleBar: function (kit, bar, absoluteBar, time) {
+        var beat = 60 / this.tempo, barLength = beat * 4;
+        var block = SHADE_BLOCKS[Math.floor(bar / 4)];
+        // гул и кластер — на 4 такта с перекрытием; при входе в тему с середины блока — сразу, на остаток блока
+        if (bar % 4 === 0 || absoluteBar === 0) {
+          var length = (4 - bar % 4) * barLength + 2;
+          deepDrone(kit, block.bass + 12, time, length, contact ? 0.16 : 0.14);
+          shade(kit, block.notes, time, length, contact ? 0.068 : 0.06);
+        }
+        SHADE_EVENTS.concat(contact ? CONTACT_EVENTS : []).forEach(function (entry) {
+          if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength);
+        });
+        // пульс: два «тук-тук» за такт (30 в минуту), в последнем такте блока — вдвое чаще
+        if (contact) {
+          var beats = bar % 4 === 3 ? [0, 1, 2, 3] : [0, 2];
+          beats.forEach(function (at) { heartbeat(kit, time + at * beat, 0.3); });
+        }
+      }
+    };
+  }
+  var SHADE = shadeTheme('shade', false), SHADE_CONTACT = shadeTheme('contact', true);
+
+  var THEMES = { calm: CALM, battle: BATTLE, shade: SHADE, contact: SHADE_CONTACT };
+
 
   // ---------------- воспроизведение в игре ----------------
   // Музыка звучит фрагментами: 30 с играет (последние 3 с затихает), затем 30 с тишины (настройка «Паузы в музыке»).
@@ -475,7 +695,7 @@ var Music = (function () {
   var FADE_OUT = 3;
   var timing = { play: 30, pause: 30 };
   var context = null, master = null, runs = [], mood = 'calm', timer = null;
-  var resumeBar = { calm: 0, battle: 0 };         // с какого такта продолжить тему
+  var resumeBar = { calm: 0, battle: 0, shade: 0, contact: 0 };   // с какого такта продолжить тему
   var pauseUntil = 0, lastTheme = null;
 
   function createMaster(audioContext, destination) {
@@ -497,12 +717,19 @@ var Music = (function () {
     refresh();
   }
 
+  // настроение → тема: tactical — «Тень», battle — «Тень» с пульсом (или прежняя ритмичная, настройка «Боевая музыка»)
+  function themeFor(moodName) {
+    var settings = window.Settings ? Settings.values : {};
+    if (moodName === 'tactical') return 'shade';
+    if (moodName === 'battle') return settings.musicBattle === 1 ? 'battle' : 'contact';
+    return 'calm';
+  }
   function wanted() {
     var settings = window.Settings ? Settings.values : {};
     if (settings.musicVolume === 0) return null;
     if (settings.musicTheme === 1) return 'calm';
-    if (settings.musicTheme === 2) return 'battle';
-    return mood;
+    if (settings.musicTheme === 2) return themeFor(mood === 'calm' ? 'tactical' : mood);
+    return themeFor(mood);
   }
   function pauseSeconds() {
     var settings = window.Settings ? Settings.values : {};
@@ -516,7 +743,7 @@ var Music = (function () {
     gain.connect(master);
     var startTime = context.currentTime + 0.1;
     gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(1, startTime + 2);
+    gain.gain.linearRampToValueAtTime(theme.level || 1, startTime + 2);
     var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: resumeBar[name], absoluteBar: 0,
       nextTime: startTime, stopping: false, endTime: startTime + timing.play };
     runs.push(run);
@@ -568,12 +795,12 @@ var Music = (function () {
   }
 
   function setMood(name) {
-    if (!THEMES[name] || name === mood) return;
+    if (['calm', 'tactical', 'battle'].indexOf(name) < 0 || name === mood) return;
     mood = name;
     refresh();
   }
   if (window.Settings) Settings.onChange(function (values, key) {
-    if (!key || key === 'musicTheme' || key === 'musicVolume') refresh();
+    if (!key || key === 'musicTheme' || key === 'musicVolume' || key === 'musicBattle') refresh();
     if (key === 'musicPause' && context) {
       var playing = current();
       if (playing) playing.endTime = values.musicPause > 0 ? Math.max(playing.endTime, context.currentTime + FADE_OUT + 1) : Infinity;
@@ -587,7 +814,10 @@ var Music = (function () {
     var barLength = 4 * 60 / theme.tempo, seconds = bars * barLength + 4;
     var offline = new OfflineAudioContext(2, Math.ceil(seconds * rate), rate);
     var output = solo ? offline.destination : createMaster(offline, offline.destination);   // отдельный инструмент — без компрессора
-    var kit = createKit(offline, output, theme.echo);
+    var level = offline.createGain();
+    level.gain.value = solo ? 1 : theme.level || 1;
+    level.connect(output);
+    var kit = createKit(offline, level, theme.echo);
     kit.solo = solo || null;
     for (var bar = 0; bar < bars; bar++) theme.scheduleBar(kit, bar % theme.bars, bar, 0.05 + bar * barLength);
     return offline.startRendering();

@@ -1509,7 +1509,8 @@
       });
     });
   }
-  function musicMood() { return combat && (turn - lastShotTurn <= 1 || inContact()) ? 'battle' : 'calm'; }
+  // мирная обстановка — общая тема; бой — фон «Тень», при контакте или стрельбе — с пульсом
+  function musicMood() { return !combat ? 'calm' : turn - lastShotTurn <= 1 || inContact() ? 'battle' : 'tactical'; }
   function updateMusic(now) {
     if (!window.Music || now < musicCheckAt) return;
     musicCheckAt = now + 1000;                     // раз в секунду: трассировки пар пришелец — боец
