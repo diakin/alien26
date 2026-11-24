@@ -97,6 +97,14 @@
 затем `MAP=base python3 tilesetbuild.py <папка> ../../game` — атлас в `game/assets/maps/outpost_base/`, карта
 в `game/js/maps/outpost_tiles_base.js`. Уникальных тайлов 807, рендер около 3,5 минуты.
 
+Быстрая проверка правок базы без рендера тайлов — `tools/render/base_quick.sh` (около 5 с): план помещений
+(`tools/base/plan.py` -> `docs/base/base_plan.json`, `base_plan.js` для инструментов и игры), данные карты для игры
+прямо из разметки (`baselogic.mjs`: проходимость, стены, двери, места высадки, препятствия для пуль — то же, что
+пишет `tilesetbuild.py`; на неизменённом плане результат совпадает байт в байт), WebGL-карта `js/map3d.js` и 3D-осмотр
+`js/base3d.js`. Атлас тайлов остаётся прежним: в карте ставится `tilesStale`, пока строится WebGL-карта старые тайлы
+не показываются, у новых дверей нет тайла створки (её рисует WebGL). Полный рендер тайлов снимает пометку.
+Клетки срезов и препятствия для пуль считает общий модуль `tools/render/solids.js` (его же использует `tileset.js`).
+
 WebGL-карта и поворот камеры на 90° (`,` / `.` и кнопки ⟲ ⟳ под панелью уровней; подпись — откуда смотрит камера:
 ЮВ, СВ, СЗ, ЮЗ). Карта базы рисуется в реальном времени (`js/map3d.js`, собирается `tools/render/build_map3d.sh` из
 `tools/render/map3d.js`): та же сцена, что в тайлах, ортокамера игры с шагом клетки 61 × 35 (пиксели совпадают с
@@ -543,6 +551,7 @@ python outpostbuild.py op_out ../../game               # фоны, маски к
 node tilesetrun.mjs render tiles_out                   # набор тайлов: цвет, маска, тень каждого (готовые пропускаются)
 python tilesetbuild.py tiles_out ../../game 0.5        # атласы, game/js/maps/outpost_tiles.js; 0.5 — сила тени
 ./build_map3d.sh                                      # WebGL-карта базы для игры: game/js/map3d.js
+./base_quick.sh                                       # правки базы без тайлов: план, данные карты, map3d.js, base3d.js
 MAP=big node tilesetrun.mjs render tiles_big          # большая карта: тайлы (два процесса: … 0 490 и … 490 2000)
 MAP=big python tilesetbuild.py tiles_big ../../game    # атлас game/assets/maps/outpost_big/, game/js/maps/outpost_tiles_big.js
 MAP=city node tilesetrun.mjs render tiles_city         # центр города: 3440 тайлов (два процесса: … 0 2000 и … 2000 100000)

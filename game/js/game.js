@@ -791,8 +791,10 @@
     var doorEntries = [];
     doors.forEach(function (door, index) {
       if (door.level > viewLevel) return;
+      var doorTile = TILESET.doors[index];
+      if (doorTile === undefined || doorTile < 0) return;          // дверь новее тайлов (baselogic.mjs): створку рисует только WebGL
       var edge = doorViewEdge(index);
-      var piece = tilePiece(cutTile(TILESET.doors[index], door.level, viewLevel, cut), edge.col, edge.row, door.level);
+      var piece = tilePiece(cutTile(doorTile, door.level, viewLevel, cut), edge.col, edge.row, door.level);
       if (piece) doorEntries.push([index, piece.x, piece.y, piece.width, piece.height, piece.sx, piece.sy, piece.page]);
     });
     tileViews[key] = { key: key, pieces: pieces, shadows: shadows, doors: doorEntries };
@@ -3262,6 +3264,8 @@
     context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     context.imageSmoothingEnabled = renderScale < 1;
     if (glActive()) { renderGL(); return; }
+    // тайлы старше разметки (tools/render/baselogic.mjs): пока строится WebGL-карта, старую картинку не показываем
+    if (MAP.tilesStale && glStarting && !glFailed) { context.fillStyle = '#141210'; context.fillRect(0, 0, viewWidth, viewHeight); return; }
     context.fillStyle = '#141210';
     context.fillRect(0, 0, viewWidth, viewHeight);
     if (TILESET) { renderTiles(); return; }
