@@ -288,6 +288,11 @@ render_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ren
 with open(os.path.join(render_dir, 'base_plan.js'), 'w', encoding='utf-8') as output:
     output.write('// Сгенерировано tools/base/plan.py из того же плана, что docs/base/base_plan.json. Не править вручную.\n')
     output.write('export const BASE_PLAN = ' + open(out + '/base_plan.json', encoding='utf-8').read() + ';\n')
+# и для игры (меню базы, js/basemenu.js): обычный скрипт без модулей, работает и с file://
+game_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'game', 'js')
+with open(os.path.join(game_dir, 'base_plan.js'), 'w', encoding='utf-8') as output:
+    output.write('// Сгенерировано tools/base/plan.py из docs/base/base_plan.json. Не править вручную.\n')
+    output.write('var BASE_PLAN = ' + json.dumps(json.load(open(out + '/base_plan.json', encoding='utf-8')), ensure_ascii=False, separators=(',', ':')) + ';\n')
 for module in [1, 2, 3, 4, 5, 6, 7, 8, 0]:
     print('%-34s %4d' % (MODULES[module][0], module_cells.get(module, 0)))
 print('всего', total)

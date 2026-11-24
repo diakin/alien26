@@ -9,7 +9,8 @@ var Globe = (function () {
   var PANEL_WIDTH = 250;
   var MISSION = { name: 'ПОСАДКА У БАЗЫ', lat: 47.5, lon: 68.0, page: 'tiles_big.html' };   // большая карта: отряд в конвертоплане
   // своя база — в горе Ямантау (Южный Урал, 54°15′ с. ш., 58°06′ в. д.)
-  var BASE = { name: 'БАЗА «ЯМАНТАУ»', lat: 54.255, lon: 58.103, page: 'base.html' };
+  // page — карта базы и меню управления; attack — тестовый бой на той же карте
+  var BASE = { name: 'БАЗА «ЯМАНТАУ»', lat: 54.255, lon: 58.103, page: 'base.html?mode=manage', attack: 'base.html' };
   var MIN_ZOOM = 0.7, MAX_ZOOM = 2.6;
 
   var canvas = document.getElementById('space');
@@ -385,6 +386,7 @@ var Globe = (function () {
     if (event.key === '-' || event.key === '_') { view.zoom /= 1.25; clampView(); }
     if (event.key === 'Enter') startMission();
     if (event.key === 'b' || event.key === 'B' || event.key === 'и' || event.key === 'И') openBase();
+    if (event.key === 'n' || event.key === 'N' || event.key === 'т' || event.key === 'Т') attackBase();
   });
   window.addEventListener('keyup', function (event) {
     var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -393,9 +395,11 @@ var Globe = (function () {
 
   function startMission() { window.location.href = MISSION.page; }
   document.getElementById('start').addEventListener('click', startMission);
-  // своя подземная база (game/base.html): пока сразу бой «Оборона базы»
+  // своя подземная база (game/base.html)
   function openBase() { window.location.href = BASE.page; }
   document.getElementById('base').addEventListener('click', openBase);
+  function attackBase() { window.location.href = BASE.attack; }
+  document.getElementById('base-attack').addEventListener('click', attackBase);
 
   // ---------------- часы ----------------
   // игровое время идёт со скоростью реального; кнопки ускорения пока не работают

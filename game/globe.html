@@ -21,6 +21,7 @@
   #start { height: 44px; font-size: 13px; color: #1a1206; background: linear-gradient(180deg, #f0b04a, #c9821f); border-color: #ffd28a; }
   #start:hover { color: #000; background: linear-gradient(180deg, #ffc35e, #d89028); }
   .menu { display: grid; grid-template-columns: 1fr; gap: 5px; }
+  .menu button.test { border-style: dashed; color: #e8a090; }
   .clock { border: 1px solid #3a454b; background: #0a1013; text-align: center; padding: 6px 4px 7px; }
   .clock .time { font: bold 28px Consolas, "DejaVu Sans Mono", monospace; color: #9fd7ee; letter-spacing: 1px; }
   .clock .time small { font-size: 15px; color: #6fa9c0; }
@@ -68,11 +69,12 @@
   <button id="start">НАЧАТЬ ЗАДАНИЕ</button>
   <div class="menu">
     <button disabled title="В разработке">ПЕРЕХВАТ</button>
-    <button id="base" title="База «Ямантау»: оборона (B)">БАЗА</button>
+    <button id="base" title="База «Ямантау»: карта и управление (B)">БАЗА</button>
     <button disabled title="В разработке">ГРАФИКИ</button>
     <button disabled title="В разработке">ЭНЦИКЛОПЕДИЯ</button>
     <button disabled title="В разработке">НАСТРОЙКИ</button>
     <button disabled title="В разработке">ФИНАНСЫ</button>
+    <button id="base-attack" class="test" title="Тест: бой на карте базы (N)">НАПАДЕНИЕ НА БАЗУ · ТЕСТ</button>
   </div>
   <div class="clock">
     <div class="time" id="clock-time">06:00<small>:00</small></div>
