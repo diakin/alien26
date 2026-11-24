@@ -693,75 +693,60 @@
     shadowCanvas = document.createElement('canvas');
   }
 
-  // ---------------- поворот вида на 90° ----------------
-  // Для карт с повёрнутыми наборами тайлов (js/maps/*_r1..r3.js кладут их в MAP_VIEWS): «,» / «.» и кнопки
-  // на панели уровней. Логика игры остаётся в координатах карты; меняются тайлы, FIELD, мини-карта, а Iso
-  // переводит координаты и направления спрайтов юнитов (8 направлений — поворот на 90° сдвигает их на 2).
-  var VIEWS = {};
-  if (TILESET) {
-    VIEWS[0] = { turns: 0, field: JSON.parse(JSON.stringify(FIELD)), minimap: MAP.minimap, tileset: TILESET, doorCells: null };
-    if (window.MAP_VIEWS) Object.keys(window.MAP_VIEWS).forEach(function (key) { VIEWS[key] = window.MAP_VIEWS[key]; });
-  }
+  // ---------------- WebGL-карта и поворот вида на 90° ----------------
+  // На картах, где сцену умеет строить js/map3d.js (Map3D.supported, сейчас база), карта рисуется в WebGL
+  // ортокамерой игры, а юниты и тела — спрайтами в той же сцене с глубиной своей клетки. Пока сцена строится,
+  // показываются тайлы. В WebGL-режиме камеру можно повернуть на 90° («,» / «.», кнопки на панели уровней):
+  // логика игры остаётся в координатах карты, Iso переводит их в координаты вида, направление спрайтов
+  // юнитов сдвигается на 2 из 8. Настройка «3D-карта (WebGL)» выключает режим.
+  var FIELD0 = JSON.parse(JSON.stringify(FIELD));
+  var MINIMAP0 = MAP.minimap;
+  var gl3d = null, glStarting = false, glFailed = false;
+  var glMinimaps = {};
   var viewTurns = 0;
-  var viewImages = { 0: { tiles: tileImages, shadows: shadowImages } };
-  function viewCount() { return Object.keys(VIEWS).length; }
-  function imagesOfView(turns) {
-    if (!viewImages[turns]) {
-      var tileset = VIEWS[turns].tileset;
-      viewImages[turns] = {
-        tiles: (tileset.images || [tileset.image]).map(function (source) { return Assets.image(source, Assets.URGENT); }),
-        shadows: (tileset.shadowImages || [tileset.shadows]).map(function (source) { return Assets.image(source, Assets.URGENT); })
-      };
-    }
-    return viewImages[turns];
-  }
+  function glActive() { return !!(gl3d && gl3d.ready && Settings.values.render3d !== false); }
+  function viewCount() { return glActive() ? 4 : 1; }
   // грань двери в координатах вида (тайл створки ставится на неё)
   function doorViewEdge(index) {
-    var cells = VIEWS[viewTurns] && VIEWS[viewTurns].doorCells, door = doors[index];
-    if (cells && cells[index]) return { col: cells[index][0], row: cells[index][1], orient: cells[index][2] ? 'N' : 'W' };
-    return { col: door.col, row: door.row, orient: door.orient };
+    var door = doors[index];
+    return Iso.edgeToView(door.col, door.row, door.orient);
   }
+  function startMap3D() {
+    if (glStarting || gl3d || glFailed || !TILESET || !window.Map3D || !Map3D.supported || Settings.values.render3d === false) return;
+    glStarting = true;
+    try {
+      Map3D.init({ field: FIELD0, doors: MAP.doors || [], onProgress: function (part) { glProgress = part; } }).then(function () {
+        gl3d = Map3D;
+        updateRotateBar();
+        updateHover();
+      }, function (error) { glFailed = true; console.warn('WebGL-карта не построена:', error); });
+    } catch (error) { glFailed = true; console.warn('WebGL-карта недоступна:', error); }
+  }
+  var glProgress = 0;
   function applyView(turns) {
-    var data = VIEWS[turns];
     viewTurns = turns;
-    TILESET = data.tileset;
-    var images = imagesOfView(turns);
-    tileImages = images.tiles; shadowImages = images.shadows;
-    tileImage = tileImages[0]; shadowImage = shadowImages[0];
-    tileViews = {}; groundPieces = null;
-    if (chunks) chunks.clear();
-    Object.keys(data.field).forEach(function (key) { FIELD[key] = data.field[key]; });
-    MAP.minimap = data.minimap;
-    Iso.setView(data.field, turns);
+    Iso.setView(FIELD0, turns);
+    if (gl3d) gl3d.setTurns(turns);
+    if (!turns) MAP.minimap = MINIMAP0;
+    else {
+      if (!glMinimaps[turns]) {
+        var snapshot = gl3d && gl3d.snapshot(Math.round(FIELD0.width / 4));
+        glMinimaps[turns] = snapshot ? snapshot.toDataURL('image/jpeg', 0.85) : MINIMAP0;
+      }
+      MAP.minimap = glMinimaps[turns];
+    }
     try { window.dispatchEvent(new CustomEvent('aliens:view', { detail: { turns: turns } })); } catch (error) { /* старый браузер */ }
     updateRotateBar();
   }
   // повернуть вид: точка земли текущего уровня в центре экрана остаётся в центре
   function rotateView(step) {
-    if (!TILESET || viewCount() < 2) return;
-    var next = viewTurns;
-    do { next = (next + step + 4) % 4; } while (!VIEWS[next]);
+    if (viewCount() < 2) return;
     var height = view.level * LEVEL_H;
     var center = Iso.toGrid(camera.x + viewWidth / 2, camera.y + viewHeight / 2 + height * Iso.pixelsPerMeterUp);
-    applyView(next);
+    applyView((viewTurns + step + 4) % 4);
     centerOn(center.col, center.row, height);
     updateHover();
   }
-  // остальные наборы тайлов подгружаются заранее, когда основной уже на экране
-  function preloadViews() {
-    if (viewCount() < 2) return;
-    if (!tileImages.every(Assets.ready)) { setTimeout(preloadViews, 1500); return; }
-    Object.keys(VIEWS).forEach(function (key) {
-      if (viewImages[key]) return;
-      var tileset = VIEWS[key].tileset;
-      viewImages[key] = {
-        tiles: (tileset.images || [tileset.image]).map(function (source) { return Assets.image(source, 3); }),
-        shadows: (tileset.shadowImages || [tileset.shadows]).map(function (source) { return Assets.image(source, 3); })
-      };
-      Assets.image(VIEWS[key].minimap, 4);
-    });
-  }
-  setTimeout(preloadViews, 2000);
   // кусок картинки тайла на месте клетки: прямоугольник в пикселях карты и в атласе
   function tilePiece(tile, col, row, level, part, shadow) {
     var entry = TILESET.list[tile];
@@ -921,21 +906,22 @@
     var marks = levelBar.querySelectorAll('.level-mark');
     for (var index = 0; index < marks.length; index++) marks[index].className = 'level-mark' + (LEVELS - 1 - index <= view.level ? ' on' : '') + (LEVELS - 1 - index === view.level ? ' current' : '');
   }
-  // кнопки поворота вида — только у карт с повёрнутыми наборами
+  // кнопки поворота вида — в WebGL-режиме; подпись — откуда смотрит камера
   var rotateRow = null;
   function updateRotateBar() {
+    if (!levelBar) return;
+    if (!rotateRow && viewCount() > 1) {
+      rotateRow = document.createElement('div');
+      rotateRow.className = 'row';
+      rotateRow.innerHTML = '<button class="view-left" title="Повернуть вид (,)">⟲</button>' +
+        '<span class="level-number view-side"></span><button class="view-right" title="Повернуть вид (.)">⟳</button>';
+      levelBar.appendChild(rotateRow);
+      rotateRow.querySelector('.view-left').addEventListener('click', function () { rotateView(-1); });
+      rotateRow.querySelector('.view-right').addEventListener('click', function () { rotateView(1); });
+    }
     if (!rotateRow) return;
+    rotateRow.style.display = viewCount() > 1 ? '' : 'none';
     rotateRow.querySelector('.view-side').textContent = ['ЮВ', 'СВ', 'СЗ', 'ЮЗ'][viewTurns] || '';
-  }
-  if (levelBar && viewCount() > 1) {
-    rotateRow = document.createElement('div');
-    rotateRow.className = 'row';
-    rotateRow.innerHTML = '<button class="view-left" title="Повернуть вид (,)">⟲</button>' +
-      '<span class="level-number view-side"></span><button class="view-right" title="Повернуть вид (.)">⟳</button>';
-    levelBar.appendChild(rotateRow);
-    rotateRow.querySelector('.view-left').addEventListener('click', function () { rotateView(-1); });
-    rotateRow.querySelector('.view-right').addEventListener('click', function () { rotateView(1); });
-    updateRotateBar();
   }
   if (levelBar) {
     if (LEVELS < 2) levelBar.style.display = 'none';
@@ -3275,6 +3261,7 @@
   function render() {
     context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     context.imageSmoothingEnabled = renderScale < 1;
+    if (glActive()) { renderGL(); return; }
     context.fillStyle = '#141210';
     context.fillRect(0, 0, viewWidth, viewHeight);
     if (TILESET) { renderTiles(); return; }
@@ -3339,6 +3326,73 @@
   // собирается в группы по перекрытию прямоугольников; в рамке группы поверх кэша рисуются по глубине
   // подвижные элементы и все куски ближе самого дальнего из них. Дальние куски уже есть в кэше под ними,
   // а за рамку ничего не выходит, поэтому ближние куски вне группы не страдают.
+  // ---------------- кадр WebGL-карты ----------------
+  // Слои: карта из WebGL -> подсветка пола, тела и юниты (2D) -> то, что перед ними (WebGL, js/map3d.js) -> рамки,
+  // маршрут и эффекты. Для слоя «перед ними» Map3D получает прямоугольники фигур с точкой ног.
+  var glStatic = { key: '', items: [] };
+  function glProxy(rect, col, row, elevation, size) {
+    var foot = Iso.toScreen(col, row, elevation || 0);
+    return { x0: rect.x, x1: rect.x + rect.width, y0: rect.y, y1: rect.y + rect.height, foot: [col, row, elevation || 0], footY: foot.y, pull: 0.45 * (size || 1) };
+  }
+  function renderGL() {
+    target = { x: camera.x, y: camera.y, width: viewWidth, height: viewHeight };
+    context.clearRect(0, 0, viewWidth, viewHeight);
+    gl3d.setViewport(Math.round(camera.x), Math.round(camera.y), viewWidth, viewHeight, renderScale);
+    gl3d.setLevel(view.level, view.cut);
+    doors.forEach(function (door, index) { gl3d.setDoor(index, door.open, DOOR_WIDTH + 0.04); });
+    gl3d.render();
+    context.drawImage(gl3d.canvas, 0, 0, viewWidth, viewHeight);
+
+    // подсветка пола (под стенами уровня, они лягут поверх слоем «перед»)
+    var staticKey = (showGrid ? 'g' : '') + view.level + (view.cut ? 'c' : 'f') + viewTurns;
+    if (glStatic.key !== staticKey) glStatic = { key: staticKey, items: staticOverlays() };
+    var floorItems = glStatic.items.concat(floorOverlays());
+    floorItems.sort(function (first, second) { return first.depth - second.depth; });
+    floorItems.forEach(function (item) { if (!item.rect || visibleRect(item.rect)) safeDraw(item); });
+
+    // тела и юниты — по глубине клетки, от дальних к ближним
+    var now = performance.now(), figures = [], proxies = [];
+    corpses.forEach(function (corpse) {
+      if (corpse.level > view.level) return;
+      var standing = corpse.wreck || corpseFrame(corpse, now) >= 0;
+      var name = corpseSprite(corpse, now), image = images[name], anchor = SPRITE_ANCHORS[name];
+      if (!image || !anchor || !image.naturalWidth) return;
+      var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
+      var rect = { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight };
+      if (!visibleRect(rect)) return;
+      figures.push({ depth: standing ? footprintDepth(corpse.col, corpse.row, corpse.level, 3.5, corpse.size) : footprintDepth(corpse.col, corpse.row, corpse.level, 1.3, corpse.size),
+        draw: function () { drawSprite(name, corpse.x, corpse.y, corpse.elevation); } });
+      proxies.push(glProxy(rect, corpse.x, corpse.y, corpse.elevation, corpse.size));
+    });
+    units.forEach(function (unit) {
+      if (unit.level > view.level || !isSeen(unit)) return;
+      var position = drawPosition(unit), rect = spriteRect(unit, position);
+      if (!visibleRect(rect)) return;
+      figures.push({ depth: unitDepth(unit), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation, unit); } });
+      proxies.push(glProxy(rect, position.x, position.y, position.elevation, unit.size));
+    });
+    figures.sort(function (first, second) { return first.depth - second.depth; });
+    figures.forEach(safeDraw);
+
+    // стены и предметы перед юнитами и над подсветкой пола
+    gl3d.renderOccluders(proxies, view.level * LEVEL_H);
+    context.drawImage(gl3d.canvas, 0, 0, viewWidth, viewHeight);
+
+    var hover = hoverStyle();
+    drawPath();
+    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
+    drawPathLabel();
+    if (hover) { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
+    drawExtraction();
+    drawPortal(now);
+    drawHighlight(now);
+    drawMarkedEnemy();
+    drawAimMarker();
+    drawParticles();
+    drawThrows();
+    drawCombatEffects();
+  }
+
   function renderTiles() {
     var current = tileView(view.level, view.cut);
     if (!tileImages.every(Assets.ready) || !shadowImages.every(Assets.ready)) return;
@@ -3526,8 +3580,19 @@
       indoorWatch.unit = selected; indoorWatch.state = indoorKey.replace('new', '');
     }
     if (wasMoving) updateHover();
+    if (!gl3d && !glStarting && TILESET && tileImages.every(Assets.ready)) startMap3D();
     render();
     drawLoading();
+    if (glStarting && !gl3d && !glFailed) {
+      context.save();
+      context.font = 'bold 12px Arial, sans-serif';
+      context.fillStyle = 'rgba(12, 15, 17, 0.8)';
+      context.fillRect(viewWidth / 2 - 110, 70, 220, 24);
+      context.fillStyle = '#c8d2d8';
+      context.textAlign = 'center';
+      context.fillText('Строится 3D-карта… ' + Math.round(glProgress * 100) + ' %', viewWidth / 2, 86);
+      context.restore();
+    }
     if (window.Panel) window.Panel.update();
   }
 
@@ -3557,6 +3622,11 @@
     if (help) help.style.display = values.showHelp ? '' : 'none';
     if (values.renderScale !== renderScale) { renderScale = values.renderScale; resize(); }
     if (key === 'fullscreen') setTimeout(resize, 200);
+    if (key === 'render3d') {
+      if (values.render3d === false && viewTurns) applyView(0);
+      if (values.render3d !== false) startMap3D();
+      updateRotateBar();
+    }
     if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; }
   });
   resize();
@@ -3579,6 +3649,6 @@
     highlightArea: highlightArea,
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
-    centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
+    centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, get gl3d() { return glActive() ? gl3d : null; }, get glProgress() { return glProgress; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

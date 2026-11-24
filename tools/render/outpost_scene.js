@@ -23,7 +23,8 @@ export const PART = { ground: 0, floor: 1, wallW: 2, wallN: 3, object: 4, doorW:
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // ---------------- рендерер, свет ----------------
-export const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+// globalThis.ALIENS_RENDERER_ALPHA — прозрачный холст (WebGL-карта в игре рисует слой «то, что перед юнитами»)
+export const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: !!(typeof globalThis !== 'undefined' && globalThis.ALIENS_RENDERER_ALPHA) });
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
