@@ -411,10 +411,10 @@ function addAutocannon(body, materials) {
   addMesh(gun, roundedBox(0.26, 0.3, 0.86, 0.06), materials.camoDark, [1.36, -0.05, 0.08]);              // ствольная коробка
   addMesh(gun, roundedBox(0.27, 0.05, 0.6, 0.02), materials.darkMetal, [1.36, 0.12, 0.05]);
   addMesh(gun, roundedBox(0.03, 0.03, 0.7, 0.012), materials.yellow, [1.495, 0.02, 0.08]);
-  addMesh(gun, cylinderZ(0.088, 0.55), materials.darkMetal, [1.36, -0.05, 0.75]);                        // кожух ствола
+  addMesh(gun, cylinderZ(0.088, 0.55), materials.camo, [1.36, -0.05, 0.75]);                            // кожух ствола (камуфляж)
   for (let ring = 0; ring < 4; ring++) addMesh(gun, torus(0.09, 0.012, 8, 24), materials.black, [1.36, -0.05, 0.56 + ring * 0.13]);
-  addMesh(gun, cylinderZ(0.052, 0.75), materials.metal, [1.36, -0.05, 1.3]);                             // ствол
-  addMesh(gun, roundedBox(0.15, 0.12, 0.2, 0.03), materials.darkMetal, [1.36, -0.05, 1.66]);            // дульный тормоз
+  addMesh(gun, cylinderZ(0.052, 0.75), materials.camoDark, [1.36, -0.05, 1.3]);                          // ствол (камуфляж)
+  addMesh(gun, roundedBox(0.15, 0.12, 0.2, 0.03), materials.camoDark, [1.36, -0.05, 1.66]);             // дульный тормоз
   for (const side of [-1, 1]) addMesh(gun, roundedBox(0.02, 0.06, 0.12, 0.008), materials.black, [1.36 + side * 0.076, -0.05, 1.66]);
   addMesh(gun, roundedBox(0.3, 0.36, 0.46, 0.06), materials.camo, [1.37, 0.06, -0.6]);                  // патронный короб
   addMesh(gun, roundedBox(0.31, 0.04, 0.47, 0.015), materials.orange, [1.37, 0.25, -0.6]);

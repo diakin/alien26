@@ -15,7 +15,7 @@ var Combat = (function () {
       ]
     },
     autocannon: {
-      damage: 55, range: 70, magazine: 40, projectile: 'shell',
+      damage: 110, range: 70, magazine: 40, projectile: 'shell',
       modes: [
         { name: 'Прицельный', cost: 20, accuracy: 1.05, shots: 1 },
         { name: 'Одиночный', cost: 12, accuracy: 0.65, shots: 1 },
