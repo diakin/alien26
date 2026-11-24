@@ -253,7 +253,8 @@ var Panel = (function () {
   var mapBackground = null;      // уменьшенная копия фона
   var mapScale = 1, mapOffsetX = 0, mapOffsetY = 0;
   var fieldImage = null;
-  function buildMinimapBackground() {
+  function buildMinimapBackground(readyImage) {
+    if (readyImage) fieldImage = readyImage;
     // карта вписывается целиком (по меньшему из масштабов), по центру
     mapScale = Math.min(minimap.width / FIELD.width, minimap.height / FIELD.height);
     mapOffsetX = (minimap.width - FIELD.width * mapScale) / 2;
@@ -274,6 +275,10 @@ var Panel = (function () {
     }
   };
   fieldImage = Assets.image(MAP.minimap, Assets.URGENT, buildMinimapBackground);
+  // поворот вида (game.js): своя мини-карта и FIELD у каждого вида
+  window.addEventListener('aliens:view', function () {
+    fieldImage = Assets.image(MAP.minimap, Assets.URGENT, buildMinimapBackground);
+  });
 
   function mapPoint(col, row) {
     var point = Iso.toScreen(col, row);

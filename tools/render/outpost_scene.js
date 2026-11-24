@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mulberry32, rockTextures, rockGeometry, screenTexture, setEnvIntensity } from './lib.js';
 import { toXZ, bladeGeometry, grassMaterial } from './world.js';
-import { buildLayout, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES, MAP_NAME } from './outpost_layout.js';
+import { buildLayout, rotateLayout, VIEW_TURNS, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES, MAP_NAME } from './outpost_layout.js';
 import { buildArmyTruck, ARMY_TRUCK, buildTiltrotor, buildCar, CARS } from './vehicles.js';
 import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
@@ -13,7 +13,7 @@ import {
 import { buildCityWall, buildCityDoorLeaf, buildCityObject, floorMaterial, CITY_MAT, STAIR_MATERIALS, isCityFacade } from './city_scene.js';
 const CITY = MAP_NAME === 'city';
 
-export const layout = buildLayout();
+export const layout = rotateLayout(buildLayout(), VIEW_TURNS);
 export const PPM = 1280 / 18.5;            // пикселей на метр (как спрайты x1)
 export const SS = 2;                       // суперсэмплинг
 export const SIZE = TILE * TILES;
@@ -371,7 +371,21 @@ export function buildLadder(item, maxTop) {
 // ---------------- предметы ----------------
 function objectOrigin(item) { return V(item.col * TILE, item.level * LEVEL_H, item.row * TILE); }
 
+// поворот вида на 90° по часовой (rotateLayout): точка (x, z) в метрах -> (SIZE - z, x)
+const TURN_MATRIX = new THREE.Matrix4().makeTranslation(TILE * TILES, 0, 0).multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2));
+
 export function buildObject(item, viewLevel) {
+  if (item.source) {
+    // предмет повёрнутого вида: строится на исходном месте и поворачивается вместе с картой
+    const inner = buildObject({ ...item.source, layer: item.layer }, viewLevel);
+    if (!inner) return inner;
+    const pivot = new THREE.Group();
+    pivot.matrixAutoUpdate = false;
+    for (let step = 0; step < item.turns; step++) pivot.matrix.premultiply(TURN_MATRIX);
+    pivot.add(inner);
+    pivot.updateMatrixWorld(true);
+    return pivot;
+  }
   const group = new THREE.Group();
   const origin = objectOrigin(item);
   const width = item.cols * TILE, depth = item.rows * TILE;

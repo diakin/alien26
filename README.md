@@ -97,6 +97,18 @@
 затем `MAP=base python3 tilesetbuild.py <папка> ../../game` — атлас в `game/assets/maps/outpost_base/`, карта
 в `game/js/maps/outpost_tiles_base.js`. Уникальных тайлов 807, рендер около 3,5 минуты.
 
+Поворот вида на 90° (`,` / `.` и кнопки ⟲ ⟳ под панелью уровней; подпись — откуда смотрит камера: ЮВ, СВ, СЗ, ЮЗ).
+Для каждого поворота свой набор тайлов, отрендеренный заранее: та же камера, но разметка повёрнута
+(`rotateLayout` в `outpost_layout.js`: клетка (col, row) -> (57 − row, col), стена W -> стена N соседней клетки и
+наоборот; предметы строятся на исходном месте и поворачиваются целиком, блоки скалы просто переносятся).
+`MAP=base ROT=1 node tilesetrun.mjs render <папка_r1>` и `MAP=base ROT=1 python3 tilesetbuild.py <папка_r1> ../../game`
+(так же для 2 и 3) пишут `game/assets/maps/outpost_base_r1/` и `game/js/maps/outpost_tiles_base_r1.js`
+(`MAP_VIEWS[1]`: проекция, мини-карта, слои тайлов, створки дверей в порядке `MAP.doors` с гранью в повёрнутом виде).
+Около 800 тайлов и 3 МБ атласа на поворот. Логика игры не меняется — всё в координатах карты; `iso.js` переводит
+точки, клетки и грани в координаты вида, `game.js` при повороте меняет атлас, FIELD и мини-карту, глубину считает по
+клетке вида (K7 — по ближней клетке), направление спрайта юнита сдвигает на 2 из 8 за каждые 90°. Остальные наборы
+подгружаются в фоне, когда основной уже на экране; точка в центре экрана при повороте остаётся на месте.
+
 Конвертоплан КТ-6 «Гриф» — `buildTiltrotor({ cutaway, rampOpen })` в `tools/render/vehicles.js`, размеры и
 раскладка салона по клеткам — `TILTROTOR`: 15 × 12,5 × 6,5 м, салон 4×6 клеток высотой 4 м, кормовая рампа,
 боковая дверь с трапом, 6 сидений и место K7. Проверка: `vehiclecheck.html`, `window.check('buildTiltrotor',
@@ -528,6 +540,8 @@ node outpostrun.mjs variant op_out 0 1                 # вариант: уро�
 python outpostbuild.py op_out ../../game               # фоны, маски кусков, game/js/maps/outpost.js
 node tilesetrun.mjs render tiles_out                   # набор тайлов: цвет, маска, тень каждого (готовые пропускаются)
 python tilesetbuild.py tiles_out ../../game 0.5        # атласы, game/js/maps/outpost_tiles.js; 0.5 — сила тени
+MAP=base ROT=1 node tilesetrun.mjs render tiles_base_r1     # база, вид повёрнут на 90° (так же ROT=2, ROT=3)
+MAP=base ROT=1 python tilesetbuild.py tiles_base_r1 ../../game # game/assets/maps/outpost_base_r1/, js/maps/outpost_tiles_base_r1.js
 MAP=big node tilesetrun.mjs render tiles_big          # большая карта: тайлы (два процесса: … 0 490 и … 490 2000)
 MAP=big python tilesetbuild.py tiles_big ../../game    # атлас game/assets/maps/outpost_big/, game/js/maps/outpost_tiles_big.js
 MAP=city node tilesetrun.mjs render tiles_city         # центр города: 3440 тайлов (два процесса: … 0 2000 и … 2000 100000)

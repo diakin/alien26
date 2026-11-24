@@ -9,6 +9,10 @@
 Карта пишется в game/js/maps/outpost_tiles.js: проекция FIELD (шаг клетки ровно 61x35), данные
 проходимости из прежней карты и слои тайлов: земля, пол, стены W и N по уровням, предметы.
 Заодно собирается общий вид карты (как его нарисует игра) — для мини-карты и для сравнения.
+
+  MAP=base ROT=1 python tilesetbuild.py tiles_dir ../../game — набор тайлов повёрнутого вида (tilesetrun.mjs с ROT=1):
+      атлас в game/assets/maps/outpost_base_r1/, вид — в game/js/maps/outpost_tiles_base_r1.js (MAP_VIEWS[1]: проекция,
+      мини-карта, слои тайлов; створки дверей — в порядке MAP.doors основной карты, с клеткой и гранью в повёрнутом виде).
 """
 import json, os, re, sys
 import numpy as np
@@ -17,7 +21,10 @@ from PIL import Image
 TILES_DIR, GAME_DIR = sys.argv[1], sys.argv[2]
 SHADOW_STRENGTH = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5
 MAP_NAME = os.environ.get('MAP', 'outpost')
+ROT = int(os.environ.get('ROT', '0')) % 4
 ASSET_FOLDER = 'assets/maps/outpost_tiles' if MAP_NAME == 'outpost' else 'assets/maps/outpost_' + MAP_NAME
+if ROT:
+    ASSET_FOLDER += '_r' + str(ROT)
 OUT_ASSETS = os.path.join(GAME_DIR, ASSET_FOLDER)
 os.makedirs(OUT_ASSETS, exist_ok=True)
 
@@ -286,6 +293,45 @@ def map_from_layout(layout):
         'caption': layout.get('caption'),
     }
 
+
+def view_edge(col, row, orient, turns):
+    """Грань (W / N клетки) основной карты -> грань повёрнутого вида (как rotateLayout в outpost_layout.js)."""
+    for _ in range(turns):
+        if orient == 'W':
+            col, row, orient = GRID - 1 - row, col, 'N'
+        else:
+            col, row, orient = GRID - row, col, 'W'
+    return col, row, orient
+
+
+if ROT:
+    # повёрнутый вид: только картинка; проходимость, двери и препятствия — из основной карты
+    base_text = open(os.path.join(GAME_DIR, 'js/maps/outpost_tiles_' + MAP_NAME + '.js'), encoding='utf-8').read()
+    base_map = json.loads(re.search(r'var MAP = (\{.*\});', base_text, re.S).group(1))
+    door_tiles, door_cells = [], []
+    for col, row, level, orient_code in base_map['doors']:
+        view_col, view_row, view_orient = view_edge(col, row, 'W' if orient_code == 0 else 'N', ROT)
+        match = next(item for item in plan['doors'] if item[0] == view_col and item[1] == view_row and item[2] == level and item[3] == view_orient)
+        door_tiles.append(match[4])
+        door_cells.append([view_col, view_row, 0 if view_orient == 'W' else 1])
+    view = {
+        'turns': ROT, 'field': field, 'minimap': ASSET_FOLDER + '/minimap.jpg', 'doorCells': door_cells,
+        'tileset': {
+            'image': ASSET_FOLDER + '/tiles.png', 'shadows': ASSET_FOLDER + '/shadows.png',
+            'images': [ASSET_FOLDER + '/' + page_name('tiles', page) for page in range(len(atlases))],
+            'shadowImages': [ASSET_FOLDER + '/' + page_name('shadows', page) for page in range(len(shadow_atlases))],
+            'shadowStrength': SHADOW_STRENGTH, 'levelPixels': LEVEL_PIXELS,
+            'list': tile_list,
+            'ground': plan['ground'], 'floor': plan['floor'], 'wallW': plan['wallW'], 'wallN': plan['wallN'],
+            'objects': plan['objects'], 'doors': door_tiles,
+        },
+    }
+    view_file = 'js/maps/outpost_tiles_' + MAP_NAME + '_r' + str(ROT) + '.js'
+    with open(os.path.join(GAME_DIR, view_file), 'w', encoding='utf-8') as output:
+        output.write('// Сгенерировано tools/render/tilesetbuild.py: вид карты «' + base_map['name'] + '», повёрнутый ' + str(ROT) + ' раз на 90°.\n')
+        output.write('(window.MAP_VIEWS = window.MAP_VIEWS || {})[' + str(ROT) + '] = ' + json.dumps(view, separators=(',', ':')) + ';\n')
+    print('view', ROT, 'tiles', len(sprites), 'shadows', len(shadows), 'atlas pages', [image.size for image in atlases], 'map', (width, height))
+    sys.exit(0)
 
 if MAP_NAME == 'outpost':
     old_text = open(os.path.join(GAME_DIR, 'js/maps/outpost.js'), encoding='utf-8').read()

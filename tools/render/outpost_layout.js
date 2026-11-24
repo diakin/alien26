@@ -456,3 +456,63 @@ export function buildLayout() {
     name: cityName || (MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'База «Ямантау»' : 'База на плато'),
     combat: MAP_NAME === 'big' || MAP_NAME === 'base' || MAP_NAME === 'city' };
 }
+
+// ---------------- поворот вида на 90° ----------------
+// Игра показывает карту с четырёх сторон (Q / E): для каждого поворота свой набор тайлов. Тот же рендер
+// с той же камерой, но разметка повёрнута: клетка (col, row) поворота 1 -> (TILES-1-row, col),
+// точка в клетках (x, y) -> (TILES - y, x). Стена W клетки (c, r) становится стеной N клетки (TILES-1-r, c),
+// стена N — стеной W клетки (TILES-r, c): у каждой грани по-прежнему один хозяин.
+// Предметы строятся в исходных координатах и поворачиваются целиком (item.source + item.turns, outpost_scene.js),
+// блоки скалы симметричны и просто переносятся. Параметр страницы ?rot=1..3.
+export const VIEW_TURNS = ((Number(PARAMS.get('rot')) || 0) % 4 + 4) % 4;
+
+export function rotateLayout(layout, turns) {
+  let current = layout;
+  for (let step = 0; step < turns; step++) current = rotateOnce(current, step + 1);
+  return current;
+}
+
+function rotateOnce(layout, turnsSoFar) {
+  const size = layout.TILES;
+  if (layout.surface || layout.buildings.length || layout.stairs.length || layout.links.length) {
+    throw new Error('rotateLayout: поворот поддержан только для карт без зданий, лестниц и покрытия (base)');
+  }
+  const emptyGrid = (source, fill) => source.map((level) => level.map((row) => row.map(() => fill)));
+  const cellGrid = (source, fill) => {
+    const result = emptyGrid(source, fill);
+    for (let level = 0; level < source.length; level++) {
+      for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) result[level][col][size - 1 - row] = source[level][row][col];
+    }
+    return result;
+  };
+  const wallW = emptyGrid(layout.wallW, null), wallN = emptyGrid(layout.wallN, null);
+  for (let level = 0; level < layout.wallW.length; level++) {
+    for (let row = 0; row <= size; row++) {
+      for (let col = 0; col <= size; col++) {
+        const west = layout.wallW[level][row][col];
+        if (west && row < size) wallN[level][col][size - 1 - row] = west;
+        const north = layout.wallN[level][row][col];
+        if (north && col < size) wallW[level][col][size - row] = north;
+      }
+    }
+  }
+  const cellPoint = ([col, row, ...rest]) => [size - 1 - row, col, ...rest];
+  const objects = layout.objects.map((item) => {
+    const footprint = { col: size - item.row - item.rows, row: item.col, cols: item.rows, rows: item.cols };
+    if (item.kind === 'rockFill') return { ...item, ...footprint };
+    // исходный предмет (без поворота) и сколько раз его повернуть
+    const source = item.source || item;
+    return { ...item, ...footprint, source, turns: turnsSoFar };
+  });
+  return {
+    ...layout,
+    floor: cellGrid(layout.floor, 0), offset: cellGrid(layout.offset, 0), indoor: cellGrid(layout.indoor, 0),
+    wallW, wallN, objects,
+    blockedCells: layout.blockedCells.map(([level, col, row]) => [level, size - 1 - row, col]),
+    extraction: layout.extraction ? layout.extraction.map(cellPoint) : layout.extraction,
+    concrete: layout.concrete.map((zone) => zone.circle
+      ? { ...zone, circle: [size * layout.TILE - zone.circle[1], zone.circle[0], zone.circle[2]] }
+      : { ...zone, rect: [size * layout.TILE - zone.rect[3], zone.rect[0], size * layout.TILE - zone.rect[1], zone.rect[2]] }),
+    viewTurns: turnsSoFar,
+  };
+}
