@@ -498,28 +498,16 @@
   }
 
   // ---------------- туман войны ----------------
-  // Как в UFO: видно то, что видят бойцы отряда. Каждый боец смотрит конусом 120° по направлению взгляда
-  // на VISION_CELLS клеток и на соседние клетки вокруг себя. Луч идёт по клеткам своего уровня; стены, обшивка
-  // и закрытые двери его останавливают, окна, перила и парапеты — нет. Над проёмом без пола (с верхнего этажа
-  // через окно) луч отмечает видимой клетку ниже. Клетки, которые видели хоть раз, — «разведаны».
-  // На карте: не видимая сейчас клетка затемнена (разведанная слабее, неразведанная сильнее); пришелец виден,
-  // только если его клетка видна сейчас или он стрелял (виден до конца следующего хода отряда).
+  // Видно то, что видят бойцы отряда: каждый боец смотрит во все стороны на VISION_CELLS клеток. Луч идёт по клеткам
+  // своего уровня; стены, обшивка и закрытые двери его останавливают, окна, перила и парапеты — нет. Над проёмом
+  // без пола (с верхнего этажа через окно) луч отмечает видимой клетку ниже. Карта не затемняется: туман только
+  // скрывает пришельцев — пришелец виден, если его клетка видна сейчас или он стрелял (до конца следующего хода отряда).
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
-  var VISION_CELLS = 24, VISION_HALF_ANGLE = Math.PI / 3, VISION_NEAR = 1.6, FOG_RAYS = 360;
+  var VISION_CELLS = 24, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка
-  var fog = { visible: null, seen: null, signature: '', checkAt: 0, items: {}, version: 0 };
+  var fog = { visible: null, signature: '', checkAt: 0 };
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
-  // направление взгляда юнита (0..7) — вектор в клетках, по Iso.directionOf
-  var DIRECTION_VECTORS = (function () {
-    var vectors = [];
-    for (var step = 0; step < 8; step++) {
-      var angle = step * Math.PI / 4, vector = { x: Math.cos(angle), y: Math.sin(angle) };
-      var direction = Iso.directionOf(vector.x, vector.y);
-      if (direction >= 0) vectors[direction] = vector;
-    }
-    return vectors;
-  })();
   function fogEnabled() {
     return !!MAP.tileset && MAP.combat !== false && PAGE_MODE !== 'manage' && (!window.Settings || Settings.values.fog !== false);
   }
@@ -543,13 +531,10 @@
     }
   }
   function castVision(unit, grids) {
-    var level = unit.level, facing = DIRECTION_VECTORS[unit.direction] || { x: 1, y: 0 };
-    var facingAngle = Math.atan2(facing.y, facing.x);
+    var level = unit.level;
     for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) markSeen(grids, unit.col + deltaCol, unit.row + deltaRow, level);
     for (var ray = 0; ray < FOG_RAYS; ray++) {
-      var angle = ray / FOG_RAYS * Math.PI * 2;
-      var difference = Math.abs(Math.atan2(Math.sin(angle - facingAngle), Math.cos(angle - facingAngle)));
-      var range = difference <= VISION_HALF_ANGLE ? VISION_CELLS : VISION_NEAR + unit.size / 2;
+      var angle = ray / FOG_RAYS * Math.PI * 2, range = VISION_CELLS;
       var stepX = Math.cos(angle) * 0.3, stepY = Math.sin(angle) * 0.3;
       var x = unit.x, y = unit.y, col = Math.floor(x), row = Math.floor(y);
       for (var travelled = 0; travelled < range; travelled += 0.3) {
@@ -572,26 +557,14 @@
   function computeFog() {
     var next = newFogGrids();
     units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next); });
-    if (!fog.seen) fog.seen = newFogGrids();
-    var changed = [];
-    for (var level = 0; level < LEVELS; level++) {
-      for (var cell = 0; cell < GRID * GRID; cell++) {
-        var before = fog.visible ? fog.visible[level][cell] : -1;
-        if (next[level][cell]) fog.seen[level][cell] = 1;
-        if (before !== next[level][cell]) changed.push([cell % GRID, Math.floor(cell / GRID), level]);
-      }
-    }
     fog.visible = next;
-    if (!changed.length) return;
-    fog.items = {}; fog.version++;
-    invalidateChunks(changed);
   }
-  // пересчёт, когда сменились клетки или взгляд бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
+  // пересчёт, когда сменились клетки бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
   function updateFog(now) {
     if (!fogEnabled() || now < fog.checkAt) return;
     fog.checkAt = now + 200;
     var parts = [];
-    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) parts.push(unit.col, unit.row, unit.level, unit.direction); });
+    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) parts.push(unit.col, unit.row, unit.level); });
     doors.forEach(function (door) { parts.push(door.open < 0.5 ? 0 : 1); });
     var signature = parts.join(',');
     if (signature === fog.signature && fog.visible) return;
@@ -608,26 +581,6 @@
     }
     return false;
   }
-  // затемнение пола клеток, которые сейчас не видны: в общем порядке глубины сразу после пола
-  function fogItems(viewLevel) {
-    if (!fogEnabled() || !fog.visible) return [];
-    if (fog.items[viewLevel]) return fog.items[viewLevel];
-    var items = [];
-    for (var level = 0; level <= viewLevel; level++) {
-      for (var row = 0; row < GRID; row++) for (var col = 0; col < GRID; col++) {
-        var cell = row * GRID + col;
-        if (fog.visible[level][cell] || !floorAt(col, row, level)) continue;
-        (function (corners, alpha) {
-          items.push({ depth: depthKey(col, row, level, 1.3), rect: quadRect(corners, 2), draw: function () {
-            quadPath(corners); context.fillStyle = 'rgba(4, 7, 10, ' + alpha + ')'; context.fill();
-          } });
-        })(Iso.tileCorners(col, row, elevationOf(col, row, level)), fog.seen[level][cell] ? 0.34 : 0.62);
-      }
-    }
-    fog.items[viewLevel] = items;
-    return items;
-  }
-
   // ---------------- уровни обзора и варианты картинки ----------------
   var view = { level: 0, cut: false };
   // Обстановка: мирная — бойцы на своей базе или на посту, стоящие юниты в стойке «вольно» (если у набора
@@ -799,18 +752,6 @@
     while (chunks.size > CHUNK_LIMIT) chunks.delete(chunks.keys().next().value);
     tileStats.chunks = chunks.size;
   }
-  // туман изменился: убрать куски, которые задевают изменившиеся клетки (много клеток — все куски)
-  function invalidateChunks(cells) {
-    if (cells.length > 400) { chunks.clear(); return; }
-    var stale = {};
-    cells.forEach(function (cell) {
-      var rect = quadRect(Iso.tileCorners(cell[0], cell[1], elevationOf(cell[0], cell[1], cell[2])), 3);
-      for (var chunkY = Math.floor(rect.y / CHUNK); chunkY <= Math.floor((rect.y + rect.height) / CHUNK); chunkY++) {
-        for (var chunkX = Math.floor(rect.x / CHUNK); chunkX <= Math.floor((rect.x + rect.width) / CHUNK); chunkX++) stale[chunkX + ':' + chunkY] = true;
-      }
-    });
-    Array.from(chunks.keys()).forEach(function (key) { var parts = key.split(':'); if (stale[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunks.delete(key); });
-  }
   function buildChunk(current, chunkX, chunkY) {
     var chunk = document.createElement('canvas');
     chunk.width = chunk.height = CHUNK;
@@ -819,7 +760,6 @@
       var list = [];
       current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
       staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
-      fogItems(view.level).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
       list.sort(function (first, second) { return first.depth - second.depth; });
       list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
     });
@@ -2712,6 +2652,7 @@
   }
   function footstepSound(unit, kind) {
     if (unit.level > view.level + 1) return;          // на скрытых верхних этажах не слышно
+    if (!isSeen(unit)) return;                         // пришелец в тумане войны — шагов не слышно
     var distance = screenDistance(unit);
     if (distance < 30) Sound.play(kind, distance);
   }
@@ -3268,7 +3209,7 @@
       groups.push(group);
     });
     tileStats.pieces = 0;
-    var overlays = staticItems(current).concat(fogItems(view.level));
+    var overlays = staticItems(current);
     groups.forEach(function (group) {
       var threshold = Infinity;
       group.items.forEach(function (item) { threshold = Math.min(threshold, item.depth); });
@@ -3438,7 +3379,7 @@
     if (help) help.style.display = values.showHelp ? '' : 'none';
     if (values.renderScale !== renderScale) { renderScale = values.renderScale; resize(); }
     if (key === 'fullscreen') setTimeout(resize, 200);
-    if (key === 'fog') { chunks.clear(); fog.items = {}; fog.signature = ''; fog.checkAt = 0; }
+    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; }
   });
   resize();
   setView(selected.level, false);
@@ -3456,7 +3397,7 @@
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
-    missionClock: missionClock, get portal() { return portal; }, fog: fog, isSeen: function (unit) { return isSeen(unit); },
+    missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
