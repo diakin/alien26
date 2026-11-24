@@ -7,6 +7,7 @@ import { setEnvIntensity } from './lib.js';
 import { buildReptileAlien, setAlienFacing, buildPlasmaPistol } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 import { buildAutocannonModel } from './mech.js';
+import { buildCivilian } from './civilian.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
@@ -43,6 +44,16 @@ window.renderPortrait = (camo) => {
     const head = model.localToWorld(model.userData.head.clone());
     camera.position.set(head.x + 0.3, head.y - 0.05, head.z + 2.4);
     camera.lookAt(head.x - 0.02, head.y - 0.19, head.z);
+  } else if (camo.startsWith('civ')) {
+    // гражданские (civilian.js): civman, civwoman, civscientist, civengineer, civworker, civboy, civgirl
+    model = buildCivilian({ kind: camo.slice(3), pose: 'idle' });
+    model.rotation.y = 0.35;
+    studio.add(model);
+    model.updateMatrixWorld(true);
+    const head = model.localToWorld(model.userData.head.clone());
+    const distance = camo === 'civboy' || camo === 'civgirl' ? 1.25 : 1.55;
+    camera.position.set(head.x + 0.45, head.y + 0.02, head.z + distance);
+    camera.lookAt(head.x + 0.02, head.y - 0.08, head.z);
   } else {
     model = buildStockySoldier({ ...LOADOUTS[camo], pose: 'idle' });
     model.rotation.y = 0.35;
@@ -68,6 +79,7 @@ window.renderPortrait = (camo) => {
 };
 
 window.renderWeapon = (camo) => {
+  if (camo.startsWith('civ')) return null;                // у гражданских оружия нет
   const scene = new THREE.Scene();
   scene.environment = environment;
   scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.2));

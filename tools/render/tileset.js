@@ -19,8 +19,10 @@ import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.
 import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
-  buildWall, buildDoorLeaf, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves,
+  buildWall, buildDoorLeaf, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
 } from './outpost_scene.js';
+import { SURFACE } from './city_layout.js';
+import { groundMaterialFor, cityGroundExtras, floorMaterial, CITY_MAT, roofCellKey } from './city_scene.js';
 import { groundBumpTexture } from './outpost_textures.js';
 
 // ---------------- камера с целым шагом клетки ----------------
@@ -193,14 +195,15 @@ function plinthCover(col, row) {
 // чтобы на стыке соседних плит не просвечивал цоколь
 function plinthAndPlate(col, row, plate) {
   const group = new THREE.Group();
+  const style = layout.floorStyle ? layout.floorStyle[0][row][col] : null;
   for (const [x0, x1, z0, z1] of plinths) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.08, z1 - z0), MAT.concrete());
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.08, z1 - z0), layout.floorStyle ? CITY_MAT.granite() : MAT.concrete());
     mesh.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
     group.add(mesh);
   }
   if (plate) {
     const size = TILE + 2 * SEAM;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, 0.04, size), MAT.interiorFloor());
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, 0.04, size), style ? floorMaterial(style) : MAT.interiorFloor());
     mesh.position.set((col + 0.5) * TILE, 0.025, (row + 0.5) * TILE);     // верх на 5 мм выше цоколя: без мерцания совпадающих граней
     group.add(mesh);
   }
@@ -244,6 +247,61 @@ function touchedSlices(group, levelCut, baseLevel) {
   return [...found.values()];
 }
 
+// ---------------- земля города: покрытие, бордюры, разметка, трава ----------------
+const surfaceAt = (col, row) => (col >= 0 && row >= 0 && col < TILES && row < TILES ? layout.surface[row][col] : -1);
+const PAVED = new Set([SURFACE.sidewalk, SURFACE.paving, SURFACE.path, SURFACE.sand]);
+// бордюр клетки со стороны соседа: высокий — у проезжей части, низкий поребрик — у газона рядом с мощением
+function curbKind(code, neighbor) {
+  if (neighbor < 0 || neighbor === code) return null;
+  if (code !== SURFACE.asphalt && neighbor === SURFACE.asphalt) return 'curb';
+  if (code === SURFACE.grass && PAVED.has(neighbor)) return 'edge';
+  return null;
+}
+function grassTufts(col, row) {
+  const group = new THREE.Group();
+  const rng = mulberry32(5000 + (col % PERIOD_CELLS) * 37 + (row % PERIOD_CELLS) * 101);
+  const bladeCount = 220;
+  const blades = new THREE.InstancedMesh(bladeGeometry(), grassMaterial(), bladeCount);
+  const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3(), position = new THREE.Vector3(), color = new THREE.Color();
+  const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  for (let blade = 0; blade < bladeCount; blade++) {
+    position.set(col * TILE + 0.04 + rng() * (TILE - 0.08), 0, row * TILE + 0.04 + rng() * (TILE - 0.08));
+    euler.set(0.15 + rng() * 0.5, rng() * Math.PI * 2, (rng() - 0.5) * 0.3);
+    quaternion.setFromEuler(euler);
+    scale.set(0.8, 0.07 + rng() * 0.08, 1);
+    matrix.compose(position, quaternion, scale);
+    blades.setMatrixAt(blade, matrix);
+    blades.setColorAt(blade, color.setRGB(0.22 + rng() * 0.12, 0.38 + rng() * 0.16, 0.14 + rng() * 0.08));
+  }
+  blades.receiveShadow = true;
+  group.add(blades);
+  return group;
+}
+function cityGround(col, row) {
+  const code = layout.surface[row][col];
+  const cover = plinthCover(col, row), plate = layout.indoor[0][row][col] === 1 && cover !== 'none';
+  const curbs = { N: curbKind(code, surfaceAt(col, row - 1)), S: curbKind(code, surfaceAt(col, row + 1)), W: curbKind(code, surfaceAt(col - 1, row)), E: curbKind(code, surfaceAt(col + 1, row)) };
+  const mark = layout.marking[row][col];
+  const curbKey = ['N', 'S', 'W', 'E'].map((side) => (curbs[side] || '-')[0]).join('');
+  const style = layout.floorStyle[0][row][col];
+  let signature;
+  if (cover === 'full') signature = `ground|full|${plate}|${style}`;
+  else if (cover === 'part') signature = `ground|part|${col}|${row}`;
+  else signature = `ground|city|${code}|${col % PERIOD_CELLS}|${row % PERIOD_CELLS}|${curbKey}|${mark || ''}|${mark === 'zebra' ? row % 4 : ''}`;
+  plan.ground[cellIndex(col, row)] = job(signature, { part: PART.ground, level: 0, col, row, shadow: false, slice: cover !== 'none' ? { col, row, level: 0, levelCut: false } : null }, () => {
+    const group = new THREE.Group();
+    const plane = groundPlane(col, row, false, 0.03);
+    plane.material = groundMaterialFor(code);
+    group.add(plane);
+    if (cover !== 'full') {
+      group.add(cityGroundExtras(col, row, curbs, mark));
+      if (code === SURFACE.grass) group.add(grassTufts(col, row));
+    }
+    if (cover !== 'none' || plate) group.add(plinthAndPlate(col, row, plate));
+    return group;
+  });
+}
+
 // ---------------- план: уникальные тайлы и их места на карте ----------------
 const jobs = [];
 const jobBySignature = new Map();
@@ -277,6 +335,7 @@ for (let row = 0; row < TILES; row++) {
       plan.ground[cellIndex(col, row)] = job('ground|base', { part: PART.ground, level: 0, col, row, shadow: false, slice: null }, () => plinthAndPlate(col, row, true));
       continue;
     }
+    if (layout.surface) { cityGround(col, row); continue; }
     const concrete = insideConcrete((col + 0.5) * TILE, (row + 0.5) * TILE);
     // плита пола — только под зданиями (на цоколе); салон конвертоплана тоже «внутри», но пол у него свой
     const cover = plinthCover(col, row), plate = layout.indoor[0][row][col] === 1 && cover !== 'none';
@@ -306,7 +365,7 @@ for (let level = 0; level < LEVELS; level++) {
         const simple = wall.type === 'rail' || wall.type === 'barrier';
         const ids = [false, true].map((cut) => {
           const usesCut = wall.type === 'wall' || wall.type === 'door' || wall.type === 'window';
-          const signature = simple ? `wall|${orient}|${level}|${wall.type}`
+          const signature = simple ? `wall|${orient}|${level}|${wall.type}|${wall.style}`
             : `wall|${orient}|${level}|${wall.type}|${wall.style}|${front}|${back}|${hashTile(col, row, level) % 3}|${usesCut && cut}`;
           return job(signature, { part: orient === 'W' ? PART.wallW : PART.wallN, level, col, row, shadow: true, slice: null },
             () => buildWall(orient, col, row, level, wall, usesCut && cut));
@@ -314,9 +373,10 @@ for (let level = 0; level < LEVELS; level++) {
         (orient === 'W' ? plan.wallW : plan.wallN)[level][row * stride + col] = ids[0];
         if (ids[1] !== ids[0]) plan.cutOf[ids[0]] = ids[1];
         if (wall.type === 'door') {
-          const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () => {
+          const leafKind = doorLeafKind(wall);
+          const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${leafKind}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () => {
             const width = 0.92, top = Math.min(2.1, cut ? 0.8 : LEVEL_H - 0.22);
-            return buildDoorLeaf(orient, col, row, level, (TILE - width) / 2, (TILE + width) / 2, top);
+            return buildDoorLeaf(orient, col, row, level, (TILE - width) / 2, (TILE + width) / 2, top, leafKind);
           }));
           plan.doors.push([col, row, level, orient, leaves[0], leaves[1]]);
         }
@@ -324,7 +384,7 @@ for (let level = 0; level < LEVELS; level++) {
       if (level > 0 && row < TILES && col < TILES) {
         const type = layout.floor[level][row][col];
         if (type === FLOOR.interior || type === FLOOR.roof || type === FLOOR.deck) {
-          plan.floor[level][cellIndex(col, row)] = job(`floor|${level}|${type}`, { part: PART.floor, level, col, row, shadow: true, slice: null }, () => {
+          plan.floor[level][cellIndex(col, row)] = job(`floor|${level}|${type}|${layout.floorStyle ? layout.floorStyle[level][row][col] : ''}`, { part: PART.floor, level, col, row, shadow: true, slice: null }, () => {
             // плита чуть шире клетки: соседние плиты перекрываются, шов не просвечивает
             const pivot = new THREE.Group();
             pivot.position.set((col + 0.5) * TILE, 0, (row + 0.5) * TILE);
@@ -341,11 +401,13 @@ for (let level = 0; level < LEVELS; level++) {
 }
 
 // предметы, лестницы, вышка, фасад — срезы по клеткам
-function addSliced(signature, part, baseLevel, levelCut, build, shadow = true) {
+// sliceKey(i, j) — общая подпись куска (одинаковые куски крыш рендерятся один раз), null — подпись по месту
+function addSliced(signature, part, baseLevel, levelCut, build, shadow = true, sliceKey = null) {
   const probe = build();
   if (!probe) return;
   for (const slice of touchedSlices(probe, levelCut, baseLevel)) {
-    const id = job(`${signature}|${slice.col - probe.userData.col0}|${slice.row - probe.userData.row0}|${slice.level}`,
+    const shared = sliceKey ? sliceKey(slice.col - probe.userData.col0, slice.row - probe.userData.row0) : null;
+    const id = job(shared ? `roofcell|${shared}` : `${signature}|${slice.col - probe.userData.col0}|${slice.row - probe.userData.row0}|${slice.level}`,
       { part, level: slice.level, col: slice.col, row: slice.row, shadow, slice }, build);
     plan.objects.push([id, slice.col, slice.row, slice.level]);
   }
@@ -399,11 +461,13 @@ for (const item of layout.objects) {
   const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
   // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;
   // разметка краской — как пол (юниты ходят по ней)
+  // крыши города: без теней (тень здания дают стены), одинаковые куски скатов — общие тайлы
+  const roof = item.kind === 'roof';
   addSliced(signature, ladder ? 3.2 : paint ? PART.floor : PART.object, item.level, ladder, () => {
     const group = ladder ? buildLadder(item, LEVELS * LEVEL_H) : buildObject(item, LEVELS - 1);
     if (group) { group.userData.col0 = item.col; group.userData.row0 = item.row; }
     return group;
-  }, !paint);
+  }, !paint && !roof, roof ? (i, j) => roofCellKey(item, i, j) : null);
 }
 layout.stairs.forEach((stair, index) => {
   addSliced(`stairs|${index}`, PART.floor, stair.level, false, () => { const group = buildStairs(stair); group.userData.col0 = 0; group.userData.row0 = 0; return group; });

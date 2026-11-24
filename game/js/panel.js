@@ -124,7 +124,7 @@ var Panel = (function () {
       '<div class="hand-ammo"><div class="hand-rounds" id="hand-' + side + '-rounds"></div><div class="hand-reserve" id="hand-' + side + '-reserve"></div></div></div>';
   }
   inner.innerHTML =
-    '<div class="box minimap"><canvas id="minimap" width="' + MINIMAP_W + '" height="' + MINIMAP_H + '"></canvas><span class="caption">КВАДРАТ 47-Б</span></div>' +
+    '<div class="box minimap"><canvas id="minimap" width="' + MINIMAP_W + '" height="' + MINIMAP_H + '"></canvas><span class="caption">' + (window.MAP && MAP.caption ? MAP.caption : 'КВАДРАТ 47-Б') + '</span></div>' +
     handHtml('left', 'ЛЕВАЯ РУКА') +
     '<div class="box portrait" title="Снаряжение (6, I)"><img id="portrait" alt=""><div class="scan"></div>' +
       '<div class="nameplate"><span id="callsign"></span><span id="rank"></span></div></div>' +
@@ -299,6 +299,9 @@ var Panel = (function () {
       } else if (unit.kind === 'mech') {      // робот — крупный квадрат
         minimapContext.fillStyle = '#7cc4ff';
         minimapContext.rect(point.x - 5, point.y - 5, 10, 10);
+      } else if (unit.kind === 'civilian' || unit.kind === 'child') {   // гражданский — жёлтый кружок (прячется — бледный)
+        minimapContext.fillStyle = unit.side === 'squad' ? '#ffd23a' : '#a89a5a';
+        minimapContext.arc(point.x, point.y, unit.vip ? 4 : 3, 0, Math.PI * 2);
       } else {                                // боец — треугольник
         minimapContext.fillStyle = '#7cc4ff';
         minimapContext.moveTo(point.x, point.y - 4.5); minimapContext.lineTo(point.x + 4, point.y + 3); minimapContext.lineTo(point.x - 4, point.y + 3);
@@ -444,7 +447,7 @@ var Panel = (function () {
     setStat('mo', unit.morale, 100);
     var standing = Game.atEase(unit) ? 'ВОЛЬНО' : 'СТОЯ';
     if (viewing) setText('chip-stance', 'ПРОСМОТР · СТРЕЛЯЕТ ' + (Game.selected ? Game.selected.callsign : '—'));
-    else setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? 'НА КОЛЕНЕ' : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ОК' : 'СТОЙКА: ' + standing));
+    else setText('chip-stance', unit.canKneel ? 'СТОЙКА: ' + (unit.kneeling ? (unit.kind === 'civilian' || unit.kind === 'child' ? 'ПРИСЕЛ' : 'НА КОЛЕНЕ') : standing) : (unit.kind === 'mech' ? 'ХОДОВАЯ: ОК' : 'СТОЙКА: ' + standing));
     setText('chip-optics', unit.optics);
     setText('chip-combat', 'БРОНЯ ' + (unit.armor || 0) + (unit.weaponType ? ' · ТОЧН ' + unit.accuracy : '') + (unit.reactions ? ' · РЕАК ' + unit.reactions : ''));
     setText('label-kneel', (Game.selected || unit).kneeling ? 'ВСТАТЬ' : 'ПРИСЕСТЬ');

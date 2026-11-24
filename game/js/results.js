@@ -65,10 +65,26 @@ var Results = (function () {
   }
 
   function verdictNote(summary) {
+    var rescue = summary.rescue;
+    if (rescue) {
+      var vipText = rescue.vipRescued ? 'учёный доставлен на базу' : rescue.vipDead ? 'учёный погиб' : 'учёный не спасён';
+      var how = summary.kind === 'cleared' ? 'пришельцы уничтожены' : summary.kind === 'wiped' ? 'отряд погиб' : 'эвакуация';
+      return how.charAt(0).toUpperCase() + how.slice(1) + ', ' + vipText + ', спасено гражданских ' + rescue.civiliansRescued.length + ' из ' + rescue.civiliansTotal;
+    }
     if (summary.kind === 'cleared') return 'Все пришельцы в зоне уничтожены';
     if (summary.kind === 'wiped') return 'Отряд погиб, зона не очищена';
     var losses = summary.soldiersLost.length + summary.soldiersLeft.length;
     return 'Эвакуация: уничтожено ' + summary.aliensKilled + ' из ' + summary.aliensTotal + ', потери бойцов ' + losses;
+  }
+  // задание спасения: учёный, дети, гражданские
+  function rescueRows(rescue) {
+    var vipValue = rescue.vipRescued ? 'ДА' : 'НЕТ';
+    var vipNote = rescue.vip ? '<div><span class="callsign">' + escape(rescue.vip.callsign) + '</span>' + escape(rescue.vip.name || '') +
+      (rescue.vipRescued ? ', доставлен на базу' : rescue.vipDead ? ', погиб' : ', остался в городе') + '</div>' : '';
+    return row('УЧЁНЫЙ СПАСЁН', vipValue, null, vipNote) +
+      row('СПАСЕНО ДЕТЕЙ', rescue.childrenRescued, rescue.childrenTotal, '') +
+      row('СПАСЕНО ГРАЖДАНСКИХ', rescue.civiliansRescued.length, rescue.civiliansTotal, peopleList(rescue.civiliansRescued)) +
+      row('ПОГИБЛО ГРАЖДАНСКИХ', rescue.civiliansDead.length, rescue.civiliansTotal, peopleList(rescue.civiliansDead));
   }
   function show(summary) {
     var good = summary.result === 'good';
@@ -80,7 +96,8 @@ var Results = (function () {
           '<span class="value">' + (good ? 'ХОРОШО' : 'ПЛОХО') + '</span>' +
           '<span class="note">' + verdictNote(summary) + '</span></div>' +
         '<table>' +
-          row('УБИТО ПРИШЕЛЬЦЕВ', summary.aliensKilled, summary.aliensTotal, '') +
+          (summary.rescue ? rescueRows(summary.rescue) : '') +
+          row('УБИТО ПРИШЕЛЬЦЕВ', summary.aliensKilled, summary.aliensTotal, summary.rescue && summary.rescue.portalOpen ? '<span class="none">с подкреплением из портала</span>' : '') +
           row('НАЙДЕНО АРТЕФАКТОВ', artifactCount, null, artifactList(summary)) +
           row('ПОГИБЛО БОЙЦОВ', summary.soldiersLost.length, summary.soldiersTotal, peopleList(summary.soldiersLost)) +
           (summary.kind === 'evac' ? row('НЕ ЭВАКУИРОВАНО', summary.soldiersLeft.length, summary.soldiersTotal, peopleList(summary.soldiersLeft)) : '') +

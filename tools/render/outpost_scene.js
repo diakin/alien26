@@ -10,6 +10,8 @@ import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
   concreteTextures, groundBumpTexture, groundTexture,
 } from './outpost_textures.js';
+import { buildCityWall, buildCityDoorLeaf, buildCityObject, floorMaterial, CITY_MAT, STAIR_MATERIALS, isCityFacade } from './city_scene.js';
+const CITY = MAP_NAME === 'city';
 
 export const layout = buildLayout();
 export const PPM = 1280 / 18.5;            // пикселей на метр (как спрайты x1)
@@ -127,7 +129,7 @@ export const isIndoor = (level, col, row) => col >= 0 && row >= 0 && col < TILES
 
 // ---------------- стены ----------------
 // коробка стены на грани: along — отрезок вдоль грани от её начала, y — от пола уровня
-function wallBox(orient, col, row, level, along0, along1, y0, y1, materials, thickness = THICK) {
+export function wallBox(orient, col, row, level, along0, along1, y0, y1, materials, thickness = THICK) {
   const length = along1 - along0, height = y1 - y0, base = level * LEVEL_H;
   const geometry = orient === 'W' ? new THREE.BoxGeometry(thickness, height, length) : new THREE.BoxGeometry(length, height, thickness);
   const centerX = orient === 'W' ? col * TILE : col * TILE + (along0 + along1) / 2;
@@ -150,7 +152,17 @@ function wallMaterials(orient, col, row, level, style) {
   return orient === 'W' ? [front, back, trim, trim, trim, trim] : [trim, trim, trim, trim, front, back];
 }
 
+// вид створки двери города: стальная у хранилища, парадная у наружных стен, деревянная внутри
+export const doorLeafKind = (wall) => (!CITY ? 'base' : wall.style === 'vault' ? 'vault' : isCityFacade(wall.style) ? 'outer' : 'inner');
 export function buildWall(orient, col, row, level, wall, cut) {
+  if (CITY && wall.type !== 'barrier') {
+    const group = buildCityWall(orient, col, row, level, wall, cut, { wallBox, isIndoor, THICK, PANEL_H });
+    if (wall.type === 'door') {
+      const width = 0.92, top = Math.min(2.1, cut ? 0.8 : PANEL_H);
+      doorLeaves.add(buildDoorLeaf(orient, col, row, level, (TILE - width) / 2, (TILE + width) / 2, top, doorLeafKind(wall)));
+    }
+    return tag(group, orient === 'W' ? PART.wallW : PART.wallN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
+  }
   const group = new THREE.Group();
   const type = wall.type, style = wall.style;
   const full = cut ? 0.8 : PANEL_H;
@@ -226,7 +238,12 @@ export function buildWall(orient, col, row, level, wall, cut) {
 
 // створка раздвижной двери: панель в плоскости стены, полоса, окошко, ручка
 let doorLeaves = new THREE.Group();
-export function buildDoorLeaf(orient, col, row, level, left, right, top) {
+export function buildDoorLeaf(orient, col, row, level, left, right, top, kind = 'base') {
+  if (kind !== 'base') {
+    const leaf = buildCityDoorLeaf(orient, col, row, level, left, right, top, kind, { wallBox });
+    leaf.userData.door = { orient, col, row, level };
+    return tag(leaf, orient === 'W' ? PART.doorW : PART.doorN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
+  }
   const group = new THREE.Group();
   const leaf = Array(6).fill(MAT.wall('cabin', 0));
   const height = top - 0.01;
@@ -251,8 +268,10 @@ export function floorTile(col, row, level, type) {
     group.add(box(0.12, 0.22, TILE, MAT.orange(), col * TILE + 0.06, top - 0.17, z));      // балки
     group.add(box(TILE, 0.18, 0.1, MAT.orange(), x, top - 0.15, row * TILE + 0.05));
   } else {
-    const material = type === FLOOR.roof ? MAT.roof() : MAT.interiorFloor();
-    const slab = box(TILE, SLAB, TILE, [MAT.slabEdge(), MAT.slabEdge(), material, MAT.ceiling(), MAT.slabEdge(), MAT.slabEdge()], x, top - SLAB / 2, z);
+    const style = CITY && layout.floorStyle ? layout.floorStyle[level][row][col] : null;
+    const material = style ? floorMaterial(style) : type === FLOOR.roof ? MAT.roof() : MAT.interiorFloor();
+    const edge = style ? CITY_MAT.slabEdge() : MAT.slabEdge(), ceiling = style ? CITY_MAT.ceiling() : MAT.ceiling();
+    const slab = box(TILE, SLAB, TILE, [edge, edge, material, ceiling, edge, edge], x, top - SLAB / 2, z);
     group.add(slab);
   }
   return tag(group, PART.floor, level, { biasCol: -0.0001, biasRow: -0.0001 });
@@ -288,11 +307,17 @@ export function buildStairs(stair) {
     if (stair.dirCol !== 0) result.z = centerAcross.z + side; else result.x = centerAcross.x + side;
     return result;
   };
+  const classic = stair.style === 'classic', stairMat = classic ? STAIR_MATERIALS() : null;
   for (let step = 0; step < steps; step++) {
     const distance0 = step / steps * run, distance1 = (step + 1) / steps * run, height = (step + 1) / steps * rise;
     const center = point((distance0 + distance1) / 2, 0, 0);
     const sizeAlong = distance1 - distance0;
-    if (stair.style === 'hab') {
+    if (classic) {
+      const body = stair.dirCol !== 0 ? [sizeAlong, height, width] : [width, height, sizeAlong];
+      group.add(box(...body, stairMat.body, center.x, base + height / 2, center.z));
+      const tread = stair.dirCol !== 0 ? [sizeAlong + 0.02, 0.035, width] : [width, 0.035, sizeAlong + 0.02];
+      group.add(box(...tread, stairMat.tread, center.x, base + height + 0.017, center.z));
+    } else if (stair.style === 'hab') {
       // сплошные ступени
       const geometryWidth = stair.dirCol !== 0 ? [sizeAlong, height, width] : [width, height, sizeAlong];
       group.add(box(...geometryWidth, MAT.slabEdge(), center.x, base + height / 2, center.z));
@@ -311,8 +336,12 @@ export function buildStairs(stair) {
   for (const side of [-width / 2 - 0.04, width / 2 + 0.04]) {
     if (stair.style !== 'hab') group.add(beam(point(0, 0, side), point(run, rise, side), 0.09, MAT.orange()));
     const railFrom = point(0.05, 0.95, side), railTo = point(run, rise + 0.95, side);
-    if (stair.style === 'hab' && side < 0) continue;               // у стены перил нет
-    group.add(tube(railFrom, railTo, 0.025, MAT.yellow()));
+    if ((stair.style === 'hab' || classic) && side < 0) continue;               // у стены перил нет
+    group.add(tube(railFrom, railTo, classic ? 0.03 : 0.025, classic ? stairMat.handrail : MAT.yellow()));
+    if (classic) {
+      for (let distance = 0.1; distance < run; distance += 0.2) group.add(tube(point(distance, distance / run * rise, side), point(distance, distance / run * rise + 0.93, side), 0.009, stairMat.rail));
+      continue;
+    }
     for (let post = 0; post <= stair.count; post++) {
       const distance = Math.min(run - 0.05, Math.max(0.05, post * TILE));
       group.add(tube(point(distance, distance / run * rise, side), point(distance, distance / run * rise + 0.95, side), 0.022, MAT.yellow()));
@@ -349,6 +378,10 @@ export function buildObject(item, viewLevel) {
   const cx = width / 2, cz = depth / 2;
   const rng = mulberry32(hashTile(item.col, item.row, item.level) % 100000 + 7);
   const add = (mesh) => { group.add(mesh); return mesh; };
+  if (CITY) {
+    const city = buildCityObject(item);
+    if (city) { group.add(city); group.position.copy(origin); return tag(group, PART.object, item.level); }
+  }
   switch (item.kind) {
     case 'console': {
       add(box(1.0, 0.75, 0.6, MAT.trim(), cx, 0.375, cz - 0.15));
@@ -545,7 +578,9 @@ export function buildObject(item, viewLevel) {
       model.position.z = -info.length / 2;
       holder.add(model);
       holder.position.set(cx, 0, cz);
-      if (item.flip) holder.rotation.y = Math.PI;
+      // вдоль столбцов (cols > rows): перед к большим col, flip — к меньшим
+      if (item.cols > item.rows) holder.rotation.y = item.flip ? -Math.PI / 2 : Math.PI / 2;
+      else if (item.flip) holder.rotation.y = Math.PI;
       add(holder);
       break;
     }

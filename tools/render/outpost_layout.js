@@ -8,15 +8,16 @@
 
 // Карта выбирается параметром страницы ?map=: outpost — «База на плато» 24×24 (по умолчанию),
 // big — 48×48 из четырёх секторов 24×24: база (пришельцы), просторные здания, стоянка, посадка с конвертопланом;
-// base — подземная база в горе по плану docs/base/base_plan.json.
+// base — подземная база в горе по плану docs/base/base_plan.json; city — центр города 96×96 (city_layout.js).
 import { BASE_PLAN } from './base_plan.js';
+import { buildCity } from './city_layout.js';
 const PARAMS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 export const MAP_NAME = PARAMS.get('map') || 'outpost';
 export const SECTOR = 24;
 export const TILE = 1.25, LEVELS = 4, LEVEL_H = 2.5;
 // подземная база: план 56×33 (tools/base/plan.py) лежит посередине поля 58×58 — со столбца BASE_COL и строки BASE_ROW,
 // чтобы скале вокруг помещений хватило клеток и с краёв плана
-export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 58 : SECTOR;
+export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 58 : MAP_NAME === 'city' ? 96 : SECTOR;
 export const BASE_COL = 1, BASE_ROW = 12;
 
 // типы стен; blocks — нельзя пройти через грань
@@ -46,6 +47,10 @@ export function buildLayout() {
 
   const concrete = [];             // бетонные площадки: { rect: [x0, z0, x1, z1] } или { circle: [x, z, r] }, м
   const blockedCells = [];         // занятые клетки без предмета на них (корпус конвертоплана): [level, col, row]
+  // город: покрытие земли (city_layout.js, SURFACE), разметка проезжей части, отделка пола помещений
+  const surface = MAP_NAME === 'city' ? Array.from({ length: TILES }, () => new Array(TILES).fill(0)) : null;
+  const marking = MAP_NAME === 'city' ? Array.from({ length: TILES }, () => new Array(TILES).fill(null)) : null;
+  const floorStyle = MAP_NAME === 'city' ? grid(null) : null;
 
   // уровень 0 — грунт везде
   // (под землёй грунта нет: пол только в помещениях)
@@ -415,8 +420,11 @@ export function buildLayout() {
     };
   }
 
-  let spawns, extraction = null;
-  if (MAP_NAME === 'big') {
+  let spawns, extraction = null, mission = null, cityName = null, caption = null;
+  if (MAP_NAME === 'city') {
+    const city = buildCity({ TILES, LEVEL_H, FLOOR, setFloor, setIndoor, setW, setN, object, building, stairRun, tiltrotor, block, surface, marking, floorStyle });
+    spawns = city.spawns; extraction = city.extraction; mission = city.mission; cityName = city.name; caption = city.caption;
+  } else if (MAP_NAME === 'big') {
     // сектора: (0, 0) база — пришельцы, (1, 0) просторные здания, (0, 1) стоянка, (1, 1) посадка — отряд в конвертоплане
     ox = 0; oy = 0; outpostSector();
     ox = SECTOR; oy = 0; spaciousSector();
@@ -443,5 +451,7 @@ export function buildLayout() {
   }
 
   return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, extraction, concrete, blockedCells,
-    name: MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'База «Ямантау»' : 'База на плато', combat: MAP_NAME === 'big' || MAP_NAME === 'base' };
+    surface, marking, floorStyle, mission, caption,
+    name: cityName || (MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'База «Ямантау»' : 'База на плато'),
+    combat: MAP_NAME === 'big' || MAP_NAME === 'base' || MAP_NAME === 'city' };
 }

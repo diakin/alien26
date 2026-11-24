@@ -1,4 +1,4 @@
-// Рендер портретов и оружия: node portraitrun.mjs out_dir [black,green,alien,mech]
+// Рендер портретов и оружия: node portraitrun.mjs out_dir [black,green,alien,mech,civman,…,civgirl]
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 const outDir = process.argv[2] || 'ui_out';
@@ -12,6 +12,7 @@ const only = process.argv[3] ? process.argv[3].split(',') : ['black', 'green', '
 for (const camo of only) {
   for (const kind of ['Portrait', 'Weapon']) {
     const url = await page.evaluate(([fn, c]) => window['render' + fn](c), [kind, camo]);
+    if (!url) continue;
     fs.writeFileSync(`${outDir}/${kind.toLowerCase()}_${camo}.png`, Buffer.from(url.split(',')[1], 'base64'));
   }
 }

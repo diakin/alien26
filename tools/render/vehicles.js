@@ -555,7 +555,7 @@ export const CARS = {
   suv: { length: 4.7, width: 1.9, height: 1.8 },
   van: { length: 5.1, width: 2.0, height: 2.15 },
 };
-const CAR_COLORS = { white: 0xd6d8d4, graphite: 0x3a3e42, red: 0x7a2a22, olive: 0x4f5638, blue: 0x2f4a66, sand: 0xa8946a };
+const CAR_COLORS = { police: 0xe4e6e2, white: 0xd6d8d4, graphite: 0x3a3e42, red: 0x7a2a22, olive: 0x4f5638, blue: 0x2f4a66, sand: 0xa8946a };
 
 function carWheel(group, materials, x, y, z, radius, width, outward) {
   const tire = cylinderMesh(group, radius, width, materials.rubber, x, y, z, 'x', 28);
@@ -612,6 +612,14 @@ export function buildCar({ type = 'suv', color = 'white', seed = 1 } = {}) {
   const axles = type === 'van' ? [0.95, 4.15] : [0.9, 3.8];
   for (const axleZ of axles) for (const side of [-1, 1]) carWheel(group, materials, side * (width / 2 - 0.12), wheelRadius, axleZ, wheelRadius, 0.26, side);
   boxMesh(group, width + 0.02, 0.08, length - 0.3, materials.dust, 0, groundClear + 0.12, length / 2);
+  if (color === 'police') {
+    // полоса по борту и маячки на крыше
+    const blue = standard(0x1f4a9a, 0.4, 0.3), red = standard(0xc02020, 0.3, 0.2, { emissive: 0x400000 }), lightBlue = standard(0x2050d0, 0.3, 0.2, { emissive: 0x001040 });
+    for (const side of [-1, 1]) boxMesh(group, 0.02, 0.16, length - 0.8, blue, side * (width / 2 + 0.005), 0.78, length / 2);
+    boxMesh(group, 1.1, 0.1, 0.3, materials.trim, 0, type === 'van' ? 2.2 : 1.85, length * 0.45);
+    boxMesh(group, 0.45, 0.12, 0.26, red, -0.3, type === 'van' ? 2.3 : 1.95, length * 0.45);
+    boxMesh(group, 0.45, 0.12, 0.26, lightBlue, 0.3, type === 'van' ? 2.3 : 1.95, length * 0.45);
+  }
   void seed;
   return group;
 }
