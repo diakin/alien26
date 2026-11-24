@@ -83,9 +83,9 @@ var Results = (function () {
           row('УБИТО ПРИШЕЛЬЦЕВ', summary.aliensKilled, summary.aliensTotal, '') +
           row('НАЙДЕНО АРТЕФАКТОВ', artifactCount, null, artifactList(summary)) +
           row('ПОГИБЛО БОЙЦОВ', summary.soldiersLost.length, summary.soldiersTotal, peopleList(summary.soldiersLost)) +
-          (summary.kind === 'evac' ? row('ОСТАВЛЕНО В ЗОНЕ', summary.soldiersLeft.length, summary.soldiersTotal, peopleList(summary.soldiersLeft)) : '') +
+          (summary.kind === 'evac' ? row('НЕ ЭВАКУИРОВАНО', summary.soldiersLeft.length, summary.soldiersTotal, peopleList(summary.soldiersLeft)) : '') +
           row('ПОТЕРЯНО РОБОТОВ', summary.robotsLost.length + summary.robotsLeft.length, summary.robotsTotal,
-            peopleList(summary.robotsLost.concat(summary.robotsLeft.map(function (robot) { return { callsign: robot.callsign, name: robot.name, rank: 'оставлен в зоне' }; })))) +
+            peopleList(summary.robotsLost.concat(summary.robotsLeft.map(function (robot) { return { callsign: robot.callsign, name: robot.name, rank: 'не эвакуирован' }; })))) +
         '</table>' +
         '<div class="buttons">' +
           '<button data-action="retry">ПОВТОРИТЬ ЗАДАНИЕ</button>' +
@@ -125,19 +125,22 @@ var Results = (function () {
   function confirmEvacuation(plan, done) {
     pending = done;
     var canLeave = plan.aboard.length > 0;
+    var total = plan.aboard.length + plan.left.length;
     root.innerHTML =
       '<div class="sheet">' +
         '<div class="head"><b>ЭВАКУАЦИЯ</b><span>ЗОНА ЭВАКУАЦИИ ПОДСВЕЧЕНА НА КАРТЕ</span></div>' +
         '<table>' +
-          row('НА БОРТУ', plan.aboard.length, null, peopleList(plan.aboard)) +
-          row('ОСТАНУТСЯ В ЗОНЕ', plan.left.length, null, peopleList(plan.left)) +
+          row('ВНЕ ЗОНЫ ЭВАКУАЦИИ', plan.left.length, total, peopleList(plan.left)) +
+          row('В ЗОНЕ ЭВАКУАЦИИ', plan.aboard.length, total, peopleList(plan.aboard)) +
         '</table>' +
-        '<div class="hint">' + (canLeave
-          ? 'Оставшиеся в зоне считаются потерянными. Вывозится только снаряжение бойцов на борту. Задание закончится.'
-          : 'В зоне эвакуации никого нет. Переведите бойцов в салон или на рампу конвертоплана.') + '</div>' +
+        '<div class="hint">' + (!canLeave
+          ? 'В зоне эвакуации никого нет. Переведите бойцов в салон или на рампу конвертоплана.'
+          : plan.left.length
+            ? 'Вне зоны эвакуации: ' + plan.left.length + '. Они останутся на месте и будут считаться потерянными. Вывозится только снаряжение тех, кто в зоне. Задание закончится.'
+            : 'Все в зоне эвакуации. Вывозится только снаряжение тех, кто в зоне. Задание закончится.') + '</div>' +
         '<div class="buttons">' +
           '<button data-action="cancel">ОТМЕНА</button>' +
-          (canLeave ? '<button class="main" data-action="takeoff">ВЗЛЁТ</button>' : '') +
+          (canLeave ? '<button class="main" data-action="takeoff">ПОДТВЕРДИТЬ ЭВАКУАЦИЮ</button>' : '') +
         '</div>' +
       '</div>';
     root.className = 'open confirm';
