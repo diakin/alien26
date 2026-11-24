@@ -8,6 +8,8 @@ var Globe = (function () {
   var DEGREE = Math.PI / 180;
   var PANEL_WIDTH = 250;
   var MISSION = { name: 'ПОСАДКА У БАЗЫ', lat: 47.5, lon: 68.0, page: 'tiles_big.html' };   // большая карта: отряд в конвертоплане
+  // своя база — в горе Ямантау (Южный Урал, 54°15′ с. ш., 58°06′ в. д.)
+  var BASE = { name: 'БАЗА «ЯМАНТАУ»', lat: 54.255, lon: 58.103, page: 'base.html' };
   var MIN_ZOOM = 0.7, MAX_ZOOM = 2.6;
 
   var canvas = document.getElementById('space');
@@ -247,6 +249,28 @@ var Globe = (function () {
     context.restore();
   }
 
+  // метка своей базы: зелёный ромб с подписью, без пульсации
+  function drawBase() {
+    var point = projectLatLon(BASE.lat, BASE.lon);
+    if (point.depth < 0.05) return;
+    context.save();
+    context.globalAlpha = Math.min(1, point.depth * 3);
+    context.fillStyle = '#7fd06a'; context.strokeStyle = '#08140a'; context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(point.x, point.y - 7); context.lineTo(point.x + 7, point.y); context.lineTo(point.x, point.y + 7); context.lineTo(point.x - 7, point.y);
+    context.closePath(); context.fill(); context.stroke();
+    context.font = 'bold 11px Arial, sans-serif';
+    var label = BASE.name, labelWidth = context.measureText(label).width + 12;
+    context.fillStyle = 'rgba(10, 13, 15, 0.82)';
+    context.fillRect(point.x - 16 - labelWidth, point.y + 4, labelWidth, 18);
+    context.strokeStyle = '#5f9a52'; context.lineWidth = 1;
+    context.strokeRect(point.x - 15.5 - labelWidth, point.y + 4.5, labelWidth - 1, 17);
+    context.fillStyle = '#c8f0a0';
+    context.textBaseline = 'middle';
+    context.fillText(label, point.x - 10 - labelWidth, point.y + 13);
+    context.restore();
+  }
+
   // ---------------- кадр ----------------
   function draw(now) {
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -287,6 +311,7 @@ var Globe = (function () {
     context.fillStyle = haze;
     context.beginPath(); context.arc(middle.x, middle.y, globeRadius, 0, Math.PI * 2); context.fill();
     drawBorders(globeRadius, middle);
+    drawBase();
     drawMission(now);
   }
 
@@ -305,6 +330,8 @@ var Globe = (function () {
     if (event.button !== 0) return;
     var point = projectLatLon(MISSION.lat, MISSION.lon);
     if (point.depth > 0.05 && Math.hypot(event.offsetX - point.x, event.offsetY - point.y) < 14) { flyTo(MISSION.lat, MISSION.lon); return; }
+    var basePoint = projectLatLon(BASE.lat, BASE.lon);
+    if (basePoint.depth > 0.05 && Math.hypot(event.offsetX - basePoint.x, event.offsetY - basePoint.y) < 12) { flyTo(BASE.lat, BASE.lon); return; }
     drag = { x: event.clientX, y: event.clientY, time: performance.now() };
     spin.lon = spin.lat = 0;
     canvas.classList.add('dragging');
@@ -367,7 +394,7 @@ var Globe = (function () {
   function startMission() { window.location.href = MISSION.page; }
   document.getElementById('start').addEventListener('click', startMission);
   // своя подземная база (game/base.html): пока сразу бой «Оборона базы»
-  function openBase() { window.location.href = 'base.html'; }
+  function openBase() { window.location.href = BASE.page; }
   document.getElementById('base').addEventListener('click', openBase);
 
   // ---------------- часы ----------------
