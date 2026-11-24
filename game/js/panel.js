@@ -3,10 +3,13 @@
 var Panel = (function () {
   'use strict';
 
-  var DESIGN_W = 1280, DESIGN_H = 260;
+  var MINIMAP_W = 364, MINIMAP_H = 216;      // мини-карта шире, чем выше: карта в изометрии — ромб примерно 1,6–1,7 : 1
+  var SHIFT = MINIMAP_W - 216;                // на столько блоки правее мини-карты сдвинуты против прежней вёрстки
+  var DESIGN_W = 1280 + SHIFT, DESIGN_H = 260;
   var root = document.getElementById('panel');
   var inner = document.createElement('div');
   inner.className = 'panel-inner';
+  inner.style.width = DESIGN_W + 'px';
   root.appendChild(inner);
 
   var ICONS = {
@@ -51,9 +54,10 @@ var Panel = (function () {
   // Ячейки рук — как в UFO: щелчок по оружию открывает меню режима огня, по гранате — бросок.
   var style = document.createElement('style');
   style.textContent = [
-    '.panel-inner .portrait { left: 380px; width: 168px; cursor: pointer; }',
+    '.panel-inner .minimap { width: ' + (MINIMAP_W + 8) + 'px; height: ' + (MINIMAP_H + 8) + 'px; }',
+    '.panel-inner .portrait { left: ' + (380 + SHIFT) + 'px; width: 168px; cursor: pointer; }',
     '.panel-inner .hand { position: absolute; top: 18px; width: 124px; height: 224px; cursor: pointer; }',
-    '.panel-inner .hand.left { left: 248px; } .panel-inner .hand.right { left: 556px; }',
+    '.panel-inner .hand.left { left: ' + (248 + SHIFT) + 'px; } .panel-inner .hand.right { left: ' + (556 + SHIFT) + 'px; }',
     '.panel-inner .hand:hover { border-color: #8a959c; }',
     '.panel-inner .hand.open { border-color: #e8a33a; }',
     '.hand-title { position: absolute; left: 8px; top: 7px; font-size: 9px; font-weight: bold; letter-spacing: 1px; color: #8fd18a; }',
@@ -64,9 +68,9 @@ var Panel = (function () {
     '.hand-rounds { font: bold 20px Consolas, "DejaVu Sans Mono", monospace; }',
     '.hand-rounds span { font-size: 12px; color: #5f6b72; }',
     '.hand-reserve { font: 9px Consolas, "DejaVu Sans Mono", monospace; color: #8a959c; margin-bottom: 3px; }',
-    '.panel-inner .stats { left: 694px; top: 18px; width: 320px; cursor: pointer; }',
+    '.panel-inner .stats { left: ' + (694 + SHIFT) + 'px; top: 18px; width: 320px; cursor: pointer; }',
     '.panel-inner .stats:hover .unit-name { color: #ffd28a; }',
-    '.panel-inner .actions { left: 1022px; top: 30px; width: 250px; }',
+    '.panel-inner .actions { left: ' + (1022 + SHIFT) + 'px; top: 30px; width: 250px; }',
     '.panel-inner .action-grid { grid-template-columns: repeat(5, 46px); column-gap: 5px; row-gap: 14px; }',
     '.panel-inner .action-box { width: 46px; height: 50px; }',
     '.panel-inner .action-label { letter-spacing: 0.2px; font-size: 8.5px; }',
@@ -116,7 +120,7 @@ var Panel = (function () {
       '<div class="hand-ammo"><div class="hand-rounds" id="hand-' + side + '-rounds"></div><div class="hand-reserve" id="hand-' + side + '-reserve"></div></div></div>';
   }
   inner.innerHTML =
-    '<div class="box minimap"><canvas id="minimap" width="216" height="216"></canvas><span class="caption">КВАДРАТ 47-Б</span></div>' +
+    '<div class="box minimap"><canvas id="minimap" width="' + MINIMAP_W + '" height="' + MINIMAP_H + '"></canvas><span class="caption">КВАДРАТ 47-Б</span></div>' +
     handHtml('left', 'ЛЕВАЯ РУКА') +
     '<div class="box portrait" title="Снаряжение (6, I)"><img id="portrait" alt=""><div class="scan"></div>' +
       '<div class="nameplate"><span id="callsign"></span><span id="rank"></span></div></div>' +
@@ -246,9 +250,10 @@ var Panel = (function () {
   var mapScale = 1, mapOffsetX = 0, mapOffsetY = 0;
   var fieldImage = null;
   function buildMinimapBackground() {
-    mapScale = Math.min(minimap.width / FIELD.width, minimap.height / FIELD.height) * 1.32;
+    // карта вписывается целиком (по меньшему из масштабов), по центру
+    mapScale = Math.min(minimap.width / FIELD.width, minimap.height / FIELD.height);
     mapOffsetX = (minimap.width - FIELD.width * mapScale) / 2;
-    mapOffsetY = (minimap.height - FIELD.height * mapScale) / 2 + 14;
+    mapOffsetY = (minimap.height - FIELD.height * mapScale) / 2;
     mapBackground = document.createElement('canvas');
     mapBackground.width = minimap.width; mapBackground.height = minimap.height;
     var mapContext = mapBackground.getContext('2d');
