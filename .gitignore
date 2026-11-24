@@ -5,3 +5,5 @@ tools/render/sp_*/
 tools/render/sprites/
 tools/render/sprites_*/
 tools/render/field_out/
+desktop_webview2/lib/
+desktop_webview2/dist/

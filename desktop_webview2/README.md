@@ -20,17 +20,19 @@ CEF-варианте.
 ## Что нужно для сборки
 
 - Lazarus 2.2.x или новее (FPC 3.2.2).
-- WebView4Delphi: https://github.com/salvadordf/WebView4Delphi
-  (проект собирался с версией 1.0.4370.26).
-
-Установка пакета: открыть `packages\webview4delphi.lpk`, «Компилировать»,
-затем «Использовать → Установить». Lazarus пересоберёт IDE, на палитре
-появится вкладка WebView4Delphi. Других зависимостей у пакета нет.
+- WebView4Delphi лежит в проекте: `WebView4Delphi\source` (коммит 12b0c13,
+  WebView2 NuGet 1.0.4370.26, https://github.com/salvadordf/WebView4Delphi,
+  лицензия MIT, файл `WebView4Delphi\LICENSE`). Пакет в Lazarus устанавливать
+  не нужно: .lpi не ссылается на пакет WebView4Delphi, путь к модулям задан в
+  параметрах проекта (Other unit files и Include files = `WebView4Delphi\source`).
+  Компоненты TWVBrowser и TWVWindowParent создаются из .lfm и без пакета;
+  без пакета не открывается только дизайнер формы uMainWV.lfm (IDE не знает
+  эти классы); сборка через lazbuild и «Запуск → Собрать» работает.
 
 ## Сборка и запуск
 
-Открыть `tools\desktop_webview2\Aliens26WV.lpi`, Запуск → Собрать.
-Exe появится в `tools\desktop_webview2\dist\` и сам найдёт `game\globe.html`
+Открыть `desktop_webview2\Aliens26WV.lpi`, Запуск → Собрать.
+Exe появится в `desktop_webview2\dist\` и сам найдёт `game\globe.html`
 (рядом с exe или в родительских папках до пяти уровней вверх).
 
 Для переноса на другой компьютер:
