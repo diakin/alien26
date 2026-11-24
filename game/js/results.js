@@ -87,6 +87,7 @@ var Results = (function () {
       row('ПОГИБЛО ГРАЖДАНСКИХ', rescue.civiliansDead.length, rescue.civiliansTotal, peopleList(rescue.civiliansDead));
   }
   function show(summary) {
+    if (window.BaseStore) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
     var good = summary.result === 'good';
     var artifactCount = summary.artifacts.reduce(function (sum, item) { return sum + item.count; }, 0);
     root.innerHTML =

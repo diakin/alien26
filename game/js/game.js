@@ -287,14 +287,28 @@
       loadout: []
     };
   }
+  // снаряжение корабля с базы (basestore.js, «Снарядить корабль»): на заданиях с конвертопланом летят отмеченные
+  // бойцы (по местам высадки в порядке посадки), K7 — если отмечен, груз лежит в ящике у отряда
+  var SHIP = (function () {
+    if (!window.BaseStore || !MAP.extraction || PAGE_MODE === 'manage') return null;
+    var ship = BaseStore.state.ship;
+    return ship.configured && ship.crew.length ? ship : null;
+  })();
+  function soldierProfiles() { return PROFILES.filter(function (profile) { return profile.side === 'squad' && !profile.kind; }).concat(EXTRA_SOLDIERS); }
   function roster() {
     var spawns = MAP.spawns;
     if (Array.isArray(spawns)) return PROFILES.map(function (profile, index) { return makeUnit(profile, spawns[index]); });
-    var soldiers = PROFILES.filter(function (profile) { return profile.side === 'squad' && !profile.kind; }).concat(EXTRA_SOLDIERS);
+    var soldiers = soldierProfiles();
     var mech = PROFILES.filter(function (profile) { return profile.kind === 'mech'; })[0];
     var list = [];
-    (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
-    (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+    if (SHIP) {
+      var crew = SHIP.crew.map(function (callsign) { return soldiers.filter(function (profile) { return profile.callsign === callsign; })[0]; }).filter(Boolean);
+      (spawns.squad || []).slice(0, crew.length).forEach(function (spawn, index) { list.push(makeUnit(crew[index], spawn)); });
+      if (SHIP.mech) (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+    } else {
+      (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
+      (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+    }
     if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
     // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
     if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
@@ -308,6 +322,7 @@
     }
     return list;
   }
+  var MISSION_RUN = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);   // номер запуска — склад базы принимает итоги один раз
   var units = roster();
   var startUnits = units.slice();      // состав в начале задания — для итогов
   // на земле рядом с отрядом: ящик с запасом — магазины, аптечка, граната
@@ -320,7 +335,9 @@
         // ни на клетке, ни на клетке перед ней (её фигура закрыла бы предметы) нет юнита
         var taken = function (testCol, testRow) { return units.some(function (unit) { return testCol >= unit.col && testCol < unit.col + unit.size && testRow >= unit.row && testRow < unit.row + unit.size; }); };
         if (taken(col, row) || taken(col + 1, row + 1)) continue;
-        ['carbineMag', 'carbineMag', 'medkit', 'grenade'].forEach(function (type) { dropOnGround(Items.make(type), col, row, first.level); });
+        var cargo = ['carbineMag', 'carbineMag', 'medkit', 'grenade'];
+        if (SHIP) { cargo = []; Object.keys(SHIP.cargo).forEach(function (type) { for (var copy = 0; copy < SHIP.cargo[type]; copy++) cargo.push(type); }); }
+        cargo.forEach(function (type) { dropOnGround(Items.make(type), col, row, first.level); });
         return;
       }
     }
@@ -1395,6 +1412,25 @@
     if (text !== timerShown) { label.textContent = text; timerShown = text; }
   }
   // портал: до открытия — слабое кольцо, которое растёт со временем; после — светящийся вихрь
+  // подсветка области (меню базы: помещение, к которому перешла камера) — мигающая рамка на полу 3 с
+  var highlight = null;
+  function highlightArea(col, row, width, height, level, seconds) {
+    highlight = { col: col, row: row, width: width, height: height, level: level || 0, until: performance.now() + (seconds || 3) * 1000 };
+  }
+  function drawHighlight(now) {
+    if (!highlight || now > highlight.until || highlight.level > view.level) return;
+    var elevation = elevationOf(highlight.col, highlight.row, highlight.level) + 0.05;
+    var corners = [Iso.toScreen(highlight.col, highlight.row, elevation), Iso.toScreen(highlight.col + highlight.width, highlight.row, elevation),
+      Iso.toScreen(highlight.col + highlight.width, highlight.row + highlight.height, elevation), Iso.toScreen(highlight.col, highlight.row + highlight.height, elevation)];
+    context.save();
+    context.beginPath();
+    corners.forEach(function (point, index) { context[index ? 'lineTo' : 'moveTo'](point.x - camera.x, point.y - camera.y); });
+    context.closePath();
+    var pulse = 0.5 + 0.5 * Math.sin(now / 160);
+    context.fillStyle = 'rgba(255, 210, 120, ' + (0.08 + 0.1 * pulse) + ')'; context.fill();
+    context.strokeStyle = 'rgba(255, 200, 90, ' + (0.6 + 0.4 * pulse) + ')'; context.lineWidth = 3; context.stroke();
+    context.restore();
+  }
   function drawPortal(now) {
     if (!portal || portal.level > view.level) return;
     var center = Iso.toScreen(portal.col + 0.5, portal.row + 0.5, elevationOf(portal.col, portal.row, portal.level) + 0.05);
@@ -1621,7 +1657,7 @@
     });
     var person = function (unit) { return { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank }; };
     return {
-      kind: kind, result: result, map: MAP.name || '', turn: turn,
+      kind: kind, result: result, map: MAP.name || '', turn: turn, run: MISSION_RUN,
       aliensKilled: killedAliens.length, aliensTotal: aliens.length,
       artifacts: order.map(function (name) { return { name: name, count: counts[name] }; }),
       soldiersLost: soldiersDead.map(person), soldiersLeft: soldiersLeft.map(person),
@@ -3187,6 +3223,7 @@
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
     drawPortal(performance.now());
+    drawHighlight(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -3265,6 +3302,7 @@
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
     drawPortal(performance.now());
+    drawHighlight(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -3432,6 +3470,8 @@
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
+    soldierProfiles: function () { return soldierProfiles().map(function (profile) { return { callsign: profile.callsign, name: profile.name, rank: profile.rank, role: profile.role }; }); },
+    highlightArea: highlightArea,
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
