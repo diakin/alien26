@@ -12,7 +12,8 @@
 import { BASE_PLAN } from './base_plan.js';
 import { buildCity } from './city_layout.js';
 const PARAMS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
-export const MAP_NAME = PARAMS.get('map') || 'outpost';
+// globalThis.ALIENS_MAP задаёт карту страницам игры без параметра (game/base3d.html)
+export const MAP_NAME = (typeof globalThis !== 'undefined' && globalThis.ALIENS_MAP) || PARAMS.get('map') || 'outpost';
 export const SECTOR = 24;
 export const TILE = 1.25, LEVELS = 4, LEVEL_H = 2.5;
 // подземная база: план 56×33 (tools/base/plan.py) лежит посередине поля 58×58 — со столбца BASE_COL и строки BASE_ROW,

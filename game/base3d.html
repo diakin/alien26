@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Осмотр базы — alien26</title>
+<link rel="stylesheet" href="css/base3d.css">
+</head>
+<body>
+<div id="loading">ПОСТРОЕНИЕ СЦЕНЫ БАЗЫ…</div>
+<script>
+  // карта для общих модулей сцены (tools/render/outpost_layout.js) и куда возвращаться
+  window.ALIENS_MAP = 'base';
+  window.BASE3D_BACK = 'base.html?mode=manage';
+  // сцена строится несколько секунд — сначала даём браузеру показать надпись
+  requestAnimationFrame(function () {
+    setTimeout(function () {
+      var script = document.createElement('script');
+      script.src = 'js/base3d.js';
+      script.onerror = function () { document.getElementById('loading').textContent = 'Не найден js/base3d.js (сборка: tools/render/build_base3d.sh)'; };
+      document.body.appendChild(script);
+    }, 30);
+  });
+</script>
+</body>
+</html>

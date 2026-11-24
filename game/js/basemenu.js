@@ -57,6 +57,7 @@ var BaseMenu = (function () {
   menu.innerHTML = '<div class="title"><b>БАЗА «ЯМАНТАУ»</b><span>Южный Урал · гора Ямантау · ярус −30 м</span></div>' +
     '<button data-section="info">ИНФОРМАЦИЯ ПО БАЗЕ</button>' +
     '<button data-section="ship">СНАРЯДИТЬ КОРАБЛЬ</button>' +
+    '<button data-section="view3d">ОСМОТР В 3D</button>' +
     '<button data-section="modules">СТРОИТЬ МОДУЛИ</button>' +
     '<button data-section="research">ИССЛЕДОВАНИЕ</button>' +
     '<button data-section="manufacture">ИЗГОТОВЛЕНИЕ</button>' +
@@ -199,6 +200,7 @@ var BaseMenu = (function () {
   var openSection = null;
   function show(name, refresh) {
     if (name === 'globe') { location.href = 'globe.html'; return; }
+    if (name === 'view3d') { location.href = 'base3d.html'; return; }
     if (openSection === name && !refresh) { close(); return; }
     var scroll = panel.scrollTop;
     var content = SECTIONS[name]();
