@@ -12,6 +12,7 @@ import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } fr
 import { buildMechPosed, buildMechFall } from './mechpose.js';
 import { buildDead, buildFall } from './dead.js';
 import { rockGeometry } from './lib.js';
+import { buildCivilian, civilianWalk, civilianFall } from './civilian.js';
 import { setEnvIntensity } from './lib.js';
 
 // масштаб как у сцены: 18.5 м на 1280 px, рендер в 2 раза крупнее
@@ -155,6 +156,11 @@ window.renderSprite = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
+  // гражданские (civilian.js): options.civilian — вид (man, woman, scientist, engineer, worker)
+  else if (options.civilian) {
+    if (options.dead || options.fall !== undefined) soldier = civilianFall(options.civilian, options.dead ? 1 : options.fall);
+    else soldier = buildCivilian({ kind: options.civilian, pose: options.walkPhase !== undefined ? civilianWalk(options.walkPhase) : options.pose || 'idle' });
+  }
   // падение (fall 0..1) и лежащие (dead): бойцы и пришельцы — dead.js, робот — обломки из mechpose.js
   else if (options.mech && (options.dead || options.fall !== undefined)) soldier = buildMechFall(options.dead ? 1 : options.fall);
   else if (options.dead) soldier = buildDead(options);

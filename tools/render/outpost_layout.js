@@ -442,5 +442,5 @@ export function buildLayout() {
   }
 
   return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, extraction, concrete, blockedCells,
-    name: MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'Подземная база' : 'База на плато', combat: MAP_NAME === 'big' || MAP_NAME === 'base' };
+    name: MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'База «Ямантау»' : 'База на плато', combat: MAP_NAME === 'big' || MAP_NAME === 'base' };
 }

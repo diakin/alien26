@@ -182,7 +182,7 @@ def render(path):
     draw.rectangle([plane_left, plane_top + 4, plane_left + 10 * SCALE, plane_top + 12 * SCALE - 4], outline=(250, 250, 250), width=1)
     draw.text((plane_left + 8, plane_top + 5 * SCALE), 'конвертоплан\n10×12 клеток\n(с рампой)', fill=(250, 250, 250), font=font(12, True))
     # заголовок и масштаб
-    draw.text((MARGIN_LEFT, 12), 'Подземная база в горе — план яруса (клетка 1,25 м)', fill=(235, 230, 220), font=font(20, True))
+    draw.text((MARGIN_LEFT, 12), 'База «Ямантау» (гора Ямантау, Южный Урал) — план яруса (клетка 1,25 м)', fill=(235, 230, 220), font=font(20, True))
     bar_left, bar_top = MARGIN_LEFT, MARGIN_TOP + GRID_HEIGHT * SCALE + 14
     draw.rectangle([bar_left, bar_top, bar_left + 8 * SCALE, bar_top + 6], fill=(220, 220, 220))
     draw.text((bar_left + 8 * SCALE + 8, bar_top - 5), '10 м = 8 клеток', fill=(220, 220, 220), font=font(12))
