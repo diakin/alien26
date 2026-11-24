@@ -1245,7 +1245,7 @@
   }
   var showExtraction = false;          // подсветка зоны, пока открыто подтверждение
   function requestEvacuation() {
-    if (mission.over) return;
+    if (mission.over || (gather && (gather.queue.length || gather.current))) return;
     if (phase !== 'squad') { say('Сейчас ход пришельцев'); return; }
     if (shots.length || throws.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
     var plan = evacuationPlan();
@@ -1261,10 +1261,78 @@
     });
     if (cellKeys.length) centerOnPixel(sumX / cellKeys.length, sumY / cellKeys.length - viewHeight * 0.18);
     if (!window.Results) return;
-    Results.confirmEvacuation({ aboard: plan.aboard.map(person), left: plan.left.map(person) }, function (confirmed) {
+    Results.confirmEvacuation({ aboard: plan.aboard.map(person), left: plan.left.map(person) }, function (answer) {
       showExtraction = false;
-      if (confirmed) evacuate();
+      if (answer === 'gather') startGather(plan.left);
+      else if (answer) evacuate();
     });
+  }
+
+  // «Перевести в зону эвакуации»: юниты вне зоны по очереди идут к свободным клеткам зоны обычным ходом
+  // (тратят ОД, могут попасть под ответный огонь). Ближние идут первыми и вглубь зоны — так входы остаются
+  // свободными для дальних. Кому не хватает ОД — проходит часть пути. Потом окно эвакуации открывается снова.
+  var gather = null;
+  function zoneCorners(unit) {
+    var corners = [];
+    Object.keys(extractionCells).forEach(function (key) {
+      var number = Number(key), level = Math.floor(number / (GRID * GRID)), row = Math.floor(number / GRID) % GRID, col = number % GRID;
+      for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
+        if (!inExtraction(col + deltaCol, row + deltaRow, level)) return;
+      }
+      corners.push({ col: col, row: row, level: level });
+    });
+    return corners;
+  }
+  function startGather(list) {
+    var queue = list.filter(function (unit) { return !unit.dead && units.indexOf(unit) >= 0; });
+    // ближние к зоне — первыми
+    var zoneCenter = zoneCorners({ size: 1 }).reduce(function (sum, cell, index, all) { sum.col += cell.col / all.length; sum.row += cell.row / all.length; return sum; }, { col: 0, row: 0 });
+    queue.sort(function (first, second) { return Math.hypot(first.col - zoneCenter.col, first.row - zoneCenter.row) - Math.hypot(second.col - zoneCenter.col, second.row - zoneCenter.row); });
+    gather = { queue: queue, current: null, short: [], underFire: [], tries: {} };
+    say('Переход в зону эвакуации: ' + queue.length);
+  }
+  function gatherNext(unit) {
+    var best = null;
+    zoneCorners(unit).forEach(function (cell) {
+      var path = findPath(unit, cell);
+      if (!path || !path.length) return;
+      var steps = affordableSteps(unit, path), whole = steps === path.length;
+      // дойдёт целиком — чем глубже (длиннее путь), тем лучше; не дойдёт — чем ближе, тем лучше
+      var score = whole ? 1000 + path.length : -path.length;
+      if (!best || score > best.score) best = { path: path, steps: steps, whole: whole, score: score };
+    });
+    if (!best || best.steps === 0) { gather.short.push(unit); return; }
+    var path = best.path.slice(0, best.steps);
+    unit.timeUnits -= pathCost(unit, path);
+    unit.kneeling = false;
+    unit.path = path;
+    unit.stoppedByFire = false;
+    gather.current = unit;
+    if (!best.whole) gather.short.push(unit);
+  }
+  // юнит остановился раньше конца пути: под ответным огнём — остаётся на месте; клетку заняли — ещё попытка (до 3)
+  function gatherCheckStopped() {
+    var unit = gather.current;
+    gather.current = null;
+    if (!unit || unit.dead || aboard(unit)) return;
+    if (unit.stoppedByFire) { gather.underFire.push(unit); gather.short.splice(gather.short.indexOf(unit), 1); return; }
+    if (gather.short.indexOf(unit) < 0 && (gather.tries[unit.callsign] = (gather.tries[unit.callsign] || 0) + 1) < 3) gather.queue.unshift(unit);
+  }
+  function updateGather() {
+    if (!gather) return;
+    if (mission.over || phase !== 'squad') { gather = null; return; }
+    if (shots.length || throws.length || shotView || units.some(function (unit) { return unit.path.length > 0; })) return;
+    if (gather.current) gatherCheckStopped();
+    var unit = gather.queue.shift();
+    if (unit) { if (!unit.dead && !aboard(unit)) gatherNext(unit); return; }
+    var short = gather.short.filter(function (item) { return !item.dead && !aboard(item); });
+    var underFire = gather.underFire.filter(function (item) { return !item.dead; });
+    gather = null;
+    var notes = [];
+    if (short.length) notes.push('не хватило ОД: ' + short.map(function (item) { return item.callsign; }).join(', '));
+    if (underFire.length) notes.push('остановлены огнём: ' + underFire.map(function (item) { return item.callsign; }).join(', '));
+    if (notes.length) say(notes.join('; '));
+    requestEvacuation();
   }
   function evacuate() {
     var plan = evacuationPlan();
@@ -1362,6 +1430,7 @@
       mover.timeUnits += refund;
       mover.path = [];
       mover.walked = 0;
+      mover.stoppedByFire = true;          // для «Перевести в зону эвакуации»: под огнём дальше не идёт
       if (mover === selected) viewFollow(mover);
     }
   }
@@ -3003,6 +3072,7 @@
     updateWrecks(now);
     updateShotView(now);
     updateAI(now);
+    updateGather();
     updateMission(now);
     updateMusic(now);
     updateSpotted(now);
