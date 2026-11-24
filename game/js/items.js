@@ -9,9 +9,9 @@ var Items = (function () {
   var TYPES = {
     carbine: { name: 'КАРАБИН КС-9', note: 'ПБС · КОЛЛИМАТОР', w: 1, h: 3, weight: 8, weapon: 'carbine', ammo: 'carbineMag', crop: [31, 84, 334, 147], image: 'assets/ui/weapon_black.png' },
     carbineM: { name: 'КАРАБИН КС-9М', note: 'КОЛЛИМАТОР · ФОНАРЬ', w: 1, h: 3, weight: 8, weapon: 'carbine', ammo: 'carbineMag', crop: [31, 96, 300, 135], image: 'assets/ui/weapon_green.png' },
-    plasmaPistol: { name: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 2, weight: 4, weapon: 'plasmaPistol', ammo: 'energyCell', crop: [32, 60, 299, 185], image: 'assets/ui/weapon_alien.png' },
+    plasmaPistol: { alien: true, name: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 2, weight: 4, weapon: 'plasmaPistol', ammo: 'energyCell', crop: [32, 60, 299, 185], image: 'assets/ui/weapon_alien.png' },
     carbineMag: { name: 'МАГАЗИН КС-9', note: 'ПАТРОНЫ 5,45', w: 1, h: 1, weight: 2, rounds: 30, draw: drawMagazine },
-    energyCell: { name: 'ЭНЕРГОЯЧЕЙКА', note: 'К ПЛАЗМЕННОМУ ОРУЖИЮ', w: 1, h: 1, weight: 2, rounds: 20, draw: drawCell },
+    energyCell: { alien: true, name: 'ЭНЕРГОЯЧЕЙКА', note: 'К ПЛАЗМЕННОМУ ОРУЖИЮ', w: 1, h: 1, weight: 2, rounds: 20, draw: drawCell },
     grenade: { name: 'ГРАНАТА РГ-7', note: 'ОСКОЛОЧНАЯ', w: 1, h: 1, weight: 3, draw: drawGrenade },
     medkit: { name: 'АПТЕЧКА', note: 'ПЕРЕВЯЗКА И ОБЕЗБОЛИВАНИЕ', w: 2, h: 1, weight: 5, draw: drawMedkit }
   };

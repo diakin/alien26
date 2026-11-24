@@ -275,6 +275,7 @@
     return list;
   }
   var units = roster();
+  var startUnits = units.slice();      // состав в начале задания — для итогов
   // на земле рядом с отрядом: ящик с запасом — магазины, аптечка, граната
   (function () {
     var first = units[0];
@@ -740,7 +741,7 @@
   window.addEventListener('resize', resize);
 
   // ---------------- действия ----------------
-  function busy() { return !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
+  function busy() { return mission.over || !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
 
   function moveSelectedTo(tile) {
     if (busy() || !tile) return;
@@ -982,7 +983,7 @@
   }
 
   function endTurn() {
-    if (phase !== 'squad') return;
+    if (phase !== 'squad' || mission.over) return;
     if (shots.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
     aiming = false; aimTarget = null; inspected = null;
     startAlienPhase();
@@ -1186,8 +1187,54 @@
       if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad'; })[0] || null;
       else selectNext();
     }
-    if (!units.some(function (other) { return other.side === 'aliens'; })) say('Пришельцы уничтожены');
-    else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) say('Отряд погиб');
+    if (!units.some(function (other) { return other.side === 'aliens'; })) { say('Пришельцы уничтожены'); endMission('good'); }
+    else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('bad'); }
+  }
+
+  // ---------------- конец задания и итоги ----------------
+  // Задание кончается, когда уничтожены все пришельцы (результат «хорошо») или погибли все бойцы (K7 без бойцов
+  // задание не продолжает) — «плохо». Окно итогов (js/results.js) открывается, когда долетели пули и проиграно падение.
+  // Артефакты — предметы пришельцев (Items: alien) на земле и у выживших бойцов и тела пришельцев; вывозятся только
+  // при успехе: при провале зона остаётся за пришельцами.
+  var mission = { over: false, result: null, endAt: 0, shown: false };
+  function endMission(result) {
+    if (mission.over) return;
+    mission.over = true; mission.result = result;
+    mission.endAt = performance.now() + 2200;
+    aiming = false; throwing = null; aimTarget = null;
+  }
+  function updateMission(now) {
+    if (!mission.over || mission.shown || now < mission.endAt || shots.length || throws.length || shotView) return;
+    mission.shown = true;
+    if (window.Results) Results.show(missionSummary());
+  }
+  function missionSummary() {
+    var good = mission.result === 'good';
+    var lost = function (test) { return startUnits.filter(function (unit) { return test(unit) && unit.dead; }); };
+    var aliens = startUnits.filter(function (unit) { return unit.side === 'aliens'; });
+    var killedAliens = lost(function (unit) { return unit.side === 'aliens'; });
+    var artifacts = [];
+    if (good) {
+      var counts = {}, order = [];
+      var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
+      killedAliens.forEach(function () { count('ТЕЛО ПРИШЕЛЬЦА · СТРАЖ'); });
+      var lists = Object.keys(groundItems).map(function (key) { return groundItems[key]; });
+      units.forEach(function (unit) { if (unit.side === 'squad' && unit.inventory) lists.push(unit.inventory); });
+      lists.forEach(function (list) {
+        list.forEach(function (entry) { var info = Items.info(entry.item); if (info.alien) count(info.name); });
+      });
+      artifacts = order.map(function (name) { return { name: name, count: counts[name] }; });
+    }
+    var person = function (unit) { return { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank }; };
+    return {
+      result: mission.result, map: MAP.name || '', turn: turn,
+      aliensKilled: killedAliens.length, aliensTotal: aliens.length,
+      artifacts: artifacts,
+      soldiersLost: lost(function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; }).map(person),
+      soldiersTotal: startUnits.filter(function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; }).length,
+      robotsLost: lost(function (unit) { return unit.kind === 'mech'; }).map(person),
+      robotsTotal: startUnits.filter(function (unit) { return unit.kind === 'mech'; }).length
+    };
   }
 
   // ---------------- ответный огонь ----------------
@@ -1648,7 +1695,7 @@
     }
   }
   function updateAI(now) {
-    if (phase !== 'aliens' || now < aiWaitUntil || shots.length || shotView) return;
+    if (phase !== 'aliens' || mission.over || now < aiWaitUntil || shots.length || shotView) return;
     if (units.some(function (unit) { return unit.path.length > 0; })) return;
     if (!combat) { finishAlienPhase(); return; }
     while (aiQueue.length && (aiQueue[0].dead || units.indexOf(aiQueue[0]) < 0)) aiQueue.shift();
@@ -2859,6 +2906,7 @@
     updateWrecks(now);
     updateShotView(now);
     updateAI(now);
+    updateMission(now);
     updateMusic(now);
     updateSpotted(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
@@ -2913,7 +2961,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
