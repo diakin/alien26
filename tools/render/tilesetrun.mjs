@@ -1,4 +1,5 @@
-// Рендер набора тайлов карты базы. Карта — переменная окружения MAP (outpost по умолчанию, big — 48×48).
+// Рендер набора тайлов карты базы. Карта — переменная окружения MAP (outpost по умолчанию, big — 48×48),
+// поворот вида — ROT=1..3 (карта base: игра поворачивает вид клавишами Q / E).
 //   node tilesetrun.mjs plan out_dir          — только план: список тайлов и их места (plan.json, layout.json)
 //   node tilesetrun.mjs render out_dir [from] [to] — план и проходы тайлов (уже готовые пропускаются)
 import { chromium } from 'playwright-core';
@@ -8,7 +9,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME || '/
 const page = await browser.newPage();
 page.on('pageerror', (error) => console.log('pageerror', error.message));
 page.on('console', (message) => { if (message.type() === 'error') console.log('console', message.text().slice(0, 300)); });
-await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/tileset.html?map=${process.env.MAP || 'outpost'}`);
+await page.goto(`http://127.0.0.1:${process.env.PORT || 8766}/tileset.html?map=${process.env.MAP || 'outpost'}&rot=${process.env.ROT || 0}`);
 await page.waitForFunction(() => window.ready, null, { timeout: 600000 });
 fs.mkdirSync(output, { recursive: true });
 const plan = await page.evaluate(() => window.tilesetPlan());

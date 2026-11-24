@@ -615,7 +615,21 @@
     key = level + 'f';
     return MAP.variants[key] ? key : Object.keys(MAP.variants)[0];
   }
-  function depthKey(col, row, level, part) { return (col + row) * 100 + level * 10 + part; }
+  // глубина по клетке вида (тайлы) и по клетке карты (юниты, подсветка): при повороте вида клетка карты переводится
+  function depthKeyView(col, row, level, part) { return (col + row) * 100 + level * 10 + part; }
+  function depthKey(col, row, level, part) {
+    if (!Iso.turns()) return depthKeyView(col, row, level, part);
+    var cell = Iso.cellToView(col, row);
+    return depthKeyView(cell.col, cell.row, level, part);
+  }
+  // глубина фигуры на нескольких клетках (K7 2×2): по ближней к зрителю клетке
+  function footprintDepth(col, row, level, part, size) {
+    var best = -Infinity;
+    for (var deltaCol = 0; deltaCol < (size || 1); deltaCol++) {
+      for (var deltaRow = 0; deltaRow < (size || 1); deltaRow++) best = Math.max(best, depthKey(col + deltaCol, row + deltaRow, level, part));
+    }
+    return best;
+  }
 
   function requestVariant(key) {
     if (variants[key]) return variants[key];
@@ -649,7 +663,7 @@
       pieceContext.drawImage(variant.mask, piece[8], piece[9], width, height, 0, 0, width, height);
       variant.pieces.push({
         col: piece[0], row: piece[1], level: piece[2], part: piece[3], x: piece[4], y: piece[5], width: width, height: height,
-        canvas: pieceCanvas, depth: depthKey(piece[0], piece[1], piece[2], piece[3])
+        canvas: pieceCanvas, depth: depthKeyView(piece[0], piece[1], piece[2], piece[3])
       });
     });
   }
@@ -678,17 +692,87 @@
     tileImage = tileImages[0]; shadowImage = shadowImages[0];
     shadowCanvas = document.createElement('canvas');
   }
+
+  // ---------------- поворот вида на 90° ----------------
+  // Для карт с повёрнутыми наборами тайлов (js/maps/*_r1..r3.js кладут их в MAP_VIEWS): «,» / «.» и кнопки
+  // на панели уровней. Логика игры остаётся в координатах карты; меняются тайлы, FIELD, мини-карта, а Iso
+  // переводит координаты и направления спрайтов юнитов (8 направлений — поворот на 90° сдвигает их на 2).
+  var VIEWS = {};
+  if (TILESET) {
+    VIEWS[0] = { turns: 0, field: JSON.parse(JSON.stringify(FIELD)), minimap: MAP.minimap, tileset: TILESET, doorCells: null };
+    if (window.MAP_VIEWS) Object.keys(window.MAP_VIEWS).forEach(function (key) { VIEWS[key] = window.MAP_VIEWS[key]; });
+  }
+  var viewTurns = 0;
+  var viewImages = { 0: { tiles: tileImages, shadows: shadowImages } };
+  function viewCount() { return Object.keys(VIEWS).length; }
+  function imagesOfView(turns) {
+    if (!viewImages[turns]) {
+      var tileset = VIEWS[turns].tileset;
+      viewImages[turns] = {
+        tiles: (tileset.images || [tileset.image]).map(function (source) { return Assets.image(source, Assets.URGENT); }),
+        shadows: (tileset.shadowImages || [tileset.shadows]).map(function (source) { return Assets.image(source, Assets.URGENT); })
+      };
+    }
+    return viewImages[turns];
+  }
+  // грань двери в координатах вида (тайл створки ставится на неё)
+  function doorViewEdge(index) {
+    var cells = VIEWS[viewTurns] && VIEWS[viewTurns].doorCells, door = doors[index];
+    if (cells && cells[index]) return { col: cells[index][0], row: cells[index][1], orient: cells[index][2] ? 'N' : 'W' };
+    return { col: door.col, row: door.row, orient: door.orient };
+  }
+  function applyView(turns) {
+    var data = VIEWS[turns];
+    viewTurns = turns;
+    TILESET = data.tileset;
+    var images = imagesOfView(turns);
+    tileImages = images.tiles; shadowImages = images.shadows;
+    tileImage = tileImages[0]; shadowImage = shadowImages[0];
+    tileViews = {}; groundPieces = null;
+    if (chunks) chunks.clear();
+    Object.keys(data.field).forEach(function (key) { FIELD[key] = data.field[key]; });
+    MAP.minimap = data.minimap;
+    Iso.setView(data.field, turns);
+    try { window.dispatchEvent(new CustomEvent('aliens:view', { detail: { turns: turns } })); } catch (error) { /* старый браузер */ }
+    updateRotateBar();
+  }
+  // повернуть вид: точка земли текущего уровня в центре экрана остаётся в центре
+  function rotateView(step) {
+    if (!TILESET || viewCount() < 2) return;
+    var next = viewTurns;
+    do { next = (next + step + 4) % 4; } while (!VIEWS[next]);
+    var height = view.level * LEVEL_H;
+    var center = Iso.toGrid(camera.x + viewWidth / 2, camera.y + viewHeight / 2 + height * Iso.pixelsPerMeterUp);
+    applyView(next);
+    centerOn(center.col, center.row, height);
+    updateHover();
+  }
+  // остальные наборы тайлов подгружаются заранее, когда основной уже на экране
+  function preloadViews() {
+    if (viewCount() < 2) return;
+    if (!tileImages.every(Assets.ready)) { setTimeout(preloadViews, 1500); return; }
+    Object.keys(VIEWS).forEach(function (key) {
+      if (viewImages[key]) return;
+      var tileset = VIEWS[key].tileset;
+      viewImages[key] = {
+        tiles: (tileset.images || [tileset.image]).map(function (source) { return Assets.image(source, 3); }),
+        shadows: (tileset.shadowImages || [tileset.shadows]).map(function (source) { return Assets.image(source, 3); })
+      };
+      Assets.image(VIEWS[key].minimap, 4);
+    });
+  }
+  setTimeout(preloadViews, 2000);
   // кусок картинки тайла на месте клетки: прямоугольник в пикселях карты и в атласе
   function tilePiece(tile, col, row, level, part, shadow) {
     var entry = TILESET.list[tile];
     var offset = shadow ? 8 : 0;
     if (!entry || entry[offset] < 0) return null;
-    var corner = Iso.toScreen(col, row, level * LEVEL_H);
+    var corner = Iso.toScreenView(col, row, level * LEVEL_H);
     return {
       x: Math.round(corner.x - entry[offset + 4]), y: Math.round(corner.y - entry[offset + 5]),
       width: entry[offset + 2], height: entry[offset + 3], sx: entry[offset], sy: entry[offset + 1],
       page: entry[shadow ? 15 : 14] || 0,
-      depth: depthKey(col, row, level, part === undefined ? entry[6] : part)
+      depth: depthKeyView(col, row, level, part === undefined ? entry[6] : part)
     };
   }
   function cutTile(tile, level, viewLevel, cut) {
@@ -722,7 +806,8 @@
     var doorEntries = [];
     doors.forEach(function (door, index) {
       if (door.level > viewLevel) return;
-      var piece = tilePiece(cutTile(TILESET.doors[index], door.level, viewLevel, cut), door.col, door.row, door.level);
+      var edge = doorViewEdge(index);
+      var piece = tilePiece(cutTile(TILESET.doors[index], door.level, viewLevel, cut), edge.col, edge.row, door.level);
       if (piece) doorEntries.push([index, piece.x, piece.y, piece.width, piece.height, piece.sx, piece.sy, piece.page]);
     });
     tileViews[key] = { key: key, pieces: pieces, shadows: shadows, doors: doorEntries };
@@ -835,6 +920,22 @@
     levelBar.querySelector('.walls-state').textContent = view.cut ? 'СРЕЗАНЫ' : 'ЦЕЛЫЕ';
     var marks = levelBar.querySelectorAll('.level-mark');
     for (var index = 0; index < marks.length; index++) marks[index].className = 'level-mark' + (LEVELS - 1 - index <= view.level ? ' on' : '') + (LEVELS - 1 - index === view.level ? ' current' : '');
+  }
+  // кнопки поворота вида — только у карт с повёрнутыми наборами
+  var rotateRow = null;
+  function updateRotateBar() {
+    if (!rotateRow) return;
+    rotateRow.querySelector('.view-side').textContent = ['ЮВ', 'СВ', 'СЗ', 'ЮЗ'][viewTurns] || '';
+  }
+  if (levelBar && viewCount() > 1) {
+    rotateRow = document.createElement('div');
+    rotateRow.className = 'row';
+    rotateRow.innerHTML = '<button class="view-left" title="Повернуть вид (,)">⟲</button>' +
+      '<span class="level-number view-side"></span><button class="view-right" title="Повернуть вид (.)">⟳</button>';
+    levelBar.appendChild(rotateRow);
+    rotateRow.querySelector('.view-left').addEventListener('click', function () { rotateView(-1); });
+    rotateRow.querySelector('.view-right').addEventListener('click', function () { rotateView(1); });
+    updateRotateBar();
   }
   if (levelBar) {
     if (LEVELS < 2) levelBar.style.display = 'none';
@@ -2210,7 +2311,8 @@
   }
   function corpseSprite(corpse, now) {
     var frame = corpseFrame(corpse, now);
-    return frame >= 0 ? corpse.set + '_fall_f' + frame + '_d' + corpse.direction : corpse.name;
+    var direction = Iso.viewDirection(corpse.direction);
+    return frame >= 0 ? corpse.set + '_fall_f' + frame + '_d' + direction : corpse.set + '_dead_d' + direction;
   }
   // обломки робота на клетке: по ним нельзя пройти
   function wreckAt(col, row, level) {
@@ -2231,7 +2333,7 @@
       var rect = image && image.naturalWidth ? { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight }
         : { x: foot.x - 40, y: foot.y - 30, width: 80, height: 40 };
       var standing = corpse.wreck || corpseFrame(corpse, now) >= 0;
-      var depth = standing ? depthKey(corpse.col, corpse.row, corpse.level, 3.5) + (corpse.size - 1) * 100 : depthKey(corpse.col, corpse.row, corpse.level, 1.3);
+      var depth = standing ? footprintDepth(corpse.col, corpse.row, corpse.level, 3.5, corpse.size) : footprintDepth(corpse.col, corpse.row, corpse.level, 1.3, corpse.size);
       return { depth: depth, rect: rect, draw: function () { drawSprite(name, corpse.x, corpse.y, corpse.elevation); } };
     });
   }
@@ -2703,6 +2805,8 @@
     if (event.key === 'PageUp' || event.key === 'e' || event.key === 'E' || event.key === 'у' || event.key === 'У') { event.preventDefault(); setView(view.level + 1, view.cut); }
     if (event.key === 'PageDown' || event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') { event.preventDefault(); setView(view.level - 1, view.cut); }
     if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
+    if (event.code === 'Comma') rotateView(-1);
+    if (event.code === 'Period') rotateView(1);
     if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') setCombat(!combat);
     if (event.key === 'c' || event.key === 'C' || event.key === 'с' || event.key === 'С') focusSelected();
     if (event.key === 'x' || event.key === 'X' || event.key === 'ч' || event.key === 'Ч') requestEvacuation();
@@ -2803,7 +2907,7 @@
   function climbState(unit) {
     var climb = unit.path.length && unit.path[0].climb;
     if (!climb || unit.segmentLength === 0) return null;
-    var name = unit.spriteSet + '_climb_f0_d' + unit.direction;
+    var name = unit.spriteSet + '_climb_f0_d' + Iso.viewDirection(unit.direction);
     if (!SPRITE_ANCHORS[name]) return null;
     var height = unit.elevation - climb.base;
     var cycles = Math.floor(height / CLIMB_STEP + 1e-6);
@@ -2813,18 +2917,18 @@
 
   function spriteName(unit) {
     var climbing = climbState(unit);
-    if (climbing) return unit.spriteSet + '_climb_f' + climbing.frame + '_d' + unit.direction;
+    if (climbing) return unit.spriteSet + '_climb_f' + climbing.frame + '_d' + Iso.viewDirection(unit.direction);
     var moving = unit.path.length && !unit.path[0].climb;
     if (moving) {
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
-      return unit.spriteSet + '_walk_f' + frame + '_d' + unit.direction;
+      return unit.spriteSet + '_walk_f' + frame + '_d' + Iso.viewDirection(unit.direction);
     }
     // гражданский присел — испуганная поза (руки на голове)
-    if (unit.kneeling && SPRITE_ANCHORS[unit.spriteSet + '_cower_d0']) return unit.spriteSet + '_cower_d' + unit.direction;
-    if (unit.kneeling) return unit.spriteSet + '_kneelAim_d' + unit.direction;
-    if (isAiming(unit) && SPRITE_ANCHORS[unit.spriteSet + '_standAim_d0']) return unit.spriteSet + '_standAim_d' + unit.direction;
-    if (atEase(unit)) return unit.spriteSet + '_ease_d' + unit.direction;
-    return unit.spriteSet + '_idle_d' + unit.direction;
+    if (unit.kneeling && SPRITE_ANCHORS[unit.spriteSet + '_cower_d0']) return unit.spriteSet + '_cower_d' + Iso.viewDirection(unit.direction);
+    if (unit.kneeling) return unit.spriteSet + '_kneelAim_d' + Iso.viewDirection(unit.direction);
+    if (isAiming(unit) && SPRITE_ANCHORS[unit.spriteSet + '_standAim_d0']) return unit.spriteSet + '_standAim_d' + Iso.viewDirection(unit.direction);
+    if (atEase(unit)) return unit.spriteSet + '_ease_d' + Iso.viewDirection(unit.direction);
+    return unit.spriteSet + '_idle_d' + Iso.viewDirection(unit.direction);
   }
   // стоит ли юнит «вольно»: мирная обстановка, стоит на ногах и у его набора спрайтов есть такая стойка
   function atEase(unit) {
@@ -2857,7 +2961,7 @@
       var last = depthKey(run.lastCol, run.lastRow, run.level, 1.5), first = depthKey(run.tiles[0].col, run.tiles[0].row, run.level, 1.5);
       return Math.max(last, first, depthKey(unit.col, unit.row, unit.level, 3.5));
     }
-    return depthKey(unit.col, unit.row, unit.level, 3.5) + (unit.size - 1) * 100;
+    return footprintDepth(unit.col, unit.row, unit.level, 3.5, unit.size);
   }
 
   // ---------------- отрисовка ----------------
@@ -3256,7 +3360,8 @@
       var door = doors[entry[0]];
       if (!door || door.open > 0.995) return;
       var cutLevel = view.cut ? view.level : -1;
-      dynamic.push({ depth: depthKey(door.col, door.row, door.level, door.orient === 'W' ? 2.05 : 3.05), rect: { x: entry[1], y: entry[2], width: entry[3], height: entry[4] },
+      var edge = doorViewEdge(entry[0]);
+      dynamic.push({ depth: depthKeyView(edge.col, edge.row, door.level, edge.orient === 'W' ? 2.05 : 3.05), rect: { x: entry[1], y: entry[2], width: entry[3], height: entry[4] },
         draw: function () { drawDoor(tileImages[entry[7] || 0], entry, cutLevel); } });
     });
 
@@ -3474,6 +3579,6 @@
     highlightArea: highlightArea,
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
-    centerOn: centerOn, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
+    centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();
