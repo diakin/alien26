@@ -1694,8 +1694,39 @@
     var label = document.getElementById('phase');
     if (label) label.textContent = phase === 'squad' ? 'ФАЗА ОТРЯДА' : 'ХОД ПРИШЕЛЬЦЕВ';
   }
+  // ---- переговоры пришельцев в их ход (Sound.alienTalk) ----
+  // В начале хода один пришелец вызывает, один-два отвечают; когда пришелец начинает действовать — иногда короткая
+  // реплика, перед первым выстрелом — резкий выкрик. Фразы не накладываются. Видимый пришелец слышен с его места
+  // (дальние тише), невидимый — как перехват по рации.
+  var talk = { queue: [], freeAt: 0 };
+  function alienVoice(alien) {
+    var number = Number((/\d+/.exec(alien.callsign || '') || [1])[0]);
+    return 115 + (number * 37) % 95;
+  }
+  function sayAlien(alien, mood, now) {
+    if (!window.Sound || !Sound.alienTalk || !alien || alien.dead) return;
+    now = now || performance.now();
+    if (now < talk.freeAt) return;
+    var seen = isSeen(alien);
+    var seconds = Sound.alienTalk({ pitch: alienVoice(alien), mood: mood, radio: !seen, distance: seen ? screenDistance(alien) : 0 });
+    talk.freeAt = now + seconds * 1000 + 250;
+  }
+  function updateTalk(now) {
+    if (phase !== 'aliens' || !talk.queue.length || now < talk.queue[0].at || now < talk.freeAt) return;
+    var entry = talk.queue.shift();
+    sayAlien(entry.alien, entry.mood, now);
+  }
+  function startAlienTalk() {
+    var aliens = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead; });
+    if (!aliens.length) return;
+    var shuffled = aliens.slice().sort(function () { return Math.random() - 0.5; });
+    var now = performance.now();
+    talk.queue = [{ at: now + 300, alien: shuffled[0], mood: 'call' }];
+    for (var index = 1; index < Math.min(shuffled.length, 1 + 1 + Math.floor(Math.random() * 2)); index++) talk.queue.push({ at: now + 300, alien: shuffled[index], mood: 'reply' });
+  }
   function startAlienPhase() {
     phase = 'aliens';
+    if (combat) startAlienTalk();
     setPhaseLabel();
     units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; unit.aiShots = 0; } });
     approachField = null;                          // отряд мог переместиться: поле путей строится заново
@@ -2112,7 +2143,9 @@
     if (!alien) { finishAlienPhase(); return; }
     if (!approachField) buildApproachField();
     var decision = aiDecide(alien);
+    var firstAction = !alien.aiMoves && !alien.aiShots;
     if (decision && decision.fire) {
+      if (!alien.aiShots && Math.random() < 0.7) sayAlien(alien, 'alert', now);
       watchUnit(alien);
       if (fire(alien, decision.fire, decision.mode)) startShotView(alien, decision.fire);
       alien.aiShots = (alien.aiShots || 0) + 1;
@@ -2120,6 +2153,7 @@
       return;
     }
     if (decision && decision.move && decision.move.length) {
+      if (firstAction && !talk.queue.length && Math.random() < 0.45) sayAlien(alien, Math.random() < 0.6 ? 'reply' : 'grunt', now);
       alien.timeUnits -= pathCost(alien, decision.move);
       alien.path = decision.move;
       alien.aiMoves++;
@@ -3335,6 +3369,7 @@
     updateGather();
     updateMission(now);
     updateFog(now);
+    updateTalk(now);
     updateMissionClock(now);
     updateTimerLabel();
     updateMusic(now);
