@@ -289,6 +289,7 @@ var Panel = (function () {
       minimapContext.fillRect(point.x - 1.5, point.y - 1.5, 3, 3);
     });
     Game.units.forEach(function (unit) {
+      if (Game.isSeen && !Game.isSeen(unit)) return;          // туман войны: невидимых пришельцев нет и на мини-карте
       var point = mapPoint(unit.x, unit.y);
       minimapContext.strokeStyle = '#000';
       minimapContext.beginPath();
