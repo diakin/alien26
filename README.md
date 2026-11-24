@@ -500,6 +500,8 @@
 
 Оболочка на Lazarus + CEF4Delphi 109 (Chromium 109, работает на Windows 7): окно со встроенным браузером открывает `game/globe.html`, F11 — полный экран, сохранения хранятся в `dist/userdata`. Установка компонентов, файлы CEF и параметры запуска — в `tools/desktop/README.md`.
 
+Второй вариант — `tools/desktop_webview2` (Lazarus + WebView4Delphi): использует установленный в системе WebView2 Runtime (для Windows 7 — версия 109), рядом с exe ничего класть не нужно. Подробности — в `tools/desktop_webview2/README.md`.
+
 ## Инструменты рендера (`tools/render`)
 
 Вся графика — пререндер из 3D (three.js) изометрической камерой: угол 35°, солнце слева-спереди.
