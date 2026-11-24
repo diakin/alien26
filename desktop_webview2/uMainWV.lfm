@@ -1,0 +1,46 @@
+object MainForm: TMainForm
+  Left = 200
+  Height = 720
+  Top = 120
+  Width = 1280
+  Caption = 'Aliens26'
+  ClientHeight = 720
+  ClientWidth = 1280
+  Color = clBlack
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  OnCreate = FormCreate
+  OnShow = FormShow
+  Position = poScreenCenter
+  WindowState = wsMaximized
+  object WVWindowParent1: TWVWindowParent
+    Left = 0
+    Height = 720
+    Top = 0
+    Width = 1280
+    Align = alClient
+    TabOrder = 0
+    Browser = WVBrowser1
+  end
+  object Timer1: TTimer
+    Enabled = False
+    Interval = 300
+    OnTimer = Timer1Timer
+    Left = 312
+    Top = 160
+  end
+  object WVBrowser1: TWVBrowser
+    TargetCompatibleBrowserVersion = '95.0.1020.44'
+    AllowSingleSignOnUsingOSPrimaryAccount = False
+    OnInitializationError = WVBrowser1InitializationError
+    OnAfterCreated = WVBrowser1AfterCreated
+    OnDocumentTitleChanged = WVBrowser1DocumentTitleChanged
+    OnContainsFullScreenElementChanged = WVBrowser1ContainsFullScreenElementChanged
+    OnNewWindowRequested = WVBrowser1NewWindowRequested
+    OnWindowCloseRequested = WVBrowser1WindowCloseRequested
+    OnAcceleratorKeyPressed = WVBrowser1AcceleratorKeyPressed
+    Left = 200
+    Top = 160
+  end
+end

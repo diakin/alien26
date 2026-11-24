@@ -1,0 +1,44 @@
+object MainForm: TMainForm
+  Left = 200
+  Height = 720
+  Top = 120
+  Width = 1280
+  Caption = 'Aliens26'
+  ClientHeight = 720
+  ClientWidth = 1280
+  Color = clBlack
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  OnCloseQuery = FormCloseQuery
+  OnCreate = FormCreate
+  OnShow = FormShow
+  Position = poScreenCenter
+  WindowState = wsMaximized
+  object CEFWindowParent1: TCEFWindowParent
+    Left = 0
+    Height = 720
+    Top = 0
+    Width = 1280
+    Align = alClient
+    TabOrder = 0
+  end
+  object Chromium1: TChromium
+    OnPreKeyEvent = Chromium1PreKeyEvent
+    OnBeforePopup = Chromium1BeforePopup
+    OnAfterCreated = Chromium1AfterCreated
+    OnBeforeClose = Chromium1BeforeClose
+    OnClose = Chromium1Close
+    OnTitleChange = Chromium1TitleChange
+    OnFullScreenModeChange = Chromium1FullScreenModeChange
+    left = 208
+    top = 120
+  end
+  object Timer1: TTimer
+    Enabled = False
+    Interval = 300
+    OnTimer = Timer1Timer
+    left = 272
+    top = 120
+  end
+end
