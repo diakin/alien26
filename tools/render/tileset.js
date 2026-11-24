@@ -442,7 +442,7 @@ for (const item of layout.objects) {
   if (item.kind === 'towerLeg') continue;
   if (item.kind === 'tiltrotor') { addTiltrotor(item); continue; }
   if (item.kind === 'rockFill') { addRock(item); continue; }
-  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform';
+  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor';
   const unique = ladder || RANDOM_KINDS.has(item.kind);
   const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
   // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;

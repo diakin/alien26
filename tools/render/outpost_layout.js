@@ -398,7 +398,19 @@ export function buildLayout() {
     object('desk', 0, 28, 25, 2, 1); object('rack', 0, 25, 24);
     // ---------- столовая, кухня, отдых ----------
     object('desk', 0, 30, 25, 2, 1); object('desk', 0, 30, 27, 2, 1); object('desk', 0, 34, 26, 2, 1);
-    object('cabinet', 0, 38, 24); object('cabinet', 0, 38, 25); object('cabinet', 0, 38, 26); object('crate', 0, 36, 27);
+    // камбуз 3×4 (столбцы 36–38, ряды 24–27; дверь из столовой — в клетке 36, 25): плитка на полу, у северной стены
+    // стол с навесным шкафом, плита с вытяжкой и холодильник, у восточной — мойка и столы, у южной — столы,
+    // посередине остров с плитами. Навесных шкафов на южной и восточной стенах нет: они ближние к камере по умолчанию.
+    object('galleyFloor', 0, 36, 24, 3, 4, { blocks: false, drain: [2.84, 1.4, 2.92, 4.8] });
+    object('galleyCounter', 0, 36, 24, 1, 1, { face: 'N', variant: 'drawers', upper: true });
+    object('galleyRange', 0, 37, 24, 1, 1, { face: 'N' });
+    object('galleyFridge', 0, 38, 24, 1, 1, { face: 'N' });                 // высокий шкаф — у дальней стены, вид не закрывает
+    object('galleyCounter', 0, 38, 25, 1, 1, { face: 'E', variant: 'sink2' });
+    object('galleyCounter', 0, 38, 26, 1, 1, { face: 'E', variant: 'drawers' });
+    object('galleyCounter', 0, 38, 27, 1, 1, { face: 'E', variant: 'microwave' });
+    object('galleyCounter', 0, 37, 27, 1, 1, { face: 'S', variant: 'doors' });
+    object('galleyCounter', 0, 36, 27, 1, 1, { face: 'S', variant: 'grinder' });
+    object('galleyIsland', 0, 37, 25, 1, 2);
     object('desk', 0, 39, 25, 2, 1); object('console', 0, 43, 24);
     // ---------- каюты и санблоки ----------
     plan.rooms.filter((room) => room.width === 3 && room.height === 3).forEach((room) => {

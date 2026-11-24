@@ -66,7 +66,7 @@ export function solidBoxes(layout, buildObject) {
   const boxes = [];
   for (const item of layout.objects) {
     if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
-    if (item.kind === 'paint' || item.kind === 'liftPlatform') continue;
+    if (item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor') continue;
     const group = buildObject(item, LEVELS - 1);
     if (!group) continue;
     group.updateMatrixWorld(true);

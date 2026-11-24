@@ -52,6 +52,17 @@ function viewFrom(azimuthDeg, elevationDeg, distance) {
     controls.target.z + Math.cos(elevation) * Math.cos(azimuth) * distance);
   controls.update();
 }
+// вид на клетку плана (для проверки и крупных планов): window.base3dLook(col, row, азимут, наклон, расстояние)
+window.base3dLook = (col, row, azimuthDeg, elevationDeg, distance) => {
+  const azimuth = THREE.MathUtils.degToRad(azimuthDeg), elevation = THREE.MathUtils.degToRad(elevationDeg);
+  controls.target.set((BASE_COL + col) * TILE, 0.9, (BASE_ROW + row) * TILE);
+  camera.position.set(
+    controls.target.x + Math.cos(elevation) * Math.sin(azimuth) * distance,
+    controls.target.y + Math.sin(elevation) * distance,
+    controls.target.z + Math.cos(elevation) * Math.cos(azimuth) * distance);
+  controls.update();
+  requestRender();
+};
 // как в игре: смотрим с юго-востока (азимут 45°), наклон 35°
 const homeView = () => viewFrom(45, 40, 78);
 

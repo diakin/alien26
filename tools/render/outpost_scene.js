@@ -10,6 +10,7 @@ import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
   concreteTextures, groundBumpTexture, groundTexture,
 } from './outpost_textures.js';
+import { GALLEY_KINDS, buildGalleyObject } from './galley.js';
 import { buildCityWall, buildCityDoorLeaf, buildCityObject, floorMaterial, CITY_MAT, STAIR_MATERIALS, isCityFacade } from './city_scene.js';
 const CITY = MAP_NAME === 'city';
 
@@ -396,6 +397,11 @@ export function buildObject(item, viewLevel) {
   if (CITY) {
     const city = buildCityObject(item);
     if (city) { group.add(city); group.position.copy(origin); return tag(group, PART.object, item.level); }
+  }
+  if (GALLEY_KINDS.has(item.kind)) {
+    group.add(buildGalleyObject(item));
+    group.position.copy(origin);
+    return tag(group, PART.object, item.level);
   }
   switch (item.kind) {
     case 'console': {
