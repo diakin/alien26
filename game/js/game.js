@@ -1094,7 +1094,7 @@
     var distance = Combat.distanceMeters(combatWorld, from, target.point);
     var line = Combat.trace(combatWorld, from, target.point, distance + 0.3, shooter);
     var clear = target.unit ? line.kind === 'unit' && line.unit === target.unit : line.kind === 'none' || line.kind === 'ground' || line.kind === 'floor';
-    return { mode: mode, chance: target.unit ? Combat.hitChance(shooter, mode, distance) : null, cost: mode.cost + turnCostTo(shooter, target.point), clear: clear, distance: distance };
+    return { mode: mode, chance: target.unit ? Combat.hitChance(shooter, mode, distance, target.unit) : null, cost: mode.cost + turnCostTo(shooter, target.point), clear: clear, distance: distance };
   }
 
   function fire(shooter, target, modeIndex, delay) {
@@ -1124,7 +1124,7 @@
     var point = target.unit && !target.unit.dead ? targetPointOf(target.unit) : target.point;
     var from = muzzleOf(shot.shooter, point);
     var distance = Combat.distanceMeters(combatWorld, from, point);
-    var chance = target.unit ? Combat.hitChance(shot.shooter, shot.mode, distance) : 100;
+    var chance = target.unit ? Combat.hitChance(shot.shooter, shot.mode, distance, target.unit) : 100;
     var radius = target.unit ? unitBody(target.unit).radius : 0.05;
     var aim = Combat.aimPoint(combatWorld, from, point, radius, chance, Math.random);
     shot.from = from;
@@ -1709,7 +1709,7 @@
   }
   // ожидаемый урон по цели: шанс × (урон оружия − броня цели); раненые и без брони — приоритетнее
   function targetValue(alien, target, mode) {
-    var weapon = weaponOf(alien), chance = Combat.hitChance(alien, mode, target.distance) / 100;
+    var weapon = weaponOf(alien), chance = Combat.hitChance(alien, mode, target.distance, target.unit) / 100;
     var damage = Math.max(4, weapon.damage - (target.unit.armor || 0));
     return chance * damage * (1.6 - 0.6 * target.unit.health / target.unit.maxHealth);
   }
@@ -2406,6 +2406,11 @@
     var distance = screenDistance(unit);
     if (distance < 30) Sound.play(kind, distance);
   }
+  // ход пришельцев: идущий пришелец ушёл за край кадра — камера снова ставит его в центр (и на его уровень)
+  function followMovingAlien(unit) {
+    if (phase !== 'aliens' || unit.side !== 'aliens' || !Settings.values.followAliens || shotView) return;
+    if (!frameFor(unit.x, unit.y, unit.elevation, unit.height || 2).inside) watchUnit(unit);
+  }
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
     // под ответным огнём идущий стоит на клетке, пока летят пули
@@ -2452,6 +2457,7 @@
     }
     var stepTiles = unit.speed * Settings.values.moveSpeed * seconds / Iso.tileMeters;
     footstep(unit, stepTiles * Iso.tileMeters);
+    followMovingAlien(unit);
     if (distanceTiles <= stepTiles) {
       unit.x = targetX; unit.y = targetY;
       unit.walked += distanceTiles * Iso.tileMeters;

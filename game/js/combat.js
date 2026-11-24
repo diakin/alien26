@@ -145,10 +145,13 @@ var Combat = (function () {
     return { kind: 'none', point: { x: x, y: y, h: h } };
   }
 
-  // шанс попадания, %: точность бойца × режим огня, на колене точнее, дальше 10 м — хуже
-  function hitChance(shooter, mode, distanceMeters) {
+  // шанс попадания, %: точность бойца × режим огня, на колене точнее, дальше 10 м — хуже;
+  // по присевшей цели — в KNEELING_TARGET раза ниже (силуэт меньше)
+  var KNEELING_TARGET = 0.7;
+  function hitChance(shooter, mode, distanceMeters, target) {
     var chance = shooter.accuracy * mode.accuracy;
     if (shooter.kneeling) chance *= 1.15;
+    if (target && target.kneeling) chance *= KNEELING_TARGET;
     if (distanceMeters > 10) chance -= (distanceMeters - 10) * 0.8;
     return Math.max(5, Math.min(95, Math.round(chance)));
   }
@@ -190,7 +193,7 @@ var Combat = (function () {
   }
 
   return {
-    WEAPONS: WEAPONS, UNIT_RADIUS: UNIT_RADIUS, createWorld: createWorld, trace: trace, hitChance: hitChance,
+    WEAPONS: WEAPONS, UNIT_RADIUS: UNIT_RADIUS, KNEELING_TARGET: KNEELING_TARGET, createWorld: createWorld, trace: trace, hitChance: hitChance,
     aimPoint: aimPoint, damage: damage, distanceMeters: distanceMeters, wallBlocks: wallBlocks
   };
 })();
