@@ -110,6 +110,7 @@ var Results = (function () {
     if (button.dataset.action === 'globe') location.href = 'globe.html';
     if (button.dataset.action === 'cancel') closeConfirm(false);
     if (button.dataset.action === 'takeoff') closeConfirm(true);
+    if (button.dataset.action === 'gather') closeConfirm('gather');
   });
   // окно перехватывает клавиши и колесо, чтобы под ним ничего не происходило
   ['keydown', 'wheel'].forEach(function (name) {
@@ -134,12 +135,13 @@ var Results = (function () {
           row('В ЗОНЕ ЭВАКУАЦИИ', plan.aboard.length, total, peopleList(plan.aboard)) +
         '</table>' +
         '<div class="hint">' + (!canLeave
-          ? 'В зоне эвакуации никого нет. Переведите бойцов в салон или на рампу конвертоплана.'
+          ? 'В зоне эвакуации никого нет. «Перевести в зону эвакуации» — все пойдут в салон и на рампу (тратят ОД).'
           : plan.left.length
             ? 'Вне зоны эвакуации: ' + plan.left.length + '. Они останутся на месте и будут считаться потерянными. Вывозится только снаряжение тех, кто в зоне. Задание закончится.'
             : 'Все в зоне эвакуации. Вывозится только снаряжение тех, кто в зоне. Задание закончится.') + '</div>' +
         '<div class="buttons">' +
           '<button data-action="cancel">ОТМЕНА</button>' +
+          (plan.left.length ? '<button data-action="gather">ПЕРЕВЕСТИ В ЗОНУ ЭВАКУАЦИИ</button>' : '') +
           (canLeave ? '<button class="main" data-action="takeoff">ПОДТВЕРДИТЬ ЭВАКУАЦИЮ</button>' : '') +
         '</div>' +
       '</div>';

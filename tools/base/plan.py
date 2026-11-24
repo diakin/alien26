@@ -95,6 +95,20 @@ ROOMS = [(room[0], room[1], room[2], shifted(room[3])) + tuple(room[4:]) for roo
 CORRIDORS = [corridor if corridor[0] == 'Главная галерея' else (corridor[0], corridor[1], shifted(corridor[2])) + tuple(corridor[3:]) for corridor in CORRIDORS]
 DOORS = [(door[0], shifted(door[1])) + tuple(door[2:]) for door in DOORS]
 
+# Ангар увеличен под будущие большие корабли: платформа подъёмника 20×20 клеток (25 × 25 м) вместо 12×12,
+# техническая полоса 4×20, высота 4 уровня (10 м). Ангар растёт на север и на запад — всё остальное сдвигается
+# на HANGAR_GROW клеток к востоку и югу; главная галерея тянется под всем ангаром с запада до востока.
+HANGAR_GROW = 8
+GRID_WIDTH, GRID_HEIGHT = GRID_WIDTH + HANGAR_GROW, GRID_HEIGHT + HANGAR_GROW
+HANGAR = {
+    'Платформа подъёмника': (2, 'Платформа подъёмника', 0, 1, 20, 20, 4, 'платформа 25 × 25 м, высота 10 м: под корабли до 22 м; конвертоплан КТ-6 — 10×12 клеток с опущенной рампой; шахта до поверхности'),
+    'Техническая полоса': (2, 'Техническая полоса', 20, 1, 4, 20, 4, 'заправка, подвоз боеприпасов, пульт подъёмника'),
+}
+ROOMS = [HANGAR.get(room[1]) or (room[0], room[1], room[2] + HANGAR_GROW, room[3] + HANGAR_GROW) + tuple(room[4:]) for room in ROOMS]
+CORRIDORS = [(corridor[0], 0, corridor[2] + HANGAR_GROW, corridor[3] + HANGAR_GROW) + tuple(corridor[4:]) if corridor[0] == 'Главная галерея'
+             else (corridor[0], corridor[1] + HANGAR_GROW, corridor[2] + HANGAR_GROW) + tuple(corridor[3:]) for corridor in CORRIDORS]
+DOORS = [(20, 20) + tuple(door[2:]) if door[:2] == (12, 12) else (door[0] + HANGAR_GROW, door[1] + HANGAR_GROW) + tuple(door[2:]) for door in DOORS]
+
 # ---------------- проверка и подсчёт ----------------
 def cells_of(x, y, width, height):
     return {(x + column, y + row) for column in range(width) for row in range(height)}
@@ -177,10 +191,13 @@ def render(path):
         else:
             edge = left if side == 'W' else left + SCALE
             draw.rectangle([edge - thickness // 2, top + 3, edge + thickness // 2, top + size_cells * SCALE - 3], fill=color, outline=(10, 10, 10))
-    # конвертоплан на платформе: контур 10×12 клеток
-    plane_left, plane_top = MARGIN_LEFT + 1 * SCALE, MARGIN_TOP + 1 * SCALE
-    draw.rectangle([plane_left, plane_top + 4, plane_left + 10 * SCALE, plane_top + 12 * SCALE - 4], outline=(250, 250, 250), width=1)
-    draw.text((plane_left + 8, plane_top + 5 * SCALE), 'конвертоплан\n10×12 клеток\n(с рампой)', fill=(250, 250, 250), font=font(12, True))
+    # конвертоплан на платформе (как на карте: салон с клетки x 8, y 9, нос на запад): 12 клеток вдоль x с рампой,
+    # 10 поперёк по винтам; рядом — контур будущего корабля до 22 м
+    plane_left, plane_top = MARGIN_LEFT + 4 * SCALE, MARGIN_TOP + 6 * SCALE
+    draw.rectangle([plane_left, plane_top, plane_left + 12 * SCALE, plane_top + 10 * SCALE], outline=(250, 250, 250), width=1)
+    draw.text((plane_left + 8, plane_top + 3 * SCALE), 'конвертоплан КТ-6\n12×10 клеток\n(с рампой)', fill=(250, 250, 250), font=font(12, True))
+    draw.rectangle([MARGIN_LEFT + 1 * SCALE, MARGIN_TOP + 2 * SCALE, MARGIN_LEFT + 19 * SCALE, MARGIN_TOP + 20 * SCALE], outline=(200, 210, 230), width=1)
+    draw.text((MARGIN_LEFT + 1 * SCALE + 6, MARGIN_TOP + 20 * SCALE - 18), 'место под корабль до 22 × 22 м', fill=(210, 220, 235), font=font(11))
     # заголовок и масштаб
     draw.text((MARGIN_LEFT, 12), 'База «Ямантау» (гора Ямантау, Южный Урал) — план яруса (клетка 1,25 м)', fill=(235, 230, 220), font=font(20, True))
     bar_left, bar_top = MARGIN_LEFT, MARGIN_TOP + GRID_HEIGHT * SCALE + 14
@@ -233,26 +250,26 @@ def render_section(path):
     draw.polygon([at(*point) for point in profile] + [at(190, -44), at(-10, -44)], fill=(72, 64, 56))
     draw.line([at(*point) for point in profile], fill=(120, 135, 95), width=4)
     draw.text(at(157, 2), 'ущелье', fill=(190, 200, 170), font=font(12, True), anchor='mb')
-    base_start = 30                               # ярус: 48 клеток = 60 м, от 30 до 90 м по сечению
+    base_start = 22                               # ярус: 56 клеток = 70 м, от 22 до 92 м по сечению
     def block(first_cell, cells, levels, color, label, label_inside=False):
         left, bottom = at(base_start + first_cell * CELL_METERS, floor)
         right, top = at(base_start + (first_cell + cells) * CELL_METERS, floor + levels * LEVEL_METERS)
         draw.rectangle([left, top, right, bottom], fill=color, outline=(15, 15, 15), width=2)
         if label: draw.text(((left + right) / 2, (bottom + 6) if label_inside else (top - 4)), label, fill=(235, 230, 220), font=font(11, True), anchor='mt' if label_inside else 'md')
         return left, top, right, bottom
-    hangar = block(0, 16, 3, (120, 140, 170), 'ангар 7,5 м', label_inside=True)
-    block(16, 8, 2, (180, 170, 90), 'цех 5 м')
-    block(24, 20, 1, (110, 170, 190), 'лаборатории, склад, жилой ярус — 2,5 м', label_inside=True)
-    lift = block(44, 4, 1, (200, 150, 70), '')
+    hangar = block(0, 24, 4, (120, 140, 170), 'ангар 10 м', label_inside=True)
+    block(24, 8, 2, (180, 170, 90), 'цех 5 м')
+    block(32, 20, 1, (110, 170, 190), 'лаборатории, склад, жилой ярус — 2,5 м', label_inside=True)
+    lift = block(52, 4, 1, (200, 150, 70), '')
     # шахта подъёмника ангара до люка в склоне
-    shaft_left, shaft_bottom = at(base_start + 0 * CELL_METERS, floor + 3 * LEVEL_METERS)
-    shaft_right, _ = at(base_start + 12 * CELL_METERS, floor)
+    shaft_left, shaft_bottom = at(base_start + 0 * CELL_METERS, floor + 4 * LEVEL_METERS)
+    shaft_right, _ = at(base_start + 20 * CELL_METERS, floor)
     hatch_elevation = 36
     _, hatch_y = at(0, hatch_elevation)
     draw.rectangle([shaft_left, hatch_y, shaft_right, shaft_bottom], fill=(34, 38, 44), outline=(120, 140, 170), width=2)
     draw.rectangle([shaft_left - 6, hatch_y - 6, shaft_right + 6, hatch_y + 2], fill=(150, 130, 90), outline=(20, 20, 20))
-    draw.text((shaft_left + 6, hatch_y + 14), 'шахта\nподъёмника\n15×15 м,\n≈ 58 м', fill=(200, 210, 225), font=font(12))
-    draw.text((shaft_left - 10, hatch_y - 12), 'люк под маскировкой в склоне', fill=(255, 225, 160), font=font(12, True), anchor='rb')
+    draw.text((shaft_left + 6, hatch_y + 14), 'шахта\nподъёмника\n25×25 м,\n≈ 56 м', fill=(200, 210, 225), font=font(12))
+    draw.text((shaft_left, hatch_y - 12), 'люк под маскировкой в склоне', fill=(255, 225, 160), font=font(12, True), anchor='lb')
     # грузовой лифт до штольни на отметке 0 и портал в ущелье
     lift_left, lift_top, lift_right, _ = lift
     _, adit_floor = at(0, 0)

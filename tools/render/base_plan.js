@@ -3,8 +3,8 @@ export const BASE_PLAN = {
  "cellMeters": 1.25,
  "levelMeters": 2.5,
  "grid": [
-  48,
-  25
+  56,
+  33
  ],
  "modules": {
   "1": "Грузовой шлюз",
@@ -23,26 +23,26 @@ export const BASE_PLAN = {
    "name": "Платформа подъёмника",
    "x": 0,
    "y": 1,
-   "width": 12,
-   "height": 12,
-   "levels": 3,
-   "note": "конвертоплан КТ-6: 10×12 клеток с опущенной рампой, высота 6,5 м; шахта до поверхности"
+   "width": 20,
+   "height": 20,
+   "levels": 4,
+   "note": "платформа 25 × 25 м, высота 10 м: под корабли до 22 м; конвертоплан КТ-6 — 10×12 клеток с опущенной рампой; шахта до поверхности"
   },
   {
    "module": 2,
    "name": "Техническая полоса",
-   "x": 12,
+   "x": 20,
    "y": 1,
    "width": 4,
-   "height": 12,
-   "levels": 3,
+   "height": 20,
+   "levels": 4,
    "note": "заправка, подвоз боеприпасов, пульт подъёмника"
   },
   {
    "module": 6,
    "name": "Цех",
-   "x": 16,
-   "y": 7,
+   "x": 24,
+   "y": 15,
    "width": 8,
    "height": 6,
    "levels": 2,
@@ -51,8 +51,8 @@ export const BASE_PLAN = {
   {
    "module": 6,
    "name": "Склад материалов",
-   "x": 16,
-   "y": 3,
+   "x": 24,
+   "y": 11,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -61,8 +61,8 @@ export const BASE_PLAN = {
   {
    "module": 8,
    "name": "Электростанция",
-   "x": 20,
-   "y": 3,
+   "x": 28,
+   "y": 11,
    "width": 5,
    "height": 4,
    "levels": 1,
@@ -71,8 +71,8 @@ export const BASE_PLAN = {
   {
    "module": 5,
    "name": "Лаборатория 1",
-   "x": 25,
-   "y": 8,
+   "x": 33,
+   "y": 16,
    "width": 6,
    "height": 5,
    "levels": 1,
@@ -81,8 +81,8 @@ export const BASE_PLAN = {
   {
    "module": 5,
    "name": "Лаборатория 2",
-   "x": 31,
-   "y": 8,
+   "x": 39,
+   "y": 16,
    "width": 6,
    "height": 5,
    "levels": 1,
@@ -91,8 +91,8 @@ export const BASE_PLAN = {
   {
    "module": 5,
    "name": "Изолятор образцов",
-   "x": 25,
-   "y": 4,
+   "x": 33,
+   "y": 12,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -101,8 +101,8 @@ export const BASE_PLAN = {
   {
    "module": 1,
    "name": "Грузовой лифт",
-   "x": 44,
-   "y": 1,
+   "x": 52,
+   "y": 9,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -111,8 +111,8 @@ export const BASE_PLAN = {
   {
    "module": 1,
    "name": "Шлюз",
-   "x": 44,
-   "y": 5,
+   "x": 52,
+   "y": 13,
    "width": 4,
    "height": 2,
    "levels": 1,
@@ -121,8 +121,8 @@ export const BASE_PLAN = {
   {
    "module": 1,
    "name": "Приёмка",
-   "x": 44,
-   "y": 7,
+   "x": 52,
+   "y": 15,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -131,8 +131,8 @@ export const BASE_PLAN = {
   {
    "module": 1,
    "name": "КПП",
-   "x": 44,
-   "y": 11,
+   "x": 52,
+   "y": 19,
    "width": 2,
    "height": 2,
    "levels": 1,
@@ -141,8 +141,8 @@ export const BASE_PLAN = {
   {
    "module": 1,
    "name": "Общий склад",
-   "x": 40,
-   "y": 7,
+   "x": 48,
+   "y": 15,
    "width": 4,
    "height": 6,
    "levels": 1,
@@ -151,8 +151,8 @@ export const BASE_PLAN = {
   {
    "module": 8,
    "name": "Жизнеобеспечение",
-   "x": 40,
-   "y": 3,
+   "x": 48,
+   "y": 11,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -161,8 +161,8 @@ export const BASE_PLAN = {
   {
    "module": 4,
    "name": "Снаряжение",
-   "x": 0,
-   "y": 16,
+   "x": 8,
+   "y": 24,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -171,8 +171,8 @@ export const BASE_PLAN = {
   {
    "module": 4,
    "name": "Оружейная",
-   "x": 4,
-   "y": 16,
+   "x": 12,
+   "y": 24,
    "width": 5,
    "height": 4,
    "levels": 1,
@@ -181,8 +181,8 @@ export const BASE_PLAN = {
   {
    "module": 4,
    "name": "Склад боеприпасов",
-   "x": 9,
-   "y": 16,
+   "x": 17,
+   "y": 24,
    "width": 3,
    "height": 4,
    "levels": 1,
@@ -191,8 +191,8 @@ export const BASE_PLAN = {
   {
    "module": 8,
    "name": "Медпункт",
-   "x": 12,
-   "y": 16,
+   "x": 20,
+   "y": 24,
    "width": 4,
    "height": 4,
    "levels": 1,
@@ -201,8 +201,8 @@ export const BASE_PLAN = {
   {
    "module": 8,
    "name": "Командный пункт",
-   "x": 17,
-   "y": 16,
+   "x": 25,
+   "y": 24,
    "width": 5,
    "height": 4,
    "levels": 1,
@@ -211,8 +211,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Столовая",
-   "x": 22,
-   "y": 16,
+   "x": 30,
+   "y": 24,
    "width": 6,
    "height": 4,
    "levels": 1,
@@ -221,8 +221,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Кухня",
-   "x": 28,
-   "y": 16,
+   "x": 36,
+   "y": 24,
    "width": 3,
    "height": 4,
    "levels": 1,
@@ -231,8 +231,8 @@ export const BASE_PLAN = {
   {
    "module": 8,
    "name": "Комната отдыха",
-   "x": 31,
-   "y": 16,
+   "x": 39,
+   "y": 24,
    "width": 5,
    "height": 4,
    "levels": 1,
@@ -241,8 +241,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 1",
-   "x": 0,
-   "y": 21,
+   "x": 8,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -251,8 +251,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 2",
-   "x": 3,
-   "y": 21,
+   "x": 11,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -261,8 +261,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 3",
-   "x": 6,
-   "y": 21,
+   "x": 14,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -271,8 +271,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 4",
-   "x": 9,
-   "y": 21,
+   "x": 17,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -281,8 +281,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 5",
-   "x": 12,
-   "y": 21,
+   "x": 20,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -291,8 +291,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 6",
-   "x": 15,
-   "y": 21,
+   "x": 23,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -301,8 +301,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Каюта 7",
-   "x": 18,
-   "y": 21,
+   "x": 26,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -311,8 +311,8 @@ export const BASE_PLAN = {
   {
    "module": 3,
    "name": "Санблок",
-   "x": 21,
-   "y": 21,
+   "x": 29,
+   "y": 29,
    "width": 4,
    "height": 3,
    "levels": 1,
@@ -321,8 +321,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У1",
-   "x": 25,
-   "y": 21,
+   "x": 33,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -331,8 +331,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У2",
-   "x": 28,
-   "y": 21,
+   "x": 36,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -341,8 +341,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У3",
-   "x": 31,
-   "y": 21,
+   "x": 39,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -351,8 +351,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У4",
-   "x": 34,
-   "y": 21,
+   "x": 42,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -361,8 +361,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У5",
-   "x": 37,
-   "y": 21,
+   "x": 45,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -371,8 +371,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У6",
-   "x": 40,
-   "y": 21,
+   "x": 48,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -381,8 +381,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У7",
-   "x": 43,
-   "y": 21,
+   "x": 51,
+   "y": 29,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -391,8 +391,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Каюта У8",
-   "x": 37,
-   "y": 17,
+   "x": 45,
+   "y": 25,
    "width": 3,
    "height": 3,
    "levels": 1,
@@ -401,8 +401,8 @@ export const BASE_PLAN = {
   {
    "module": 7,
    "name": "Санблок",
-   "x": 40,
-   "y": 17,
+   "x": 48,
+   "y": 25,
    "width": 4,
    "height": 3,
    "levels": 1,
@@ -413,39 +413,39 @@ export const BASE_PLAN = {
   {
    "name": "Главная галерея",
    "x": 0,
-   "y": 13,
-   "width": 48,
+   "y": 21,
+   "width": 56,
    "height": 3,
    "note": "ширина 3 клетки (3,75 м): K7 в модели 3,1 м шириной; ангар, цех, склад и приёмка выходят в неё"
   },
   {
    "name": "Выход приёмки",
-   "x": 46,
-   "y": 11,
+   "x": 54,
+   "y": 19,
    "width": 2,
    "height": 2,
    "note": "к галерее"
   },
   {
    "name": "Жилой коридор",
-   "x": 0,
-   "y": 20,
+   "x": 8,
+   "y": 28,
    "width": 46,
    "height": 1,
    "note": "вдоль всех кают"
   },
   {
    "name": "Проход к жилому коридору",
-   "x": 16,
-   "y": 16,
+   "x": 24,
+   "y": 24,
    "width": 1,
    "height": 4,
    "note": ""
   },
   {
    "name": "Проход к каютам учёных",
-   "x": 36,
-   "y": 16,
+   "x": 44,
+   "y": 24,
    "width": 1,
    "height": 4,
    "note": ""
@@ -453,309 +453,309 @@ export const BASE_PLAN = {
  ],
  "doors": [
   {
-   "x": 12,
-   "y": 12,
+   "x": 20,
+   "y": 20,
    "side": "S",
    "size": 4,
    "kind": "gate"
   },
   {
-   "x": 18,
-   "y": 12,
+   "x": 26,
+   "y": 20,
    "side": "S",
    "size": 3,
    "kind": "gate"
   },
   {
-   "x": 17,
-   "y": 7,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 21,
-   "y": 7,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 27,
-   "y": 12,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 33,
-   "y": 12,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 30,
-   "y": 10,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 26,
-   "y": 8,
-   "side": "N",
-   "size": 1,
-   "kind": "hatch"
-  },
-  {
-   "x": 45,
-   "y": 4,
-   "side": "S",
-   "size": 2,
-   "kind": "hatch"
-  },
-  {
-   "x": 45,
-   "y": 6,
-   "side": "S",
-   "size": 2,
-   "kind": "hatch"
-  },
-  {
-   "x": 44,
-   "y": 8,
-   "side": "W",
-   "size": 2,
-   "kind": "door"
-  },
-  {
-   "x": 46,
-   "y": 10,
-   "side": "S",
-   "size": 2,
-   "kind": "gate"
-  },
-  {
-   "x": 45,
-   "y": 11,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 41,
-   "y": 12,
-   "side": "S",
-   "size": 2,
-   "kind": "gate"
-  },
-  {
-   "x": 41,
-   "y": 7,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 2,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 3,
-   "y": 17,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 6,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 9,
-   "y": 18,
-   "side": "W",
-   "size": 1,
-   "kind": "hatch"
-  },
-  {
-   "x": 13,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 19,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 24,
-   "y": 16,
-   "side": "N",
-   "size": 2,
-   "kind": "door"
-  },
-  {
    "x": 25,
-   "y": 19,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 28,
-   "y": 17,
-   "side": "W",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 33,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 33,
-   "y": 19,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 38,
-   "y": 19,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 41,
-   "y": 19,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 1,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 4,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 7,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 10,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 13,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 16,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 19,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 26,
-   "y": 21,
+   "y": 15,
    "side": "N",
    "size": 1,
    "kind": "door"
   },
   {
    "x": 29,
-   "y": 21,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 32,
-   "y": 21,
+   "y": 15,
    "side": "N",
    "size": 1,
    "kind": "door"
   },
   {
    "x": 35,
-   "y": 21,
-   "side": "N",
+   "y": 20,
+   "side": "S",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 41,
+   "y": 20,
+   "side": "S",
    "size": 1,
    "kind": "door"
   },
   {
    "x": 38,
-   "y": 21,
+   "y": 18,
+   "side": "E",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 34,
+   "y": 16,
+   "side": "N",
+   "size": 1,
+   "kind": "hatch"
+  },
+  {
+   "x": 53,
+   "y": 12,
+   "side": "S",
+   "size": 2,
+   "kind": "hatch"
+  },
+  {
+   "x": 53,
+   "y": 14,
+   "side": "S",
+   "size": 2,
+   "kind": "hatch"
+  },
+  {
+   "x": 52,
+   "y": 16,
+   "side": "W",
+   "size": 2,
+   "kind": "door"
+  },
+  {
+   "x": 54,
+   "y": 18,
+   "side": "S",
+   "size": 2,
+   "kind": "gate"
+  },
+  {
+   "x": 53,
+   "y": 19,
+   "side": "E",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 49,
+   "y": 20,
+   "side": "S",
+   "size": 2,
+   "kind": "gate"
+  },
+  {
+   "x": 49,
+   "y": 15,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 10,
+   "y": 24,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 11,
+   "y": 25,
+   "side": "E",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 14,
+   "y": 24,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 17,
+   "y": 26,
+   "side": "W",
+   "size": 1,
+   "kind": "hatch"
+  },
+  {
+   "x": 21,
+   "y": 24,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 27,
+   "y": 24,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 32,
+   "y": 24,
+   "side": "N",
+   "size": 2,
+   "kind": "door"
+  },
+  {
+   "x": 33,
+   "y": 27,
+   "side": "S",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 36,
+   "y": 25,
+   "side": "W",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 41,
+   "y": 24,
    "side": "N",
    "size": 1,
    "kind": "door"
   },
   {
    "x": 41,
-   "y": 21,
+   "y": 27,
+   "side": "S",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 46,
+   "y": 27,
+   "side": "S",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 49,
+   "y": 27,
+   "side": "S",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 9,
+   "y": 29,
    "side": "N",
    "size": 1,
    "kind": "door"
   },
   {
-   "x": 44,
-   "y": 21,
+   "x": 12,
+   "y": 29,
    "side": "N",
    "size": 1,
    "kind": "door"
   },
   {
-   "x": 22,
-   "y": 21,
+   "x": 15,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 18,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 21,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 24,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 27,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 34,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 37,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 40,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 43,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 46,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 49,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 52,
+   "y": 29,
+   "side": "N",
+   "size": 1,
+   "kind": "door"
+  },
+  {
+   "x": 30,
+   "y": 29,
    "side": "N",
    "size": 1,
    "kind": "door"
   }
  ],
  "cells": {
-  "2": 192,
+  "2": 480,
   "6": 64,
   "8": 92,
   "5": 76,
@@ -763,7 +763,7 @@ export const BASE_PLAN = {
   "4": 48,
   "3": 111,
   "7": 84,
-  "0": 202
+  "0": 226
  },
- "total": 937
+ "total": 1249
 };
