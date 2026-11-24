@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mulberry32, rockTextures, rockGeometry, screenTexture, setEnvIntensity } from './lib.js';
 import { toXZ, bladeGeometry, grassMaterial } from './world.js';
-import { buildLayout, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES } from './outpost_layout.js';
+import { buildLayout, TILE, TILES, LEVELS, LEVEL_H, FLOOR, WALL_TYPES, MAP_NAME } from './outpost_layout.js';
 import { buildArmyTruck, ARMY_TRUCK, buildTiltrotor, buildCar, CARS } from './vehicles.js';
 import {
   wallPanelTextures, interiorFloorTextures, roofTextures, gratingTextures, corrugatedTextures,
@@ -30,11 +30,13 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1610);
+// подземная база: свет потолочных ламп — почти сверху, мягче, без длинных теней; рассеянный свет сильнее
+const UNDERGROUND = MAP_NAME === 'base';
+scene.background = new THREE.Color(UNDERGROUND ? 0x0c0b0a : 0x1a1610);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-scene.add(new THREE.HemisphereLight(0xc8dcff, 0x5a4a34, 0.75));
-export const sun = new THREE.DirectionalLight(0xfff4e0, 4.2);
-{ const offset = toXZ(-11, 7.5); sun.position.set(CENTER.x + offset.x * 1.6, 17.6, CENTER.z + offset.y * 1.6); }
+scene.add(UNDERGROUND ? new THREE.HemisphereLight(0xe4ecf4, 0x4c4842, 1.25) : new THREE.HemisphereLight(0xc8dcff, 0x5a4a34, 0.75));
+export const sun = new THREE.DirectionalLight(UNDERGROUND ? 0xfff6ea : 0xfff4e0, UNDERGROUND ? 2.6 : 4.2);
+{ const offset = toXZ(-11, 7.5), spread = UNDERGROUND ? 0.45 : 1.6; sun.position.set(CENTER.x + offset.x * spread, UNDERGROUND ? 24 : 17.6, CENTER.z + offset.y * spread); }
 sun.target.position.copy(CENTER);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
@@ -77,6 +79,9 @@ export const MAT = {
     return new THREE.MeshStandardMaterial({ map: textures.map, normalMap: textures.normalMap, color: color === 'orange' ? 0xc2551c : 0x2f5e8a, roughness: 0.6, metalness: 0.3 });
   }),
   rock: () => once('rock', () => { const textures = rockTextures(5, [150, 116, 88]); return new THREE.MeshStandardMaterial({ normalMap: textures.normalMap, color: 0x9c7a5e, roughness: 0.92 }); }),
+  // скала подземной базы: бока блока и срез сверху
+  baseRock: (variant) => once('baseRock' + variant, () => { const textures = rockTextures(11 + variant * 7, [120, 112, 102]); return new THREE.MeshStandardMaterial({ normalMap: textures.normalMap, color: 0x5e5750, roughness: 0.95 }); }),   // только рельеф: цветная карта на боках рябит
+  rockCut: (variant) => once('rockCut' + variant, () => { const textures = rockTextures(31 + variant * 5, [92, 86, 80]); return new THREE.MeshStandardMaterial({ normalMap: textures.normalMap, color: 0x57524c, roughness: 0.98 }); }),   // без цветной карты: в ней пятна «лишайника»
 };
 
 // ---------------- пометки для прохода ID ----------------
@@ -85,7 +90,7 @@ function tag(object, part, level, { biasCol = 0, biasRow = 0, auto = false } = {
     if (node.isMesh) {
       node.userData.id = { part, level, biasCol, biasRow, auto };
       node.castShadow = true;
-      node.receiveShadow = true;
+      node.receiveShadow = !node.userData.noShadowReceive;     // скала базы: свет почти сверху — на боках полосы самозатенения
     }
   });
   return object;
@@ -542,6 +547,45 @@ export function buildObject(item, viewLevel) {
       holder.position.set(cx, 0, cz);
       if (item.flip) holder.rotation.y = Math.PI;
       add(holder);
+      break;
+    }
+    case 'rockFill': {
+      // блок скалы вокруг помещений базы: высота item.height, срезанный вариант — до item.top (от пола уровня 0);
+      // заходит на 1,7 см к соседям с меньшими col и row (они рисуются раньше): на стыке блоков нет щели;
+      // к соседям, которые рисуются позже, не доходит 3 мм: грани не должны лежать в плоскостях среза клетки
+      // (иначе отсечение прорезает их через пиксель — сетка из точек)
+      // item.bottom — низ блока (для тайла уровня: блок от пола уровня, закрытый сверху, а не отсечённый)
+      const top = item.top !== undefined ? Math.min(item.top, item.height) : item.height, bottom = item.bottom || 0;
+      const variant = item.variant || 0;
+      const side = MAT.baseRock(variant), cut = MAT.rockCut(variant);
+      const rockBox = add(box(TILE + 0.014, top - bottom, TILE + 0.014, [side, side, cut, side, side, side], cx - 0.01, (top + bottom) / 2, cz - 0.01));
+      rockBox.userData.noShadowReceive = true;
+      const position = rockBox.geometry.attributes.position, uv = rockBox.geometry.attributes.uv, normal = rockBox.geometry.attributes.normal;
+      // UV по мировым координатам: соседние блоки и уровни стыкуются без повторов на каждой клетке
+      for (let index = 0; index < position.count; index++) {
+        const worldX = item.col * TILE + cx + position.getX(index), worldY = (top + bottom) / 2 + position.getY(index), worldZ = item.row * TILE + cz + position.getZ(index);
+        if (Math.abs(normal.getY(index)) > 0.5) uv.setXY(index, worldX / 8, worldZ / 8);
+        else if (Math.abs(normal.getX(index)) > 0.5) uv.setXY(index, worldZ / 8, worldY / 8);
+        else uv.setXY(index, worldX / 8, worldY / 8);
+      }
+      break;
+    }
+    case 'liftPlatform': {
+      // платформа подъёмника: стальной настил с швами и жёлто-чёрная кайма по краю
+      add(box(width - 0.04, 0.03, depth - 0.04, MAT.darkSteel(), cx, 0.06, cz));
+      for (let seam = 2.5; seam < width - 0.1; seam += 2.5) add(box(0.03, 0.035, depth - 0.3, MAT.rubber(), seam, 0.062, cz));
+      for (let seam = 2.5; seam < depth - 0.1; seam += 2.5) add(box(width - 0.3, 0.035, 0.03, MAT.rubber(), cx, 0.062, seam));
+      const segment = 0.5, band = 0.22;
+      for (let along = 0; along < width - 1e-6; along += segment) {
+        const material = Math.round(along / segment) % 2 ? MAT.rubber() : MAT.yellow(), length = Math.min(segment, width - along);
+        add(box(length, 0.04, band, material, along + length / 2, 0.065, band / 2 + 0.03));
+        add(box(length, 0.04, band, material, along + length / 2, 0.065, depth - band / 2 - 0.03));
+      }
+      for (let along = band + 0.03; along < depth - band - 0.03 - 1e-6; along += segment) {
+        const material = Math.round(along / segment) % 2 ? MAT.yellow() : MAT.rubber(), length = Math.min(segment, depth - band - 0.03 - along);
+        add(box(band, 0.04, length, material, band / 2 + 0.03, 0.065, along + length / 2));
+        add(box(band, 0.04, length, material, width - band / 2 - 0.03, 0.065, along + length / 2));
+      }
       break;
     }
     case 'paint':

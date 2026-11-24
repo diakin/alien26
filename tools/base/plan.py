@@ -1,7 +1,7 @@
 # План подземной базы: помещения — прямоугольники на сетке клеток 1,25 м. Проверяет пересечения,
 # считает клетки по модулям и рисует схему. python3 plan.py <папка вывода>
 # Пишет base_plan.png (схема), base_plan.json (помещения, двери — для будущей карты), base_plan.txt (таблица).
-import json, sys
+import os, json, sys
 from PIL import Image, ImageDraw, ImageFont
 
 CELL_METERS = 1.25
@@ -283,6 +283,11 @@ json.dump({'cellMeters': CELL_METERS, 'levelMeters': LEVEL_METERS, 'grid': [GRID
            'doors': [dict(x=item[0], y=item[1], side=item[2], size=item[3], kind=item[4]) for item in DOORS],
            'cells': {str(key): value for key, value in module_cells.items()}, 'total': total},
           open(out + '/base_plan.json', 'w'), ensure_ascii=False, indent=1)
+# тот же план — модулем для разметчика карты базы (tools/render/outpost_layout.js, MAP=base)
+render_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'render')
+with open(os.path.join(render_dir, 'base_plan.js'), 'w', encoding='utf-8') as output:
+    output.write('// Сгенерировано tools/base/plan.py из того же плана, что docs/base/base_plan.json. Не править вручную.\n')
+    output.write('export const BASE_PLAN = ' + open(out + '/base_plan.json', encoding='utf-8').read() + ';\n')
 for module in [1, 2, 3, 4, 5, 6, 7, 8, 0]:
     print('%-34s %4d' % (MODULES[module][0], module_cells.get(module, 0)))
 print('всего', total)

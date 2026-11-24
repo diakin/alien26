@@ -15,7 +15,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mulberry32, tileNoise, rockGeometry, setEnvIntensity, canvasTexture } from './lib.js';
 import { bladeGeometry, grassMaterial } from './world.js';
-import { TILE, TILES, LEVELS, LEVEL_H, FLOOR } from './outpost_layout.js';
+import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.js';
 import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
@@ -268,9 +268,15 @@ const plan = {
   doors: [],          // [col, row, level, 'W'|'N', тайл створки, тайл створки при срезе]
 };
 
-// земля
+// земля (под землёй, MAP=base: только плита пола в помещениях, вне их — темнота)
+const UNDERGROUND = MAP_NAME === 'base';
 for (let row = 0; row < TILES; row++) {
   for (let col = 0; col < TILES; col++) {
+    if (UNDERGROUND) {
+      if (layout.floor[0][row][col] !== FLOOR.interior) continue;
+      plan.ground[cellIndex(col, row)] = job('ground|base', { part: PART.ground, level: 0, col, row, shadow: false, slice: null }, () => plinthAndPlate(col, row, true));
+      continue;
+    }
     const concrete = insideConcrete((col + 0.5) * TILE, (row + 0.5) * TILE);
     // плита пола — только под зданиями (на цоколе); салон конвертоплана тоже «внутри», но пол у него свой
     const cover = plinthCover(col, row), plate = layout.indoor[0][row][col] === 1 && cover !== 'none';
@@ -367,10 +373,28 @@ function addTiltrotor(item) {
     }
   }
 }
+// Скала вокруг помещений базы: на каждый уровень, который задевает блок, — свой закрытый блок от пола уровня
+// до его верха (у отсечённого по высоте блока срез был бы полым, и сквозь него видны грани соседей). У каждого
+// слоя есть вариант для среза стен: блок до пола уровня + 0,8 м, как срезанные стены. Тайл не зависит от клетки:
+// подпись — по виду блока и уровню.
+const ROCK_CUT = 0.8;
+function addRock(item) {
+  const build = (bottom, top) => () => { const group = buildObject({ ...item, bottom, top }, LEVELS - 1); group.userData.col0 = item.col; group.userData.row0 = item.row; return group; };
+  for (const slice of touchedSlices(build(0, undefined)(), true, item.level)) {
+    if (slice.col !== item.col || slice.row !== item.row) continue;     // только своя клетка
+    const bottom = slice.level * LEVEL_H;
+    const info = { part: PART.object, level: slice.level, col: slice.col, row: slice.row, shadow: true, slice };
+    const id = job(`rock|${item.type}|${slice.level}`, info, build(bottom, Math.min(item.height, bottom + LEVEL_H)));
+    const cutId = job(`rock|${item.type}|${slice.level}|cut`, { ...info, shadow: false }, build(bottom, bottom + ROCK_CUT));
+    plan.cutOf[id] = cutId;
+    plan.objects.push([id, slice.col, slice.row, slice.level]);
+  }
+}
 for (const item of layout.objects) {
   if (item.kind === 'towerLeg') continue;
   if (item.kind === 'tiltrotor') { addTiltrotor(item); continue; }
-  const ladder = item.kind === 'ladder', paint = item.kind === 'paint';
+  if (item.kind === 'rockFill') { addRock(item); continue; }
+  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform';
   const unique = ladder || RANDOM_KINDS.has(item.kind);
   const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
   // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;
@@ -532,7 +556,7 @@ function solidBoxes() {
   const boxes = [];
   for (const item of layout.objects) {
     if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
-    if (item.kind === 'paint') continue;
+    if (item.kind === 'paint' || item.kind === 'liftPlatform') continue;
     const group = buildObject(item, LEVELS - 1);
     if (!group) continue;
     group.updateMatrixWorld(true);
