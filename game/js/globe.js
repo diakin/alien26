@@ -7,7 +7,7 @@ var Globe = (function () {
 
   var DEGREE = Math.PI / 180;
   var PANEL_WIDTH = 250;
-  var MISSION = { name: 'БАЗА НА ПЛАТО', lat: 47.5, lon: 68.0, page: 'index.html' };
+  var MISSION = { name: 'ПОСАДКА У БАЗЫ', lat: 47.5, lon: 68.0, page: 'tiles_big.html' };   // большая карта: отряд в конвертоплане
   var MIN_ZOOM = 0.7, MAX_ZOOM = 2.6;
 
   var canvas = document.getElementById('space');
