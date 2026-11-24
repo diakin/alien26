@@ -238,7 +238,7 @@
       maxTimeUnits: 64, health: 52, maxHealth: 58, stamina: 84, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] },
     { kind: 'mech', name: 'Шагающая машина K7', callsign: 'K7', rank: 'машина', subtitle: 'ПОДДЕРЖКА · ЗАНИМАЕТ 2×2 КЛЕТКИ', camo: 'mech',
-      side: 'squad', accuracy: 62, reactions: 38, armor: 45, weaponType: 'autocannon',
+      side: 'squad', accuracy: 62, reactions: 38, armor: 35, weaponType: 'autocannon',
       weapon: 'АВТОПУШКА АП-30', weaponNote: 'КАЛИБР 30 ММ · ЛЕНТА', ammo: 40, reserve: 3,
       maxTimeUnits: 72, health: 360, maxHealth: 360, stamina: 100, maxStamina: 100, morale: 100, optics: 'ТЕПЛОВИЗОР',
       statLabels: ['ОЧКИ ДЕЙСТВИЯ', 'КОРПУС', 'ЭНЕРГИЯ', 'СВЯЗЬ'] }
