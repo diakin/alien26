@@ -497,6 +497,137 @@
     });
   }
 
+  // ---------------- туман войны ----------------
+  // Как в UFO: видно то, что видят бойцы отряда. Каждый боец смотрит конусом 120° по направлению взгляда
+  // на VISION_CELLS клеток и на соседние клетки вокруг себя. Луч идёт по клеткам своего уровня; стены, обшивка
+  // и закрытые двери его останавливают, окна, перила и парапеты — нет. Над проёмом без пола (с верхнего этажа
+  // через окно) луч отмечает видимой клетку ниже. Клетки, которые видели хоть раз, — «разведаны».
+  // На карте: не видимая сейчас клетка затемнена (разведанная слабее, неразведанная сильнее); пришелец виден,
+  // только если его клетка видна сейчас или он стрелял (виден до конца следующего хода отряда).
+  // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
+  var VISION_CELLS = 24, VISION_HALF_ANGLE = Math.PI / 3, VISION_NEAR = 1.6, FOG_RAYS = 360;
+  var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка
+  var fog = { visible: null, seen: null, signature: '', checkAt: 0, items: {}, version: 0 };
+  var doorByEdge = {};
+  doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
+  // направление взгляда юнита (0..7) — вектор в клетках, по Iso.directionOf
+  var DIRECTION_VECTORS = (function () {
+    var vectors = [];
+    for (var step = 0; step < 8; step++) {
+      var angle = step * Math.PI / 4, vector = { x: Math.cos(angle), y: Math.sin(angle) };
+      var direction = Iso.directionOf(vector.x, vector.y);
+      if (direction >= 0) vectors[direction] = vector;
+    }
+    return vectors;
+  })();
+  function fogEnabled() {
+    return !!MAP.tileset && MAP.combat !== false && PAGE_MODE !== 'manage' && (!window.Settings || Settings.values.fog !== false);
+  }
+  function sightBlocked(walls, orient, level, col, row) {
+    if (col < 0 || row < 0 || col > GRID || row > GRID) return true;
+    var rule = SIGHT_BLOCKS[walls[level][row * WALL_STRIDE + col]];
+    if (rule === 'door') { var door = doorByEdge[orient + ':' + col + ':' + row + ':' + level]; return !door || door.open < 0.5; }
+    return !!rule;
+  }
+  // можно ли взгляду перейти из клетки в соседнюю по стороне
+  function sightOpen(col, row, nextCol, nextRow, level) {
+    if (nextCol === col + 1) return !sightBlocked(MAP.wallW, 'W', level, col + 1, row);
+    if (nextCol === col - 1) return !sightBlocked(MAP.wallW, 'W', level, col, row);
+    if (nextRow === row + 1) return !sightBlocked(MAP.wallN, 'N', level, col, row + 1);
+    if (nextRow === row - 1) return !sightBlocked(MAP.wallN, 'N', level, col, row);
+    return true;
+  }
+  function markSeen(grids, col, row, level) {
+    for (var below = level; below >= 0; below--) {
+      if (floorAt(col, row, below)) { grids[below][row * GRID + col] = 1; return; }
+    }
+  }
+  function castVision(unit, grids) {
+    var level = unit.level, facing = DIRECTION_VECTORS[unit.direction] || { x: 1, y: 0 };
+    var facingAngle = Math.atan2(facing.y, facing.x);
+    for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) markSeen(grids, unit.col + deltaCol, unit.row + deltaRow, level);
+    for (var ray = 0; ray < FOG_RAYS; ray++) {
+      var angle = ray / FOG_RAYS * Math.PI * 2;
+      var difference = Math.abs(Math.atan2(Math.sin(angle - facingAngle), Math.cos(angle - facingAngle)));
+      var range = difference <= VISION_HALF_ANGLE ? VISION_CELLS : VISION_NEAR + unit.size / 2;
+      var stepX = Math.cos(angle) * 0.3, stepY = Math.sin(angle) * 0.3;
+      var x = unit.x, y = unit.y, col = Math.floor(x), row = Math.floor(y);
+      for (var travelled = 0; travelled < range; travelled += 0.3) {
+        x += stepX; y += stepY;
+        var nextCol = Math.floor(x), nextRow = Math.floor(y);
+        if (nextCol === col && nextRow === row) continue;
+        if (!inside(nextCol, nextRow)) break;
+        var open;
+        if (nextCol !== col && nextRow !== row) {
+          open = (sightOpen(col, row, nextCol, row, level) && sightOpen(nextCol, row, nextCol, nextRow, level)) ||
+            (sightOpen(col, row, col, nextRow, level) && sightOpen(col, nextRow, nextCol, nextRow, level));
+        } else open = sightOpen(col, row, nextCol, nextRow, level);
+        if (!open) break;
+        col = nextCol; row = nextRow;
+        markSeen(grids, col, row, level);
+      }
+    }
+  }
+  function newFogGrids() { var grids = []; for (var level = 0; level < LEVELS; level++) grids.push(new Uint8Array(GRID * GRID)); return grids; }
+  function computeFog() {
+    var next = newFogGrids();
+    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next); });
+    if (!fog.seen) fog.seen = newFogGrids();
+    var changed = [];
+    for (var level = 0; level < LEVELS; level++) {
+      for (var cell = 0; cell < GRID * GRID; cell++) {
+        var before = fog.visible ? fog.visible[level][cell] : -1;
+        if (next[level][cell]) fog.seen[level][cell] = 1;
+        if (before !== next[level][cell]) changed.push([cell % GRID, Math.floor(cell / GRID), level]);
+      }
+    }
+    fog.visible = next;
+    if (!changed.length) return;
+    fog.items = {}; fog.version++;
+    invalidateChunks(changed);
+  }
+  // пересчёт, когда сменились клетки или взгляд бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
+  function updateFog(now) {
+    if (!fogEnabled() || now < fog.checkAt) return;
+    fog.checkAt = now + 200;
+    var parts = [];
+    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) parts.push(unit.col, unit.row, unit.level, unit.direction); });
+    doors.forEach(function (door) { parts.push(door.open < 0.5 ? 0 : 1); });
+    var signature = parts.join(',');
+    if (signature === fog.signature && fog.visible) return;
+    fog.signature = signature;
+    computeFog();
+  }
+  function cellVisible(col, row, level) { return !fogEnabled() || !fog.visible || !!fog.visible[level][row * GRID + col]; }
+  // виден ли юнит игроку: свои всегда; пришелец — если видна его клетка или он недавно стрелял
+  function isSeen(unit) {
+    if (!unit || unit.side !== 'aliens' || !fogEnabled() || !fog.visible) return true;
+    if (unit.revealedTurn === turn || (unit.revealedTurn === turn - 1 && phase === 'squad')) return true;
+    for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
+      if (cellVisible(unit.col + deltaCol, unit.row + deltaRow, unit.level)) return true;
+    }
+    return false;
+  }
+  // затемнение пола клеток, которые сейчас не видны: в общем порядке глубины сразу после пола
+  function fogItems(viewLevel) {
+    if (!fogEnabled() || !fog.visible) return [];
+    if (fog.items[viewLevel]) return fog.items[viewLevel];
+    var items = [];
+    for (var level = 0; level <= viewLevel; level++) {
+      for (var row = 0; row < GRID; row++) for (var col = 0; col < GRID; col++) {
+        var cell = row * GRID + col;
+        if (fog.visible[level][cell] || !floorAt(col, row, level)) continue;
+        (function (corners, alpha) {
+          items.push({ depth: depthKey(col, row, level, 1.3), rect: quadRect(corners, 2), draw: function () {
+            quadPath(corners); context.fillStyle = 'rgba(4, 7, 10, ' + alpha + ')'; context.fill();
+          } });
+        })(Iso.tileCorners(col, row, elevationOf(col, row, level)), fog.seen[level][cell] ? 0.34 : 0.62);
+      }
+    }
+    fog.items[viewLevel] = items;
+    return items;
+  }
+
   // ---------------- уровни обзора и варианты картинки ----------------
   var view = { level: 0, cut: false };
   // Обстановка: мирная — бойцы на своей базе или на посту, стоящие юниты в стойке «вольно» (если у набора
@@ -668,6 +799,18 @@
     while (chunks.size > CHUNK_LIMIT) chunks.delete(chunks.keys().next().value);
     tileStats.chunks = chunks.size;
   }
+  // туман изменился: убрать куски, которые задевают изменившиеся клетки (много клеток — все куски)
+  function invalidateChunks(cells) {
+    if (cells.length > 400) { chunks.clear(); return; }
+    var stale = {};
+    cells.forEach(function (cell) {
+      var rect = quadRect(Iso.tileCorners(cell[0], cell[1], elevationOf(cell[0], cell[1], cell[2])), 3);
+      for (var chunkY = Math.floor(rect.y / CHUNK); chunkY <= Math.floor((rect.y + rect.height) / CHUNK); chunkY++) {
+        for (var chunkX = Math.floor(rect.x / CHUNK); chunkX <= Math.floor((rect.x + rect.width) / CHUNK); chunkX++) stale[chunkX + ':' + chunkY] = true;
+      }
+    });
+    Array.from(chunks.keys()).forEach(function (key) { var parts = key.split(':'); if (stale[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunks.delete(key); });
+  }
   function buildChunk(current, chunkX, chunkY) {
     var chunk = document.createElement('canvas');
     chunk.width = chunk.height = CHUNK;
@@ -676,6 +819,7 @@
       var list = [];
       current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
       staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
+      fogItems(view.level).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
       list.sort(function (first, second) { return first.depth - second.depth; });
       list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
     });
@@ -1133,6 +1277,7 @@
 
   function fire(shooter, target, modeIndex, delay) {
     delay = delay || 0;
+    if (shooter.side === 'aliens') shooter.revealedTurn = turn;
     var weapon = weaponOf(shooter);
     if (!weapon) { say('Нет оружия'); return false; }
     var mode = weapon.modes[modeIndex] || weapon.modes[0];
@@ -1600,7 +1745,7 @@
   // или скрытно подходит. В мирной обстановке пришельцы ничего не делают.
   var aiQueue = [], aiWaitUntil = 0;
   function watchUnit(unit) {
-    if (!Settings.values.followAliens) return;
+    if (!Settings.values.followAliens || !isSeen(unit)) return;
     centerOn(unit.x, unit.y, unit.elevation);
     var level = followLevel(unit);
     setView(level, isIndoor(unit.col, unit.row, unit.level) || isIndoor(unit.col, unit.row, level));
@@ -1658,7 +1803,7 @@
     if (!viewer || viewer.dead || viewer.side !== 'squad') { spotted.list = []; return; }
     var list = [];
     units.forEach(function (unit) {
-      if (unit.side !== 'aliens' || unit.dead) return;
+      if (unit.side !== 'aliens' || unit.dead || !isSeen(unit)) return;
       var distance = canSee(viewer, unit);
       if (distance !== null) list.push({ unit: unit, distance: distance });
     });
@@ -1727,9 +1872,10 @@
   // ---- музыка (js/music.js): общая тема, пока тихо; боевая — если стреляли в этот или прошлый ход
   // либо живые пришелец и боец ближе 25 м видят друг друга (ничто не заслоняет линию от ствола до корпуса) ----
   var lastShotTurn = -10, musicCheckAt = 0, CONTACT_METERS = 25;
+  // контакт: пришелец виден отряду (с туманом войны — только обнаруженный) и между ним и бойцом свободная линия огня
   function inContact() {
     return units.some(function (alien) {
-      if (alien.side !== 'aliens' || alien.dead) return false;
+      if (alien.side !== 'aliens' || alien.dead || !isSeen(alien)) return false;
       return units.some(function (unit) {
         if (unit.side !== 'squad' || unit.dead) return false;
         var point = targetPointOf(unit), from = muzzleOf(alien, point);
@@ -1741,7 +1887,12 @@
     });
   }
   // мирная обстановка — общая тема; бой — фон «Тень», при контакте или стрельбе — с пульсом
-  function musicMood() { return !combat ? 'calm' : turn - lastShotTurn <= 1 || inContact() ? 'battle' : 'tactical'; }
+  // настроение музыки: мирно — общая тема; бой без контакта (пришельцев ещё не видно) — «Высадка»; контакт или стрельба
+  // на этом или прошлом ходу — «Штурм»; задание кончилось (эвакуация, зачистка) — «Возвращение»
+  function musicMood() {
+    if (mission.over) return 'debrief';
+    return !combat ? 'calm' : turn - lastShotTurn <= 1 || inContact() ? 'battle' : 'tactical';
+  }
   function updateMusic(now) {
     if (!window.Music || now < musicCheckAt) return;
     musicCheckAt = now + 1000;                     // раз в секунду: трассировки пар пришелец — боец
@@ -2443,7 +2594,7 @@
   function unitUnderMouse(preferEnemy) {
     var best = null;
     units.forEach(function (unit) {
-      if (unit.level > view.level) return;
+      if (unit.level > view.level || !isSeen(unit)) return;
       var foot = Iso.toScreen(unit.x, unit.y, unit.elevation);
       var left = foot.x - camera.x - unit.pickWidth, right = foot.x - camera.x + unit.pickWidth;
       var top = foot.y - camera.y - unit.height * Iso.pixelsPerMeterUp, bottom = foot.y - camera.y + 8 * unit.size;
@@ -2566,7 +2717,7 @@
   }
   // ход пришельцев: идущий пришелец ушёл за край кадра — камера снова ставит его в центр (и на его уровень)
   function followMovingAlien(unit) {
-    if (phase !== 'aliens' || unit.side !== 'aliens' || !Settings.values.followAliens || shotView) return;
+    if (phase !== 'aliens' || unit.side !== 'aliens' || !Settings.values.followAliens || shotView || !isSeen(unit)) return;
     if (!frameFor(unit.x, unit.y, unit.elevation, unit.height || 2).inside) watchUnit(unit);
   }
   function updateUnit(unit, seconds) {
@@ -2613,7 +2764,7 @@
       var direction = Iso.directionOf(deltaX, deltaY);
       if (direction >= 0) unit.direction = direction;
     }
-    var stepTiles = unit.speed * Settings.values.moveSpeed * seconds / Iso.tileMeters;
+    var stepTiles = unit.speed * Settings.values.moveSpeed * seconds / Iso.tileMeters * (isSeen(unit) ? 1 : 4);
     footstep(unit, stepTiles * Iso.tileMeters);
     followMovingAlien(unit);
     if (distanceTiles <= stepTiles) {
@@ -3029,7 +3180,7 @@
     if (hover) drawList.push({ depth: depthKey(hover.tile.col, hover.tile.row, hover.tile.level, 1.45), draw: function () { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); } });
     drawList.push({ depth: -1, draw: drawPath });
     units.forEach(function (unit) {
-      if (unit.level > view.level) return;          // выше уровня обзора — не видно
+      if (unit.level > view.level || !isSeen(unit)) return;          // выше уровня обзора — не видно
       var position = drawPosition(unit);
       rects.push(spriteRect(unit, position));
       drawList.push({ depth: unitDepth(unit), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation, unit); } });
@@ -3085,7 +3236,7 @@
       dynamic.push({ depth: depthKey(hover.tile.col, hover.tile.row, hover.tile.level, 1.45), rect: quadRect(boxCorners, 4), draw: function () { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); } });
     }
     units.forEach(function (unit) {
-      if (unit.level > view.level) return;
+      if (unit.level > view.level || !isSeen(unit)) return;
       var position = drawPosition(unit);
       dynamic.push({ depth: unitDepth(unit), rect: spriteRect(unit, position), draw: function () { drawSprite(spriteName(unit), position.x, position.y, position.elevation, unit); } });
     });
@@ -3117,7 +3268,7 @@
       groups.push(group);
     });
     tileStats.pieces = 0;
-    var overlays = staticItems(current);
+    var overlays = staticItems(current).concat(fogItems(view.level));
     groups.forEach(function (group) {
       var threshold = Infinity;
       group.items.forEach(function (item) { threshold = Math.min(threshold, item.depth); });
@@ -3150,6 +3301,7 @@
   setCombat(combat);
   setPhaseLabel();
   var Game = window.Game = {
+    isSeen: function (unit) { return isSeen(unit); },
     COST: COST, MAGAZINE: MAGAZINE, FIRE_MODES: FIRE_MODES, GRID: GRID,
     units: units, obstacles: obstacles, camera: camera, KINDS: KINDS,
     get selected() { return selected; },
@@ -3241,6 +3393,7 @@
     updateAI(now);
     updateGather();
     updateMission(now);
+    updateFog(now);
     updateMissionClock(now);
     updateTimerLabel();
     updateMusic(now);
@@ -3285,6 +3438,7 @@
     if (help) help.style.display = values.showHelp ? '' : 'none';
     if (values.renderScale !== renderScale) { renderScale = values.renderScale; resize(); }
     if (key === 'fullscreen') setTimeout(resize, 200);
+    if (key === 'fog') { chunks.clear(); fog.items = {}; fog.signature = ''; fog.checkAt = 0; }
   });
   resize();
   setView(selected.level, false);
@@ -3302,7 +3456,7 @@
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
     },
-    missionClock: missionClock, get portal() { return portal; },
+    missionClock: missionClock, get portal() { return portal; }, fog: fog, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };

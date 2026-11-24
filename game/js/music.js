@@ -684,7 +684,172 @@ var Music = (function () {
   }
   var SHADE = shadeTheme('shade', false), SHADE_CONTACT = shadeTheme('contact', true);
 
-  var THEMES = { calm: CALM, battle: BATTLE, shade: SHADE, contact: SHADE_CONTACT };
+  // ---------------- набор «Высадка — Штурм — Возвращение» ----------------
+  // Общая тональность ля минор у первых двух тем: при контакте музыка меняется, но остаётся той же «историей».
+  // Записи мелодий: [такт, доля, нота, длительность в долях].
+
+  // «Высадка»: 70 ударов, 32 такта (≈110 с). Плавная подушка над гулом, тихое остинато восьмыми (3+3+2),
+  // фразы валторны на тактах 4–7 и 12–15; на втором проходе — длинная мелодия ниже, редкие удары литавры,
+  // «сонар» и тиканье. Неаполитанский Bb перед доминантой и задержания sus4 держат напряжение.
+  var LANDING_CHORDS = [
+    { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [59, 60, 64] }, { bass: 29, pad: [57, 60, 64] }, { bass: 29, pad: [57, 60, 65] },
+    { bass: 26, pad: [57, 62, 65] }, { bass: 26, pad: [57, 62, 64] }, { bass: 28, pad: [57, 59, 64] }, { bass: 28, pad: [56, 59, 64] },
+    { bass: 33, pad: [57, 60, 64] }, { bass: 31, pad: [55, 60, 64] }, { bass: 29, pad: [57, 60, 65] }, { bass: 31, pad: [55, 59, 62] },
+    { bass: 26, pad: [57, 62, 65] }, { bass: 34, pad: [58, 62, 65] }, { bass: 28, pad: [57, 59, 64] }, { bass: 28, pad: [56, 59, 64] }
+  ];
+  var LANDING_CALLS = [
+    [4, 0, 69, 3], [4, 3, 72, 1], [5, 0, 74, 2], [5, 2, 72, 2], [6, 0, 71, 3], [6, 3, 69, 1], [7, 0, 68, 4],
+    [12, 0, 77, 2], [12, 2, 76, 1], [12, 3, 74, 1], [13, 0, 74, 3], [13, 3, 72, 1], [14, 0, 71, 2], [14, 2, 72, 1], [14, 3, 71, 1], [15, 0, 68, 4]
+  ];
+  var LANDING_LINE = [
+    [0, 0, 64, 4], [1, 0, 67, 2], [1, 2, 69, 2], [2, 0, 72, 4], [3, 0, 71, 4], [4, 0, 69, 3], [4, 3, 72, 1], [5, 0, 74, 4],
+    [6, 0, 76, 2], [6, 2, 74, 2], [7, 0, 71, 4], [8, 0, 69, 2], [8, 2, 72, 2], [9, 0, 76, 4], [10, 0, 77, 3], [10, 3, 76, 1],
+    [11, 0, 74, 4], [12, 0, 74, 2], [12, 2, 77, 2], [13, 0, 74, 4], [14, 0, 71, 3], [14, 3, 72, 1], [15, 0, 68, 4]
+  ];
+  var OSTINATO = [0, 2, 1, 0, 2, 1, 2, 3];          // звуки аккорда по восьмым: 3+3+2
+  var LANDING = {
+    name: 'landing', tempo: 70, bars: 32, echo: 0.75 * 60 / 70, level: 1.2,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4;
+      var chord = LANDING_CHORDS[bar % 16], second = bar >= 16;
+      pad(kit, chord.pad, time, barLength + 0.08, { cutoff: 850, peak: 0.03, attack: 1.4, release: 2.2, detune: 8, reverb: 0.5 });
+      deepDrone(kit, chord.bass + 12, time, barLength + 0.5, 0.12);
+      if (absoluteBar >= 2) {
+        var tones = [chord.pad[0] - 12, chord.pad[1] - 12, chord.pad[2] - 12, chord.pad[0]];
+        for (var step = 0; step < 8; step++) {
+          var accent = step === 0 || step === 3 || step === 6;
+          pluck(kit, tones[OSTINATO[step]], time + step * beat / 2, {
+            type: 'triangle', peak: vary(accent ? 0.13 : 0.08, 0.15), decay: 0.32, cutoff: 1100, reverb: 0.3, echo: 0.22, pan: step % 2 ? 0.25 : -0.25
+          });
+        }
+      }
+      if (!second) {
+        LANDING_CALLS.forEach(function (entry) {
+          if (entry[0] !== bar) return;
+          lead(kit, entry[2], time + entry[1] * beat, entry[3] * beat, { types: ['triangle', 'sine'], peak: 0.06, cutoff: 1900, attack: 0.22, release: 0.9, vibrato: 0.004, reverb: 0.55, echo: 0.2 });
+        });
+        if (bar % 8 === 3) ping(kit, 88, time + 2 * beat, 0.07, 0.4);
+      } else {
+        LANDING_LINE.forEach(function (entry) {
+          if (entry[0] !== bar - 16) return;
+          lead(kit, entry[2] - 12, time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.045, cutoff: 1200, attack: 0.3, release: 1.0, vibrato: 0.003, reverb: 0.5, echo: 0.15 });
+        });
+        if (bar % 2 === 0) drum(kit, time, 62, 0.22, 1.1, 0);
+        for (var tick = 1; tick < 8; tick += 2) hat(kit, time + tick * beat / 2, 0.035, 0.02, 0.3);
+        if (bar % 4 === 1) glass(kit, chord.pad[2] + 24, time + beat, barLength * 2, 0.02, -0.4);
+      }
+      if (bar === 15 || bar === 31) swell(kit, time, barLength, 0.06);
+    }
+  };
+
+  // «Штурм»: 100 ударов (не так часто, как прежняя ритмичная), 32 такта. Бас восьмыми с акцентами 3+3+2,
+  // бочка и малый барабан вполсилы (малый на третью долю), арпеджио восьмыми мягким треугольником.
+  // Первый проход — короткие аккорды-удары, второй — мелодия перекличкой коротких фраз.
+  var ASSAULT_CHORDS = [
+    { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [57, 60, 64] }, { bass: 29, pad: [57, 60, 65] }, { bass: 31, pad: [55, 59, 62] },
+    { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [57, 60, 64] }, { bass: 26, pad: [57, 62, 65] }, { bass: 28, pad: [56, 59, 64] },
+    { bass: 29, pad: [57, 60, 65] }, { bass: 31, pad: [55, 59, 62] }, { bass: 33, pad: [57, 60, 64] }, { bass: 28, pad: [55, 60, 64] },
+    { bass: 26, pad: [57, 62, 65] }, { bass: 29, pad: [57, 60, 65] }, { bass: 28, pad: [57, 59, 64] }, { bass: 28, pad: [56, 59, 64] }
+  ];
+  var ASSAULT_MELODY = [
+    [0, 0, 76, 1], [0, 1, 74, 0.5], [0, 1.5, 72, 0.5], [0, 2, 71, 1], [0, 3, 72, 1], [1, 0, 69, 3],
+    [2, 0, 72, 1], [2, 1, 74, 1], [2, 2, 76, 2], [3, 0, 74, 2], [3, 2, 71, 2],
+    [4, 0, 76, 1], [4, 1, 77, 0.5], [4, 1.5, 76, 0.5], [4, 2, 74, 1], [4, 3, 72, 1], [5, 0, 76, 3],
+    [6, 0, 77, 1.5], [6, 1.5, 76, 0.5], [6, 2, 74, 2], [7, 0, 71, 2], [7, 2, 68, 2],
+    [8, 0, 72, 1], [8, 1, 74, 1], [8, 2, 77, 2], [9, 0, 79, 2], [9, 2, 74, 2],
+    [10, 0, 76, 1.5], [10, 1.5, 72, 0.5], [10, 2, 69, 2], [11, 0, 72, 2], [11, 2, 76, 2],
+    [12, 0, 77, 1], [12, 1, 76, 1], [12, 2, 74, 1], [12, 3, 72, 1], [13, 0, 72, 2], [13, 2, 77, 2],
+    [14, 0, 76, 2], [14, 2, 74, 1], [14, 3, 71, 1], [15, 0, 68, 4]
+  ];
+  var ASSAULT_BASS = [0, 0, 12, 0, 0, 12, 7, 0];
+  var ASSAULT = {
+    name: 'assault', tempo: 100, bars: 32, echo: 0.75 * 60 / 100, level: 1.0,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, sixteenth = beat / 4, barLength = beat * 4;
+      var chord = ASSAULT_CHORDS[bar % 16], second = bar >= 16;
+      pad(kit, chord.pad, time, barLength + 0.02, { cutoff: 1000, peak: 0.028, attack: 0.4, release: 0.8, detune: 8, reverb: 0.4 });
+      for (var eighth = 0; eighth < 8; eighth++) {
+        var accent = eighth === 0 || eighth === 3 || eighth === 6;
+        pulseBass(kit, chord.bass + 12 + ASSAULT_BASS[eighth], time + eighth * beat / 2, beat * 0.4, accent ? 0.14 : 0.08);
+      }
+      if (absoluteBar >= 1) {
+        for (var step = 0; step < 16; step++) {
+          var at = time + step * sixteenth;
+          if (step === 0 || step === 6 || step === 10) kick(kit, at, step === 0 ? 0.42 : 0.3);
+          if (step === 8) snare(kit, at, 0.32);
+          if (step === 14 && bar % 2) snare(kit, at, 0.1);
+          if (step % 4 === 2) hat(kit, at, 0.09, 0.035, 0.25);
+        }
+        if (bar % 4 === 0) drum(kit, time, 80, 0.28, 0.7, 0);
+        if (bar % 8 === 7) [190, 160, 130, 100].forEach(function (frequency, index) { drum(kit, time + (12 + index) * sixteenth, frequency, 0.2, 0.3, 0.3 - index * 0.2); });
+      }
+      var tones = [chord.pad[0], chord.pad[1], chord.pad[2], chord.pad[1]];
+      for (var pulse = 0; pulse < 8; pulse++) {
+        pluck(kit, tones[pulse % 4] + 12, time + pulse * beat / 2, { type: 'triangle', peak: second ? 0.06 : 0.09, decay: 0.22, cutoff: 1700, reverb: 0.25, echo: 0.2, pan: pulse % 2 ? 0.35 : -0.35 });
+      }
+      if (!second && absoluteBar >= 2 && bar % 2 === 1) {
+        stab(kit, chord.pad.map(function (note) { return note + 12; }), time + 6 * sixteenth, 0.1);
+        stab(kit, chord.pad.map(function (note) { return note + 12; }), time + 14 * sixteenth, 0.08);
+      }
+      if (second) {
+        ASSAULT_MELODY.forEach(function (entry) {
+          if (entry[0] !== bar - 16) return;
+          lead(kit, entry[2], time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.06, cutoff: 1800, attack: 0.03, release: 0.3, vibrato: 0.004, vibratoRate: 5.2, reverb: 0.4, echo: 0.22 });
+        });
+      }
+      if (bar === 15 || bar === 31) riser(kit, time, barLength, 0.05);
+    }
+  };
+
+  // «Возвращение»: 66 ударов, ре мажор, 32 такта. Тёплая подушка, бас, мелодия поднимается к верхней точке
+  // на такте 12; второй проход без мелодии — фортепианное арпеджио и колокола, в конце задержание sus4 → A.
+  var RETURN_CHORDS = [
+    { bass: 38, pad: [62, 66, 69] }, { bass: 37, pad: [61, 64, 69] }, { bass: 35, pad: [62, 66, 71] }, { bass: 31, pad: [62, 67, 71] },
+    { bass: 38, pad: [62, 66, 69] }, { bass: 33, pad: [61, 64, 69] }, { bass: 31, pad: [59, 62, 67] }, { bass: 33, pad: [62, 64, 69] },
+    { bass: 31, pad: [62, 67, 71] }, { bass: 30, pad: [62, 66, 69] }, { bass: 28, pad: [59, 64, 67] }, { bass: 33, pad: [61, 64, 69] },
+    { bass: 35, pad: [62, 66, 71] }, { bass: 31, pad: [62, 67, 71] }, { bass: 33, pad: [62, 64, 69] }, { bass: 33, pad: [61, 64, 69] }
+  ];
+  var RETURN_MELODY = [
+    [0, 0, 74, 2], [0, 2, 76, 1], [0, 3, 78, 1], [1, 0, 76, 3], [1, 3, 73, 1],
+    [2, 0, 74, 2], [2, 2, 78, 1], [2, 3, 81, 1], [3, 0, 79, 4],
+    [4, 0, 78, 2], [4, 2, 76, 1], [4, 3, 74, 1], [5, 0, 76, 3], [5, 3, 69, 1],
+    [6, 0, 71, 2], [6, 2, 74, 1], [6, 3, 76, 1], [7, 0, 76, 2], [7, 2, 73, 2],
+    [8, 0, 74, 2], [8, 2, 79, 2], [9, 0, 78, 3], [9, 3, 74, 1],
+    [10, 0, 76, 2], [10, 2, 79, 1], [10, 3, 83, 1], [11, 0, 81, 4],
+    [12, 0, 83, 2], [12, 2, 81, 1], [12, 3, 78, 1], [13, 0, 79, 2], [13, 2, 83, 2],
+    [14, 0, 81, 3], [14, 3, 78, 1], [15, 0, 76, 2], [15, 2, 73, 2]
+  ];
+  var RETURN_ARP = [0, 1, 2, 3, 2, 1, 3, 2];
+  var RETURN = {
+    name: 'return', tempo: 66, bars: 32, echo: 0.75 * 60 / 66, level: 0.95,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4;
+      var chord = RETURN_CHORDS[bar % 16], second = bar >= 16;
+      pad(kit, chord.pad, time, barLength + 0.08, { cutoff: 1400, peak: 0.034, attack: 1.2, release: 2.0, detune: 6, reverb: 0.5 });
+      drone(kit, chord.bass, time, barLength, 0.12);
+      var tones = [chord.pad[0], chord.pad[1], chord.pad[2], chord.pad[0] + 12];
+      if (absoluteBar >= 1) {
+        for (var step = 0; step < 8; step++) {
+          pluck(kit, tones[RETURN_ARP[step]] + (second ? 12 : 0), time + step * beat / 2, {
+            type: 'triangle', peak: vary(second ? 0.16 : 0.11, 0.2), decay: 0.9, cutoff: 2600, reverb: 0.45, echo: 0.25, pan: step % 2 ? 0.3 : -0.3
+          });
+        }
+      }
+      if (!second) {
+        RETURN_MELODY.forEach(function (entry) {
+          if (entry[0] !== bar) return;
+          lead(kit, entry[2], time + entry[1] * beat, entry[3] * beat, { types: ['sine', 'triangle'], peak: 0.075, cutoff: 3000, attack: 0.12, release: 0.8, vibrato: 0.005, reverb: 0.55, echo: 0.2 });
+        });
+        if (bar % 4 === 3) bell(kit, chord.pad[2] + 12, time + 2 * beat, 0.12, 0.3);
+      } else {
+        bell(kit, chord.pad[2] + 12, time, 0.16, -0.2);
+        if (bar % 2) bell(kit, chord.pad[1] + 24, time + 2.5 * beat, 0.1, 0.3);
+        if (bar % 8 === 0) swell(kit, time, barLength * 2, 0.04);
+      }
+    }
+  };
+
+  var THEMES = { calm: CALM, battle: BATTLE, shade: SHADE, contact: SHADE_CONTACT, landing: LANDING, assault: ASSAULT, 'return': RETURN };
 
 
   // ---------------- воспроизведение в игре ----------------
@@ -695,7 +860,7 @@ var Music = (function () {
   var FADE_OUT = 3;
   var timing = { play: 30, pause: 30 };
   var context = null, master = null, runs = [], mood = 'calm', timer = null;
-  var resumeBar = { calm: 0, battle: 0, shade: 0, contact: 0 };   // с какого такта продолжить тему
+  var resumeBar = { calm: 0, battle: 0, shade: 0, contact: 0, landing: 0, assault: 0, 'return': 0 };   // с какого такта продолжить тему
   var pauseUntil = 0, lastTheme = null;
 
   function createMaster(audioContext, destination) {
@@ -717,18 +882,23 @@ var Music = (function () {
     refresh();
   }
 
-  // настроение → тема: tactical — «Тень», battle — «Тень» с пульсом (или прежняя ритмичная, настройка «Боевая музыка»)
+  // настроение → тема по набору (настройка «Боевая музыка», musicSet):
+  //   0 — «Высадка» до контакта, «Штурм» при контакте; 1 — «Тень» и «Тень» с пульсом (фон, как в UFO);
+  //   2 — «Тень» и прежняя ритмичная. Конец задания (debrief) — «Возвращение» в любом наборе.
   function themeFor(moodName) {
     var settings = window.Settings ? Settings.values : {};
-    if (moodName === 'tactical') return 'shade';
-    if (moodName === 'battle') return settings.musicBattle === 1 ? 'battle' : 'contact';
+    var set = settings.musicSet === undefined ? 0 : settings.musicSet;
+    if (moodName === 'debrief') return 'return';
+    if (moodName === 'tactical') return set === 0 ? 'landing' : 'shade';
+    if (moodName === 'battle') return set === 0 ? 'assault' : set === 2 ? 'battle' : 'contact';
     return 'calm';
   }
   function wanted() {
     var settings = window.Settings ? Settings.values : {};
     if (settings.musicVolume === 0) return null;
-    if (settings.musicTheme === 1) return 'calm';
+    if (settings.musicTheme === 1 && mood !== 'debrief') return 'calm';
     if (settings.musicTheme === 2) return themeFor(mood === 'calm' ? 'tactical' : mood);
+    if (mood === 'debrief') return themeFor(mood);
     return themeFor(mood);
   }
   function pauseSeconds() {
@@ -745,7 +915,7 @@ var Music = (function () {
     gain.gain.setValueAtTime(0, startTime);
     gain.gain.linearRampToValueAtTime(theme.level || 1, startTime + 2);
     var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: resumeBar[name], absoluteBar: 0,
-      nextTime: startTime, stopping: false, endTime: startTime + timing.play };
+      nextTime: startTime, stopping: false, endTime: name === 'return' ? Infinity : startTime + timing.play };   // «Возвращение» — без пауз
     runs.push(run);
     lastTheme = name;
     pauseUntil = 0;
@@ -795,12 +965,12 @@ var Music = (function () {
   }
 
   function setMood(name) {
-    if (['calm', 'tactical', 'battle'].indexOf(name) < 0 || name === mood) return;
+    if (['calm', 'tactical', 'battle', 'debrief'].indexOf(name) < 0 || name === mood) return;
     mood = name;
     refresh();
   }
   if (window.Settings) Settings.onChange(function (values, key) {
-    if (!key || key === 'musicTheme' || key === 'musicVolume' || key === 'musicBattle') refresh();
+    if (!key || key === 'musicTheme' || key === 'musicVolume' || key === 'musicSet') refresh();
     if (key === 'musicPause' && context) {
       var playing = current();
       if (playing) playing.endTime = values.musicPause > 0 ? Math.max(playing.endTime, context.currentTime + FADE_OUT + 1) : Infinity;
