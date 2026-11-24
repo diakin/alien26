@@ -357,6 +357,7 @@ var Globe = (function () {
     if (event.key === '+' || event.key === '=') { view.zoom *= 1.25; clampView(); }
     if (event.key === '-' || event.key === '_') { view.zoom /= 1.25; clampView(); }
     if (event.key === 'Enter') startMission();
+    if (event.key === 'b' || event.key === 'B' || event.key === 'и' || event.key === 'И') openBase();
   });
   window.addEventListener('keyup', function (event) {
     var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -365,6 +366,9 @@ var Globe = (function () {
 
   function startMission() { window.location.href = MISSION.page; }
   document.getElementById('start').addEventListener('click', startMission);
+  // своя подземная база (game/base.html): пока сразу бой «Оборона базы»
+  function openBase() { window.location.href = 'base.html'; }
+  document.getElementById('base').addEventListener('click', openBase);
 
   // ---------------- часы ----------------
   // игровое время идёт со скоростью реального; кнопки ускорения пока не работают
@@ -411,7 +415,7 @@ var Globe = (function () {
   window.requestAnimationFrame(frame);
 
   return {
-    view: view, flyTo: flyTo, start: startMission,
+    view: view, flyTo: flyTo, start: startMission, base: openBase,
     get ready() { return !!texture; },
     project: function (lat, lon) { return projectLatLon(lat, lon); }
   };
