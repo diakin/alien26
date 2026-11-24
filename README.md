@@ -399,6 +399,14 @@
 - `art/sprite_sheet_aliens_mech.png` — спрайты пришельца и робота: стойка и ходьба (16 кадров) на 8 направлений,
   имена `alien_idle_d*`, `alien_walk_f*_d*`, `mech_idle_d*`, `mech_walk_f*_d*`.
 - Лазание по лестнице: `<black|green|alien>_climb_f<0..7>_d<1|3|5|7>` — лицом к стене, 8 кадров на подъём 0,6 м.
+- Гражданские (`tools/render/civilian.js`): мужчина, женщина, учёный (белый халат, очки), инженер (синий
+  комбинезон, сигнальный жилет, белая каска, планшет), рабочий (оранжевый комбинезон, жёлтая каска, перчатки,
+  пояс с инструментом). Наборы `civman`, `civwoman`, `civscientist`, `civengineer`, `civworker`: `_idle_d*`,
+  `_walk_f0..15_d*`, `_cower_d*` (присел, руки на голове — у гражданского вместо стрельбы с колена),
+  `_fall_f0..5_d*`, `_dead_d*` — по 200 кадров на вид. Грузятся только когда понадобятся (на картах без
+  гражданских не тратят трафик). Обзор — `docs/civilians_sheet.png`. Рендер: `node spriterun.mjs raw_civ
+  specs/spec_civilians.json`, `python spritebuild.py raw_civ civ_sprites`, установка в игру —
+  `python spriteinstall.py civ_sprites ../../game civ` (кадры x1 в `game/assets/units`, точки привязки в `data.js`).
 
 ## Инструменты рендера (`tools/render`)
 

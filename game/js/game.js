@@ -48,10 +48,12 @@
     if (/_walk_/.test(name)) return 4;
     return 5;
   }
-  Object.keys(SPRITE_ANCHORS).forEach(function (name) { images[name] = Assets.image(spriteSource(name), spritePriority(name)); });
+  // кадры гражданских (civ*) грузятся только когда понадобятся (drawableSprite): на картах без них не тратят трафик
+  Object.keys(SPRITE_ANCHORS).forEach(function (name) { if (!/^civ/.test(name)) images[name] = Assets.image(spriteSource(name), spritePriority(name)); });
   // Имя кадра, который можно нарисовать сейчас: нужный, а пока он не загружен — стойка того же юнита
   // в том же направлении (или в любом). Для лежащих тел подходит только кадр тела. null — рисовать нечего.
   function drawableSprite(name) {
+    if (!images[name] && SPRITE_ANCHORS[name]) images[name] = Assets.image(spriteSource(name), spritePriority(name));
     var image = images[name];
     if (Assets.ready(image)) return name;
     if (image) Assets.want(spriteSource(name));
@@ -2419,6 +2421,8 @@
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
       return unit.spriteSet + '_walk_f' + frame + '_d' + unit.direction;
     }
+    // гражданский присел — испуганная поза (руки на голове)
+    if (unit.kneeling && SPRITE_ANCHORS[unit.spriteSet + '_cower_d0']) return unit.spriteSet + '_cower_d' + unit.direction;
     if (unit.kneeling) return unit.spriteSet + '_kneelAim_d' + unit.direction;
     if (isAiming(unit) && SPRITE_ANCHORS[unit.spriteSet + '_standAim_d0']) return unit.spriteSet + '_standAim_d' + unit.direction;
     if (atEase(unit)) return unit.spriteSet + '_ease_d' + unit.direction;
