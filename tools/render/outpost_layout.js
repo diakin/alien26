@@ -14,9 +14,9 @@ const PARAMS = typeof location !== 'undefined' ? new URLSearchParams(location.se
 export const MAP_NAME = PARAMS.get('map') || 'outpost';
 export const SECTOR = 24;
 export const TILE = 1.25, LEVELS = 4, LEVEL_H = 2.5;
-// подземная база: план 48×25 (tools/base/plan.py) лежит посередине поля 50×50 — со столбца BASE_COL и строки BASE_ROW,
+// подземная база: план 56×33 (tools/base/plan.py) лежит посередине поля 58×58 — со столбца BASE_COL и строки BASE_ROW,
 // чтобы скале вокруг помещений хватило клеток и с краёв плана
-export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 50 : SECTOR;
+export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 58 : SECTOR;
 export const BASE_COL = 1, BASE_ROW = 12;
 
 // типы стен; blocks — нельзя пройти через грань
@@ -357,42 +357,43 @@ export function buildLayout() {
       object('rockFill', 0, col, row, 1, 1, { type: `h${levels}v${variant}`, height: levels * LEVEL_H, variant });
     }
 
-    // ---------- ангар: платформа подъёмника с конвертопланом, техполоса ----------
-    object('liftPlatform', 0, 0, 1, 12, 12, { blocks: false });
-    const extraction = tiltrotor(4, 5);                  // нос к западной стене, рампа к техполосе
-    object('barrels', 0, 12, 1); object('barrels', 0, 13, 1); object('generator', 0, 14, 1, 2, 2);   // заправка
-    object('crate', 0, 12, 3); object('crate', 0, 13, 3); object('console', 0, 15, 4);                // пульт подъёмника
-    object('crate', 0, 14, 10); object('crate', 0, 15, 10); object('crate', 0, 15, 11);              // боеприпасы
+    // ---------- ангар 20×20 + техполоса 4×20, высота 4 уровня: платформа подъёмника с конвертопланом ----------
+    // (кроме ангара, координаты обстановки ниже — в плане до увеличения ангара, сдвинутые на 8 клеток к востоку и югу)
+    object('liftPlatform', 0, 0, 1, 20, 20, { blocks: false });
+    const extraction = tiltrotor(8, 9);                  // посередине платформы, нос на запад, рампа к техполосе
+    object('barrels', 0, 20, 1); object('barrels', 0, 21, 1); object('generator', 0, 22, 1, 2, 2);   // заправка
+    object('crate', 0, 20, 3); object('crate', 0, 21, 3); object('console', 0, 23, 4);                // пульт подъёмника
+    object('crate', 0, 22, 17); object('crate', 0, 23, 17); object('crate', 0, 23, 18);              // боеприпасы
     // ---------- мастерские ----------
-    object('generator', 0, 16, 9, 2, 2); object('desk', 0, 16, 11, 2, 1); object('desk', 0, 19, 7, 2, 1);   // станки, верстаки
-    object('rack', 0, 23, 7); object('rack', 0, 23, 8); object('crate', 0, 23, 12); object('crate', 0, 22, 12);
-    object('rack', 0, 16, 3); object('rack', 0, 16, 4); object('crate', 0, 18, 3); object('crate', 0, 19, 3); object('crate', 0, 19, 4);   // склад материалов
-    object('generator', 0, 20, 3, 2, 2); object('generator', 0, 23, 3, 2, 2); object('rack', 0, 24, 5); object('barrels', 0, 24, 6);   // электростанция
+    object('generator', 0, 24, 17, 2, 2); object('desk', 0, 24, 19, 2, 1); object('desk', 0, 27, 15, 2, 1);   // станки, верстаки
+    object('rack', 0, 31, 15); object('rack', 0, 31, 16); object('crate', 0, 31, 20); object('crate', 0, 30, 20);
+    object('rack', 0, 24, 11); object('rack', 0, 24, 12); object('crate', 0, 26, 11); object('crate', 0, 27, 11); object('crate', 0, 27, 12);   // склад материалов
+    object('generator', 0, 28, 11, 2, 2); object('generator', 0, 31, 11, 2, 2); object('rack', 0, 32, 13); object('barrels', 0, 32, 14);   // электростанция
     // ---------- лаборатории, изолятор ----------
-    object('tank', 0, 27, 4, 2, 3); object('cabinet', 0, 25, 4); object('console', 0, 25, 6);
-    object('labTable', 0, 28, 8, 2, 1); object('labTable', 0, 28, 11, 2, 1); object('console', 0, 25, 9); object('cabinet', 0, 25, 12); object('rack', 0, 30, 8);
-    object('labTable', 0, 33, 9, 2, 1); object('labTable', 0, 34, 11, 2, 1); object('cabinet', 0, 31, 8); object('console', 0, 36, 8); object('crate', 0, 31, 12);
+    object('tank', 0, 35, 12, 2, 3); object('cabinet', 0, 33, 12); object('console', 0, 33, 14);
+    object('labTable', 0, 36, 16, 2, 1); object('labTable', 0, 36, 19, 2, 1); object('console', 0, 33, 17); object('cabinet', 0, 33, 20); object('rack', 0, 38, 16);
+    object('labTable', 0, 41, 17, 2, 1); object('labTable', 0, 42, 19, 2, 1); object('cabinet', 0, 39, 16); object('console', 0, 44, 16); object('crate', 0, 39, 20);
     // ---------- грузовой шлюз ----------
-    object('liftPlatform', 0, 44, 1, 4, 4, { blocks: false });
-    object('crate', 0, 44, 1); object('crate', 0, 47, 4);
-    object('crate', 0, 47, 7); object('crate', 0, 44, 7);                                           // приёмка
-    object('console', 0, 44, 11); object('console', 0, 44, 12);                                     // КПП
-    object('rack', 0, 40, 7); object('rack', 0, 40, 8); object('rack', 0, 40, 9); object('crate', 0, 40, 11); object('crate', 0, 40, 12); object('crate', 0, 43, 11); object('crate', 0, 43, 12); object('crate', 0, 43, 7);   // общий склад
-    object('acUnit', 0, 40, 3, 2, 1); object('tank', 0, 42, 3, 2, 3); object('barrels', 0, 40, 5);   // жизнеобеспечение
+    object('liftPlatform', 0, 52, 9, 4, 4, { blocks: false });
+    object('crate', 0, 52, 9); object('crate', 0, 55, 12);
+    object('crate', 0, 55, 15); object('crate', 0, 52, 15);                                           // приёмка
+    object('console', 0, 52, 19); object('console', 0, 52, 20);                                     // КПП
+    object('rack', 0, 48, 15); object('rack', 0, 48, 16); object('rack', 0, 48, 17); object('crate', 0, 48, 19); object('crate', 0, 48, 20); object('crate', 0, 51, 19); object('crate', 0, 51, 20); object('crate', 0, 51, 15);   // общий склад
+    object('acUnit', 0, 48, 11, 2, 1); object('tank', 0, 50, 11, 2, 3); object('barrels', 0, 48, 13);   // жизнеобеспечение
     // ---------- снаряжение, оружейная, боеприпасы ----------
-    for (const row of [16, 17, 18, 19]) object('locker', 0, 0, row);
-    object('locker', 0, 1, 19); object('locker', 0, 3, 19);
-    for (const col of [4, 5, 6, 7]) object('locker', 0, col, 19);                                   // стойки комплектов
-    object('desk', 0, 4, 16, 2, 1);                                                                 // верстак
-    for (const [col, row] of [[10, 16], [11, 16], [11, 17], [11, 19], [10, 19]]) object('crate', 0, col, row);
+    for (const row of [24, 25, 26, 27]) object('locker', 0, 8, row);
+    object('locker', 0, 9, 27); object('locker', 0, 11, 27);
+    for (const col of [12, 13, 14, 15]) object('locker', 0, col, 27);                                   // стойки комплектов
+    object('desk', 0, 12, 24, 2, 1);                                                                 // верстак
+    for (const [col, row] of [[18, 24], [19, 24], [19, 25], [19, 27], [18, 27]]) object('crate', 0, col, row);
     // ---------- медпункт, командный пункт ----------
-    object('bunk', 0, 12, 19, 2, 1); object('bunk', 0, 14, 19, 2, 1); object('cabinet', 0, 15, 16); object('console', 0, 12, 16);
-    for (const col of [17, 18, 20, 21]) object('console', 0, col, 19);
-    object('desk', 0, 20, 17, 2, 1); object('rack', 0, 17, 16);
+    object('bunk', 0, 20, 27, 2, 1); object('bunk', 0, 22, 27, 2, 1); object('cabinet', 0, 23, 24); object('console', 0, 20, 24);
+    for (const col of [25, 26, 28, 29]) object('console', 0, col, 27);
+    object('desk', 0, 28, 25, 2, 1); object('rack', 0, 25, 24);
     // ---------- столовая, кухня, отдых ----------
-    object('desk', 0, 22, 17, 2, 1); object('desk', 0, 22, 19, 2, 1); object('desk', 0, 26, 18, 2, 1);
-    object('cabinet', 0, 30, 16); object('cabinet', 0, 30, 17); object('cabinet', 0, 30, 18); object('crate', 0, 28, 19);
-    object('desk', 0, 31, 17, 2, 1); object('console', 0, 35, 16);
+    object('desk', 0, 30, 25, 2, 1); object('desk', 0, 30, 27, 2, 1); object('desk', 0, 34, 26, 2, 1);
+    object('cabinet', 0, 38, 24); object('cabinet', 0, 38, 25); object('cabinet', 0, 38, 26); object('crate', 0, 36, 27);
+    object('desk', 0, 39, 25, 2, 1); object('console', 0, 43, 24);
     // ---------- каюты и санблоки ----------
     plan.rooms.filter((room) => room.width === 3 && room.height === 3).forEach((room) => {
       const doorOnSouth = plan.doors.some((door) => door.side === 'S' && door.y === room.y + room.height - 1 && door.x >= room.x && door.x < room.x + room.width);
@@ -400,16 +401,16 @@ export function buildLayout() {
       object('bunk', 0, room.x, bedRow, 2, 1);
       object('locker', 0, room.x + 2, doorOnSouth ? room.y + room.height - 1 : room.y);
     });
-    object('locker', 0, 24, 21); object('locker', 0, 24, 22); object('locker', 0, 24, 23); object('cabinet', 0, 21, 23); object('cabinet', 0, 22, 23);
-    object('locker', 0, 43, 17); object('locker', 0, 43, 18); object('cabinet', 0, 40, 17); object('cabinet', 0, 41, 17);
+    object('locker', 0, 32, 29); object('locker', 0, 32, 30); object('locker', 0, 32, 31); object('cabinet', 0, 29, 31); object('cabinet', 0, 30, 31);
+    object('locker', 0, 51, 25); object('locker', 0, 51, 26); object('cabinet', 0, 48, 25); object('cabinet', 0, 49, 25);
 
     const at = (col, row, direction) => [col + ox, row + oy, 0, direction];
     return {
-      // отряд — в техполосе ангара у рампы (столбцы 12–13 свободны: проход K7 к платформе), K7 — в галерее у ворот;
+      // отряд — в техполосе ангара напротив рампы, K7 — в галерее у ворот ангара;
       // пришельцы вошли через грузовой лифт: в шахте, шлюзе и приёмке
-      squad: [at(14, 6, 1), at(15, 6, 1), at(14, 7, 1), at(15, 7, 1), at(14, 8, 1), at(15, 8, 1)],
-      mech: [at(12, 13, 7)],
-      aliens: [at(45, 2, 1), at(46, 2, 1), at(45, 3, 1), at(46, 3, 1), at(44, 5, 3), at(47, 6, 3), at(45, 8, 3), at(46, 9, 3)],
+      squad: [at(21, 9, 1), at(22, 9, 1), at(21, 10, 1), at(22, 10, 1), at(21, 11, 1), at(22, 11, 1)],
+      mech: [at(16, 21, 7)],
+      aliens: [at(53, 10, 1), at(54, 10, 1), at(53, 11, 1), at(54, 11, 1), at(52, 13, 3), at(55, 14, 3), at(53, 16, 3), at(54, 17, 3)],
       extraction,
     };
   }
