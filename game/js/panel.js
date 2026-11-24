@@ -5,7 +5,8 @@ var Panel = (function () {
 
   var MINIMAP_W = 364, MINIMAP_H = 216;      // мини-карта шире, чем выше: карта в изометрии — ромб примерно 1,6–1,7 : 1
   var SHIFT = MINIMAP_W - 216;                // на столько блоки правее мини-карты сдвинуты против прежней вёрстки
-  var DESIGN_W = 1280 + SHIFT, DESIGN_H = 260;
+  var ACTIONS_EXTRA = 32;                     // кнопки реже: подписи «КОНЕЦ ХОДА» и «ЭВАКУАЦ.» не сходятся
+  var DESIGN_W = 1280 + SHIFT + ACTIONS_EXTRA, DESIGN_H = 260;
   var root = document.getElementById('panel');
   var inner = document.createElement('div');
   inner.className = 'panel-inner';
@@ -23,6 +24,7 @@ var Panel = (function () {
     up: 'M0,-10 l-8,8 h5 v9 h6 v-9 h5 z',
     down: 'M0,10 l-8,-8 h5 v-9 h6 v9 h5 z',
     endTurn: 'M-8,-10 v20 M-8,-10 h15 l-4,5 l4,5 h-15',
+    evac: 'M-11,4 h22 M-7,4 l-2,6 M7,4 l2,6 M-4,-1 h8 v5 h-8 z M0,-1 v-5 M-12,-7 h24',
     focus: 'M0,-4 a4,4 0 1 0 0.1,0 M0,-13 v6 M0,7 v6 M-13,0 h6 M7,0 h6 M-9,-9 l3,3 M9,-9 l-3,3 M-9,9 l3,-3 M9,9 l-3,-3'
   };
   var BUTTONS = [
@@ -34,7 +36,8 @@ var Panel = (function () {
     { id: 'next', label: 'ДАЛЕЕ', key: '7' },
     { id: 'up', label: 'ВЫШЕ', key: '8' },
     { id: 'down', label: 'НИЖЕ', key: '9' },
-    { id: 'endTurn', label: 'КОНЕЦ ХОДА', key: '0' }
+    { id: 'endTurn', label: 'КОНЕЦ ХОДА', key: '0' },
+    { id: 'evac', label: 'ЭВАКУАЦ.', title: 'Эвакуация на конвертоплане (X)', key: 'X' }
   ];
 
   function bar(id, label) {
@@ -45,7 +48,7 @@ var Panel = (function () {
 
   var buttonsHtml = BUTTONS.map(function (button) {
     return '<div class="action' + (button.disabled ? ' disabled' : '') + '" data-action="' + button.id + '" title="' +
-      (button.disabled || button.label) + '"><div class="action-box"><span class="action-key">' + button.key + '</span>' +
+      (button.disabled || button.title || button.label) + '"><div class="action-box"><span class="action-key">' + button.key + '</span>' +
       '<svg viewBox="-16 -16 32 32" width="32" height="32"><path d="' + ICONS[button.id] + '"/></svg></div>' +
       '<div class="action-label" id="label-' + button.id + '">' + button.label + '</div></div>';
   }).join('');
@@ -70,10 +73,11 @@ var Panel = (function () {
     '.hand-reserve { font: 9px Consolas, "DejaVu Sans Mono", monospace; color: #8a959c; margin-bottom: 3px; }',
     '.panel-inner .stats { left: ' + (694 + SHIFT) + 'px; top: 18px; width: 320px; cursor: pointer; }',
     '.panel-inner .stats:hover .unit-name { color: #ffd28a; }',
-    '.panel-inner .actions { left: ' + (1022 + SHIFT) + 'px; top: 30px; width: 250px; }',
-    '.panel-inner .action-grid { grid-template-columns: repeat(5, 46px); column-gap: 5px; row-gap: 14px; }',
+    '.panel-inner .actions { left: ' + (1022 + SHIFT) + 'px; top: 30px; width: ' + (250 + ACTIONS_EXTRA) + 'px; }',
+    '.panel-inner .action-grid { grid-template-columns: repeat(5, 46px); column-gap: 13px; row-gap: 14px; }',
     '.panel-inner .action-box { width: 46px; height: 50px; }',
-    '.panel-inner .action-label { letter-spacing: 0.2px; font-size: 8.5px; }',
+    // подпись шире кнопки — по центру под ней, поровну в обе стороны
+    '.panel-inner .action-label { letter-spacing: 0.2px; font-size: 8.5px; margin-left: -12px; margin-right: -12px; transform: none; }',
     '.panel-inner .action:last-child .action-label { transform: none; }',
     '.no-unit .hand > * { visibility: hidden; }',
     '.viewing .portrait, .viewing .hand { border-color: #c0462e; }',

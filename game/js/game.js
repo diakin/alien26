@@ -1187,53 +1187,139 @@
       if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad'; })[0] || null;
       else selectNext();
     }
-    if (!units.some(function (other) { return other.side === 'aliens'; })) { say('Пришельцы уничтожены'); endMission('good'); }
-    else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('bad'); }
+    if (!units.some(function (other) { return other.side === 'aliens'; })) { say('Пришельцы уничтожены'); endMission('cleared'); }
+    else if (!units.some(function (other) { return other.side === 'squad' && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('wiped'); }
   }
 
   // ---------------- конец задания и итоги ----------------
-  // Задание кончается, когда уничтожены все пришельцы (результат «хорошо») или погибли все бойцы (K7 без бойцов
-  // задание не продолжает) — «плохо». Окно итогов (js/results.js) открывается, когда долетели пули и проиграно падение.
-  // Артефакты — предметы пришельцев (Items: alien) на земле и у выживших бойцов и тела пришельцев; вывозятся только
-  // при успехе: при провале зона остаётся за пришельцами.
-  var mission = { over: false, result: null, endAt: 0, shown: false };
-  function endMission(result) {
+  // Задание кончается:
+  //   cleared — уничтожены все пришельцы: «хорошо»;
+  //   wiped   — погибли все бойцы (K7 без бойцов задание не продолжает): «плохо»;
+  //   evac    — эвакуация (кнопка «ЭВАКУАЦИЯ», X): улетают те, кто стоит в зоне эвакуации (на большой карте — салон
+  //             и рампа конвертоплана, MAP.extraction; на других картах — клетки в 2 шагах от точек высадки отряда),
+  //             остальные остаются в зоне и считаются потерянными. Результат по обстановке: «хорошо», если уничтожено
+  //             не меньше половины пришельцев и потери отряда (погибшие и оставленные) меньше числа убитых пришельцев.
+  // Окно итогов (js/results.js) открывается, когда долетели пули и проиграно падение.
+  // Артефакты — предметы пришельцев (Items: alien) и тела пришельцев. При зачистке вывозится всё: земля, снаряжение
+  // выживших, тела; при эвакуации — только снаряжение улетевших; при гибели отряда — ничего.
+  var mission = { over: false, kind: null, result: null, endAt: 0, shown: false, evacuated: null };
+  function endMission(kind, delay) {
     if (mission.over) return;
-    mission.over = true; mission.result = result;
-    mission.endAt = performance.now() + 2200;
+    mission.over = true; mission.kind = kind;
+    mission.endAt = performance.now() + (delay === undefined ? 2200 : delay);
     aiming = false; throwing = null; aimTarget = null;
+    mission.result = missionSummary().result;
   }
   function updateMission(now) {
     if (!mission.over || mission.shown || now < mission.endAt || shots.length || throws.length || shotView) return;
     mission.shown = true;
     if (window.Results) Results.show(missionSummary());
   }
+
+  // зона эвакуации: ключи клеток
+  var extractionCells = (function () {
+    var cells = {};
+    var add = function (col, row, level) { if (inside(col, row) && level >= 0 && level < LEVELS) cells[level * GRID * GRID + row * GRID + col] = true; };
+    if (MAP.extraction && MAP.extraction.length) MAP.extraction.forEach(function (cell) { add(cell[0], cell[1], cell[2]); });
+    else startUnits.forEach(function (unit) {
+      if (unit.side !== 'squad') return;
+      for (var deltaRow = -2; deltaRow < unit.size + 2; deltaRow++) for (var deltaCol = -2; deltaCol < unit.size + 2; deltaCol++) add(unit.col + deltaCol, unit.row + deltaRow, unit.level);
+    });
+    return cells;
+  })();
+  function inExtraction(col, row, level) { return !!extractionCells[level * GRID * GRID + row * GRID + col]; }
+  // на борту — если все клетки юнита в зоне
+  function aboard(unit) {
+    for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
+      if (!inExtraction(unit.col + deltaCol, unit.row + deltaRow, unit.level)) return false;
+    }
+    return true;
+  }
+  function evacuationPlan() {
+    var squad = units.filter(function (unit) { return unit.side === 'squad'; });
+    return { aboard: squad.filter(aboard), left: squad.filter(function (unit) { return !aboard(unit); }) };
+  }
+  var showExtraction = false;          // подсветка зоны, пока открыто подтверждение
+  function requestEvacuation() {
+    if (mission.over) return;
+    if (phase !== 'squad') { say('Сейчас ход пришельцев'); return; }
+    if (shots.length || throws.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
+    var plan = evacuationPlan();
+    var person = function (unit) { return { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank, robot: unit.kind === 'mech' }; };
+    showExtraction = true;
+    if (!plan.aboard.length) say('В зоне эвакуации никого нет');
+    // камера к зоне: в нижнюю половину экрана, сверху — окно подтверждения
+    var cellKeys = Object.keys(extractionCells), sumX = 0, sumY = 0;
+    cellKeys.forEach(function (key) {
+      var number = Number(key), level = Math.floor(number / (GRID * GRID)), row = Math.floor(number / GRID) % GRID, col = number % GRID;
+      var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level));
+      sumX += point.x; sumY += point.y;
+    });
+    if (cellKeys.length) centerOnPixel(sumX / cellKeys.length, sumY / cellKeys.length - viewHeight * 0.18);
+    if (!window.Results) return;
+    Results.confirmEvacuation({ aboard: plan.aboard.map(person), left: plan.left.map(person) }, function (confirmed) {
+      showExtraction = false;
+      if (confirmed) evacuate();
+    });
+  }
+  function evacuate() {
+    var plan = evacuationPlan();
+    if (!plan.aboard.length || mission.over) return;
+    mission.evacuated = plan.aboard.slice();
+    say('Эвакуация: на борту ' + plan.aboard.length);
+    endMission('evac', 400);
+  }
+  function drawExtraction() {
+    if (!showExtraction) return;
+    context.save();
+    Object.keys(extractionCells).forEach(function (key) {
+      var number = Number(key), level = Math.floor(number / (GRID * GRID)), row = Math.floor(number / GRID) % GRID, col = number % GRID;
+      var corners = Iso.tileCorners(col, row, elevationOf(col, row, level));
+      context.beginPath();
+      corners.forEach(function (corner, index) { context[index ? 'lineTo' : 'moveTo'](corner.x - camera.x, corner.y - camera.y); });
+      context.closePath();
+      context.fillStyle = 'rgba(120, 230, 120, 0.28)'; context.fill();
+      context.strokeStyle = 'rgba(160, 255, 160, 0.55)'; context.lineWidth = 1; context.stroke();
+    });
+    context.restore();
+  }
+
   function missionSummary() {
-    var good = mission.result === 'good';
+    var kind = mission.kind;
     var lost = function (test) { return startUnits.filter(function (unit) { return test(unit) && unit.dead; }); };
+    var evacuated = mission.evacuated || [];
+    var leftBehind = function (test) { return kind === 'evac' ? units.filter(function (unit) { return test(unit) && evacuated.indexOf(unit) < 0; }) : []; };
+    var isSoldier = function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; };
+    var isRobot = function (unit) { return unit.kind === 'mech'; };
     var aliens = startUnits.filter(function (unit) { return unit.side === 'aliens'; });
     var killedAliens = lost(function (unit) { return unit.side === 'aliens'; });
-    var artifacts = [];
-    if (good) {
-      var counts = {}, order = [];
-      var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
+    var soldiersDead = lost(isSoldier), soldiersLeft = leftBehind(isSoldier);
+    var robotsDead = lost(isRobot), robotsLeft = leftBehind(isRobot);
+    var result = kind === 'cleared' ? 'good' : kind === 'wiped' ? 'bad'
+      : killedAliens.length * 2 >= aliens.length && soldiersDead.length + soldiersLeft.length < killedAliens.length ? 'good' : 'bad';
+    var counts = {}, order = [];
+    var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
+    var lists = [];
+    if (kind === 'cleared') {
       killedAliens.forEach(function () { count('ТЕЛО ПРИШЕЛЬЦА · СТРАЖ'); });
-      var lists = Object.keys(groundItems).map(function (key) { return groundItems[key]; });
+      Object.keys(groundItems).forEach(function (key) { lists.push(groundItems[key]); });
       units.forEach(function (unit) { if (unit.side === 'squad' && unit.inventory) lists.push(unit.inventory); });
-      lists.forEach(function (list) {
-        list.forEach(function (entry) { var info = Items.info(entry.item); if (info.alien) count(info.name); });
-      });
-      artifacts = order.map(function (name) { return { name: name, count: counts[name] }; });
+    } else if (kind === 'evac') {
+      evacuated.forEach(function (unit) { if (unit.inventory) lists.push(unit.inventory); });
     }
+    lists.forEach(function (list) {
+      list.forEach(function (entry) { var info = Items.info(entry.item); if (info.alien) count(info.name); });
+    });
     var person = function (unit) { return { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank }; };
     return {
-      result: mission.result, map: MAP.name || '', turn: turn,
+      kind: kind, result: result, map: MAP.name || '', turn: turn,
       aliensKilled: killedAliens.length, aliensTotal: aliens.length,
-      artifacts: artifacts,
-      soldiersLost: lost(function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; }).map(person),
-      soldiersTotal: startUnits.filter(function (unit) { return unit.side === 'squad' && unit.kind !== 'mech'; }).length,
-      robotsLost: lost(function (unit) { return unit.kind === 'mech'; }).map(person),
-      robotsTotal: startUnits.filter(function (unit) { return unit.kind === 'mech'; }).length
+      artifacts: order.map(function (name) { return { name: name, count: counts[name] }; }),
+      soldiersLost: soldiersDead.map(person), soldiersLeft: soldiersLeft.map(person),
+      soldiersTotal: startUnits.filter(isSoldier).length,
+      robotsLost: robotsDead.map(person), robotsLeft: robotsLeft.map(person),
+      robotsTotal: startUnits.filter(isRobot).length,
+      evacuated: evacuated.length
     };
   }
 
@@ -2226,6 +2312,7 @@
     if (event.key === 'h' || event.key === 'H' || event.key === 'р' || event.key === 'Р') setView(view.level, !view.cut);
     if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') setCombat(!combat);
     if (event.key === 'c' || event.key === 'C' || event.key === 'с' || event.key === 'С') focusSelected();
+    if (event.key === 'x' || event.key === 'X' || event.key === 'ч' || event.key === 'Ч') requestEvacuation();
     if (event.key === ' ' || event.key === 'Tab') { event.preventDefault(); selectNext(); }
     if (ACTION_KEYS[event.key]) Game.action(ACTION_KEYS[event.key]);
     if (window.Inventory && Inventory.isOpen()) event.stopImmediatePropagation();   // клавиша открыла окно — оно её не получает
@@ -2731,6 +2818,7 @@
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
+    drawExtraction();
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -2807,6 +2895,7 @@
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
+    drawExtraction();
     drawMarkedEnemy();
     drawAimMarker();
     drawParticles();
@@ -2881,6 +2970,7 @@
       else if (name === 'up') { if (view.level < LEVELS - 1) setView(view.level + 1, view.cut); }
       else if (name === 'down') { if (view.level > 0) setView(view.level - 1, view.cut); }
       else if (name === 'focus') focusSelected();
+      else if (name === 'evac') requestEvacuation();
       else say('Пока не работает');
       updateHover();
     }

@@ -8,6 +8,9 @@ var Results = (function () {
   style.textContent = [
     '#results { position: fixed; inset: 0; z-index: 60; display: none; background: rgba(4, 6, 7, 0.62); font-family: Arial, sans-serif; user-select: none; }',
     '#results.open { display: block; }',
+    '#results.confirm { background: rgba(4, 6, 7, 0.18); }',
+    '#results.confirm .sheet { top: 24px; transform-origin: 50% 0; }',
+    '#results .hint { margin: 12px 20px 0; font-size: 12px; color: #a8c8a8; }',
     '#results .sheet { position: absolute; left: 50%; top: 50%; width: 640px; transform: translate(-50%, -50%); transform-origin: 50% 50%;',
     '  background: rgba(14, 20, 18, 0.97); border: 1px solid #4c6a58; box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #d8e8d0; padding-bottom: 14px; }',
     '#results .head { margin: 12px; padding: 8px 14px; border: 1px solid #4c6a58; display: flex; align-items: baseline; justify-content: space-between; }',
@@ -53,13 +56,20 @@ var Results = (function () {
     }).join('');
   }
   function artifactList(summary) {
-    if (summary.result !== 'good') return '<span class="none">не вывезены: зона осталась за пришельцами</span>';
+    if (summary.kind === 'wiped') return '<span class="none">не вывезены: зона осталась за пришельцами</span>';
+    if (summary.kind === 'evac' && !summary.artifacts.length) return '<span class="none">нет: вывозится только то, что у бойцов на борту</span>';
     if (!summary.artifacts.length) return '<span class="none">нет</span>';
     return summary.artifacts.map(function (item) {
       return '<div>' + escape(item.name) + ' <span class="count">× ' + item.count + '</span></div>';
     }).join('');
   }
 
+  function verdictNote(summary) {
+    if (summary.kind === 'cleared') return 'Все пришельцы в зоне уничтожены';
+    if (summary.kind === 'wiped') return 'Отряд погиб, зона не очищена';
+    var losses = summary.soldiersLost.length + summary.soldiersLeft.length;
+    return 'Эвакуация: уничтожено ' + summary.aliensKilled + ' из ' + summary.aliensTotal + ', потери бойцов ' + losses;
+  }
   function show(summary) {
     var good = summary.result === 'good';
     var artifactCount = summary.artifacts.reduce(function (sum, item) { return sum + item.count; }, 0);
@@ -68,12 +78,14 @@ var Results = (function () {
         '<div class="head"><b>ИТОГИ ЗАДАНИЯ</b><span>' + escape(summary.map) + ' · ХОД ' + summary.turn + '</span></div>' +
         '<div class="verdict ' + (good ? 'good' : 'bad') + '"><span class="label">РЕЗУЛЬТАТ</span>' +
           '<span class="value">' + (good ? 'ХОРОШО' : 'ПЛОХО') + '</span>' +
-          '<span class="note">' + (good ? 'Все пришельцы в зоне уничтожены' : 'Отряд погиб, зона не очищена') + '</span></div>' +
+          '<span class="note">' + verdictNote(summary) + '</span></div>' +
         '<table>' +
           row('УБИТО ПРИШЕЛЬЦЕВ', summary.aliensKilled, summary.aliensTotal, '') +
           row('НАЙДЕНО АРТЕФАКТОВ', artifactCount, null, artifactList(summary)) +
           row('ПОГИБЛО БОЙЦОВ', summary.soldiersLost.length, summary.soldiersTotal, peopleList(summary.soldiersLost)) +
-          row('ПОТЕРЯНО РОБОТОВ', summary.robotsLost.length, summary.robotsTotal, peopleList(summary.robotsLost)) +
+          (summary.kind === 'evac' ? row('ОСТАВЛЕНО В ЗОНЕ', summary.soldiersLeft.length, summary.soldiersTotal, peopleList(summary.soldiersLeft)) : '') +
+          row('ПОТЕРЯНО РОБОТОВ', summary.robotsLost.length + summary.robotsLeft.length, summary.robotsTotal,
+            peopleList(summary.robotsLost.concat(summary.robotsLeft.map(function (robot) { return { callsign: robot.callsign, name: robot.name, rank: 'оставлен в зоне' }; })))) +
         '</table>' +
         '<div class="buttons">' +
           '<button data-action="retry">ПОВТОРИТЬ ЗАДАНИЕ</button>' +
@@ -88,7 +100,7 @@ var Results = (function () {
     var sheet = root.querySelector('.sheet');
     if (!sheet) return;
     var scale = Math.min(1, (window.innerWidth - 24) / sheet.offsetWidth, (window.innerHeight - 24) / sheet.offsetHeight);
-    sheet.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+    sheet.style.transform = (root.className.indexOf('confirm') >= 0 ? 'translate(-50%, 0)' : 'translate(-50%, -50%)') + ' scale(' + scale + ')';
   }
   window.addEventListener('resize', fit);
   root.addEventListener('click', function (event) {
@@ -96,11 +108,47 @@ var Results = (function () {
     if (!button) return;
     if (button.dataset.action === 'retry') location.reload();
     if (button.dataset.action === 'globe') location.href = 'globe.html';
+    if (button.dataset.action === 'cancel') closeConfirm(false);
+    if (button.dataset.action === 'takeoff') closeConfirm(true);
   });
   // окно перехватывает клавиши и колесо, чтобы под ним ничего не происходило
   ['keydown', 'wheel'].forEach(function (name) {
-    window.addEventListener(name, function (event) { if (root.className === 'open') event.stopPropagation(); }, true);
+    window.addEventListener(name, function (event) {
+      if (root.className.indexOf('open') < 0) return;
+      if (name === 'keydown' && pending && event.key === 'Escape') closeConfirm(false);
+      event.stopPropagation();
+    }, true);
   });
 
-  return { show: show, get open() { return root.className === 'open'; } };
+  // Подтверждение эвакуации: кто на борту, кто останется. done(true) — взлёт, done(false) — отмена.
+  var pending = null;
+  function confirmEvacuation(plan, done) {
+    pending = done;
+    var canLeave = plan.aboard.length > 0;
+    root.innerHTML =
+      '<div class="sheet">' +
+        '<div class="head"><b>ЭВАКУАЦИЯ</b><span>ЗОНА ЭВАКУАЦИИ ПОДСВЕЧЕНА НА КАРТЕ</span></div>' +
+        '<table>' +
+          row('НА БОРТУ', plan.aboard.length, null, peopleList(plan.aboard)) +
+          row('ОСТАНУТСЯ В ЗОНЕ', plan.left.length, null, peopleList(plan.left)) +
+        '</table>' +
+        '<div class="hint">' + (canLeave
+          ? 'Оставшиеся в зоне считаются потерянными. Вывозится только снаряжение бойцов на борту. Задание закончится.'
+          : 'В зоне эвакуации никого нет. Переведите бойцов в салон или на рампу конвертоплана.') + '</div>' +
+        '<div class="buttons">' +
+          '<button data-action="cancel">ОТМЕНА</button>' +
+          (canLeave ? '<button class="main" data-action="takeoff">ВЗЛЁТ</button>' : '') +
+        '</div>' +
+      '</div>';
+    root.className = 'open confirm';
+    fit();
+  }
+  function closeConfirm(confirmed) {
+    var done = pending;
+    pending = null;
+    root.className = '';
+    if (done) done(confirmed);
+  }
+
+  return { show: show, confirmEvacuation: confirmEvacuation, get open() { return root.className.indexOf('open') >= 0; } };
 })();

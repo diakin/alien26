@@ -278,19 +278,24 @@ export function buildLayout() {
     for (const [col, row, size] of [[22, 22, 2], [0, 0, 2], [23, 13, 1], [1, 21, 1], [12, 0, 1]]) object('rock', 0, col, row, size, size);
     // отряд в салоне: бойцы у сидений A2–A4 (row r0, смотрят на +row) и D2–D4 (row r0+3, смотрят на −row), K7 — B–C, ряды 1–2, лицом к рампе
     const at = (col, row, direction) => [col + ox, row + oy, 0, direction];
+    // зона эвакуации: салон и рампа — кто стоит здесь, улетает (game.js, «ЭВАКУАЦИЯ»)
+    const extraction = [];
+    for (let col = c0; col <= c0 + 7; col++) for (let row = r0; row <= r0 + 3; row++) extraction.push([col + ox, row + oy, 0]);
     return {
       squad: [at(c0 + 1, r0, 1), at(c0 + 2, r0, 1), at(c0 + 3, r0, 1), at(c0 + 1, r0 + 3, 5), at(c0 + 2, r0 + 3, 5), at(c0 + 3, r0 + 3, 5)],
       mech: [at(c0, r0 + 1, 7)],
+      extraction,
     };
   }
 
-  let spawns;
+  let spawns, extraction = null;
   if (MAP_NAME === 'big') {
     // сектора: (0, 0) база — пришельцы, (1, 0) просторные здания, (0, 1) стоянка, (1, 1) посадка — отряд в конвертоплане
     ox = 0; oy = 0; outpostSector();
     ox = SECTOR; oy = 0; spaciousSector();
     ox = 0; oy = SECTOR; parkingSector();
     ox = SECTOR; oy = SECTOR; const landing = landingSector();
+    extraction = landing.extraction;
     spawns = {
       squad: landing.squad, mech: landing.mech,
       // 10 пришельцев на базе: двор, корпус (оба этажа), под настилом, кабина на настиле, вышка
@@ -306,6 +311,6 @@ export function buildLayout() {
     ];
   }
 
-  return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, concrete, blockedCells,
+  return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, extraction, concrete, blockedCells,
     name: MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : 'База на плато', combat: MAP_NAME === 'big' };
 }

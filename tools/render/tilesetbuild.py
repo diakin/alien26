@@ -242,6 +242,7 @@ def map_from_layout(layout):
         'stairs': [[stair['level'], stair['col'], stair['row'], stair['dirCol'], stair['dirRow'], stair['count']] for stair in layout['stairs']],
         'links': [{'from': link['from'], 'to': link['to'], 'cost': link['cost'], 'kind': link['kind']} for link in layout['links']],
         'spawns': layout['spawns'],
+        'extraction': layout.get('extraction'),
     }
 
 
