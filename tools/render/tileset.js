@@ -614,6 +614,28 @@ function preciseBoxes(group, level) {
   return boxes;
 }
 
+// Предметы с просветами (крона над стволом, фонарь с кронштейном, чаша фонтана, качели): рамка на каждую часть
+// модели в каждой клетке, а не одна на весь предмет — иначе под кроной соседних со стволом клеток рамка шла бы
+// от земли до верха кроны и закрывала линию огня. Прозрачные части (струи фонтана) пулю не останавливают.
+const PER_PART = new Set(['tree', 'fountain', 'streetLamp', 'lamp', 'swing', 'slide', 'carousel', 'busStop', 'balcony', 'column']);
+function partBoxes(group, level) {
+  const boxes = [], round = (value) => Math.round(value * 1000) / 1000;
+  group.traverse((node) => {
+    if (!node.isMesh) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (materials.every((material) => material.transparent && material.opacity < 0.6)) return;
+    const whole = new THREE.Box3().setFromObject(node);
+    const col0 = Math.max(0, Math.floor(whole.min.x / TILE)), col1 = Math.min(TILES - 1, Math.floor((whole.max.x - 1e-6) / TILE));
+    const row0 = Math.max(0, Math.floor(whole.min.z / TILE)), row1 = Math.min(TILES - 1, Math.floor((whole.max.z - 1e-6) / TILE));
+    for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) {
+      const box = whole.clone().intersect(new THREE.Box3(V(col * TILE, -100, row * TILE), V((col + 1) * TILE, 100, (row + 1) * TILE)));
+      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
+      boxes.push([level, col, row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
+    }
+  });
+  return boxes;
+}
+
 // Препятствия для пуль: рамки предметов по клеткам и уровням (без лестниц, вышки и мелочей фасада —
 // они тонкие или висят на стенах). [уровень, col, row, x0, z0, x1, z1, y0, y1]: x и z в клетках, y в метрах.
 function solidBoxes() {
@@ -625,6 +647,7 @@ function solidBoxes() {
     if (!group) continue;
     group.updateMatrixWorld(true);
     if (item.kind === 'tiltrotor') { boxes.push(...preciseBoxes(group, item.level)); continue; }
+    if (PER_PART.has(item.kind)) { boxes.push(...partBoxes(group, item.level)); continue; }
     for (const slice of touchedSlices(group, false, item.level)) {
       const box = new THREE.Box3();
       group.traverse((node) => { if (node.isMesh) box.union(new THREE.Box3().setFromObject(node)); });
