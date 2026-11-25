@@ -156,7 +156,7 @@ export const BASE_PLAN = {
    "y": 0,
    "width": 3,
    "height": 17,
-   "levels": 1,
+   "levels": 2,
    "kind": "corridor",
    "note": "K7 из ангара в цех, не выходя к остальной базе"
   },
@@ -168,7 +168,7 @@ export const BASE_PLAN = {
    "y": 17,
    "width": 3,
    "height": 3,
-   "levels": 1,
+   "levels": 2,
    "kind": "airlock",
    "note": "ворота в проезд и в коридор H1, открываются по очереди"
   },
@@ -216,7 +216,7 @@ export const BASE_PLAN = {
    "y": 0,
    "width": 5,
    "height": 5,
-   "levels": 1,
+   "levels": 2,
    "kind": "room",
    "note": "платформа 5×5 м, шахта до поверхности"
   },
@@ -228,7 +228,7 @@ export const BASE_PLAN = {
    "y": 5,
    "width": 5,
    "height": 5,
-   "levels": 1,
+   "levels": 2,
    "kind": "room",
    "note": "разгрузка с лифта"
   },
@@ -240,7 +240,7 @@ export const BASE_PLAN = {
    "y": 10,
    "width": 5,
    "height": 5,
-   "levels": 1,
+   "levels": 2,
    "kind": "room",
    "note": "стеллажи, контейнеры"
   },
@@ -252,7 +252,7 @@ export const BASE_PLAN = {
    "y": 15,
    "width": 16,
    "height": 2,
-   "levels": 1,
+   "levels": 2,
    "kind": "corridor",
    "note": ""
   },
@@ -276,7 +276,7 @@ export const BASE_PLAN = {
    "y": 17,
    "width": 4,
    "height": 3,
-   "levels": 1,
+   "levels": 2,
    "kind": "airlock",
    "note": ""
   },
@@ -408,7 +408,7 @@ export const BASE_PLAN = {
    "y": 29,
    "width": 20,
    "height": 2,
-   "levels": 1,
+   "levels": 2,
    "kind": "corridor",
    "note": ""
   },
@@ -432,7 +432,7 @@ export const BASE_PLAN = {
    "y": 28,
    "width": 4,
    "height": 4,
-   "levels": 1,
+   "levels": 2,
    "kind": "airlock",
    "note": ""
   },
@@ -504,7 +504,7 @@ export const BASE_PLAN = {
    "y": 23,
    "width": 4,
    "height": 3,
-   "levels": 1,
+   "levels": 2,
    "kind": "airlock",
    "note": ""
   },
@@ -528,7 +528,7 @@ export const BASE_PLAN = {
    "y": 26,
    "width": 16,
    "height": 2,
-   "levels": 1,
+   "levels": 2,
    "kind": "corridor",
    "note": ""
   },
@@ -576,7 +576,7 @@ export const BASE_PLAN = {
    "y": 23,
    "width": 4,
    "height": 4,
-   "levels": 1,
+   "levels": 2,
    "kind": "airlock",
    "note": "обработка перед входом к образцам"
   },
@@ -600,7 +600,7 @@ export const BASE_PLAN = {
    "y": 27,
    "width": 2,
    "height": 10,
-   "levels": 1,
+   "levels": 2,
    "kind": "corridor",
    "note": ""
   },
@@ -1128,7 +1128,8 @@ export const BASE_PLAN = {
    "y": 20,
    "width": 56,
    "height": 3,
-   "note": "коридор между зонами"
+   "levels": 2,
+   "note": "коридор между зонами, маршрут K7, высота 5 м"
   },
   {
    "name": "H2",
@@ -1136,6 +1137,7 @@ export const BASE_PLAN = {
    "y": 37,
    "width": 59,
    "height": 3,
+   "levels": 1,
    "note": "коридор между зонами"
   },
   {
@@ -1144,7 +1146,8 @@ export const BASE_PLAN = {
    "y": 23,
    "width": 3,
    "height": 14,
-   "note": "коридор между зонами"
+   "levels": 2,
+   "note": "коридор между зонами, маршрут K7, высота 5 м"
   },
   {
    "name": "V2",
@@ -1152,7 +1155,8 @@ export const BASE_PLAN = {
    "y": 0,
    "width": 3,
    "height": 20,
-   "note": "коридор между зонами"
+   "levels": 2,
+   "note": "коридор между зонами, маршрут K7, высота 5 м"
   },
   {
    "name": "V2",
@@ -1160,7 +1164,8 @@ export const BASE_PLAN = {
    "y": 23,
    "width": 3,
    "height": 14,
-   "note": "коридор между зонами"
+   "levels": 2,
+   "note": "коридор между зонами, маршрут K7, высота 5 м"
   },
   {
    "name": "V3",
@@ -1168,6 +1173,7 @@ export const BASE_PLAN = {
    "y": 40,
    "width": 3,
    "height": 16,
+   "levels": 1,
    "note": "коридор между зонами"
   },
   {
@@ -1176,6 +1182,7 @@ export const BASE_PLAN = {
    "y": 40,
    "width": 3,
    "height": 16,
+   "levels": 1,
    "note": "коридор между зонами"
   },
   {
@@ -1184,6 +1191,7 @@ export const BASE_PLAN = {
    "y": 40,
    "width": 3,
    "height": 16,
+   "levels": 1,
    "note": "коридор между зонами"
   }
  ],

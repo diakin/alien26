@@ -509,7 +509,7 @@
   var GATE_SPEED = { gate: 1.3, double: DOOR_SPEED };
   var gates = (MAP.gates || []).map(function (gate, index) {
     gate.doors.forEach(function (doorIndex) { doors[doorIndex].gate = index; });
-    return { kind: gate.kind, airlock: gate.airlock, doors: gate.doors, open: 0, requested: false };
+    return { kind: gate.kind, airlock: gate.airlock, height: gate.height || (gate.kind === 'gate' ? 2.35 : 2.1), doors: gate.doors, open: 0, requested: false };
   });
   var airlockOwner = {};                 // шлюз -> ворота, которым сейчас можно быть открытыми
   function nearDoor(door) {
@@ -3289,7 +3289,9 @@
     var tile = Iso.tileMeters;
     var cut = cutLevel === door.level;
     var gate = door.gate !== undefined ? gates[door.gate] : null;
-    var top = cut ? 0.8 : gate ? (gate.kind === 'gate' ? 2.36 : 2.11) : 2.12;
+    // створка ворот: часть своего уровня (высокие ворота K7 — из двух частей), как в tools/render/outpost_scene.js (gateLeafTop)
+    var top = !gate ? (cut ? 0.8 : 2.12) : cut ? Math.min(gate.height - door.level * LEVEL_H, 0.8)
+      : gate.height > (door.level + 1) * LEVEL_H ? LEVEL_H : Math.min(gate.height - door.level * LEVEL_H, LEVEL_H - 0.22);
     var base = door.level * LEVEL_H;
     var left = gate ? -0.02 : (tile - DOOR_WIDTH) / 2 / tile - 0.02, right = gate ? 1.02 : (tile + DOOR_WIDTH) / 2 / tile + 0.02;
     // точка в плоскости стены: along — доля клетки вдоль грани, across — сдвиг поперёк, height — м
@@ -3297,7 +3299,8 @@
       return door.orient === 'W' ? Iso.toScreen(door.col + across, door.row + along, base + height) : Iso.toScreen(door.col + along, door.row + across, base + height);
     }
     // обычная створка уезжает в стену, створка ворот поднимается к верху проёма
-    var slide = gate ? 0 : door.open * (DOOR_WIDTH + 0.04) / tile, lift = gate ? door.open * top : 0;
+    var slide = gate ? 0 : door.open * (DOOR_WIDTH + 0.04) / tile;
+    var lift = gate ? Math.max(0, Math.min(top, door.open * gate.height - door.level * LEVEL_H)) : 0;
     var start = wallPoint(0, 0, 0), shifted = wallPoint(slide, 0, lift);
     context.save();
     context.beginPath();

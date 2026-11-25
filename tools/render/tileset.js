@@ -19,7 +19,7 @@ import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.
 import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
-  buildWall, buildDoorLeaf, buildGateLeaf, gateShape, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
+  buildWall, buildDoorLeaf, buildGateLeaf, gateShape, gateLeafTop, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
 } from './outpost_scene.js';
 import { SURFACE } from './city_layout.js';
 import { groundMaterialFor, cityGroundExtras, floorMaterial, CITY_MAT, roofCellKey } from './city_scene.js';
@@ -363,7 +363,7 @@ for (let level = 0; level < LEVELS; level++) {
           // створка широкого проёма: на всю клетку (без стоек там, где группа продолжается), сдвигается вверх в игре
           const shape = gateShape(orient, col, row, level, wall);
           const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${shape.signature}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () =>
-            buildGateLeaf(orient, col, row, level, shape.left, shape.right, Math.min(shape.heavy ? 2.35 : 2.1, cut ? 0.8 : LEVEL_H), shape.heavy)));
+            buildGateLeaf(orient, col, row, level, shape.left, shape.right, gateLeafTop(level, wall, cut), shape.heavy, wall.gate.height)));
           plan.doors.push([col, row, level, orient, leaves[0], leaves[1]]);
         } else if (wall.type === 'door') {
           const leafKind = doorLeafKind(wall);

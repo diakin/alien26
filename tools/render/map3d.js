@@ -282,7 +282,12 @@ const Map3D = {
     for (const leaves of [door.full, door.cut]) {
       if (!leaves) continue;
       // створка широкого проёма поднимается (сворачивается к верху проёма), обычная дверь уезжает в стену
-      if (door.rollUp) leaves.traverse((node) => { if (node.userData.rollUp) node.scale.y = Math.max(0.03, 1 - open); });
+      if (door.rollUp) leaves.traverse((node) => {
+        const roll = node.userData.rollUp;
+        if (!roll) return;
+        const edge = open * roll.gateHeight;                     // нижний край створки над полом уровня 0
+        node.scale.y = Math.max(0.002, (roll.top - Math.max(roll.bottom, edge)) / (roll.top - roll.bottom));
+      });
       else leaves.position.copy(door.along).multiplyScalar(open * slide);
     }
   },

@@ -176,18 +176,21 @@ export function buildWall(orient, col, row, level, wall, cut) {
       group.add(wallBox(orient, col, row, level, -extend, TILE + extend, 0, full, materials));
     } else if (type === 'door' && wall.gate) {
       // клетка широкого проёма (ворота шлюза или двойная дверь): стойки только по краям группы, подъёмная створка
+      // высокие ворота (маршрут K7) — грани на уровнях 0 и 1: на нижнем проём во всю высоту уровня, на верхнем — до верха ворот
       const { startOpen, endOpen, heavy, left, right, post } = gateShape(orient, col, row, level, wall);
-      const top = Math.min(heavy ? 2.35 : 2.1, full);
+      const top = Math.min(wall.gate.height - level * LEVEL_H, full);
+      // нижняя часть высоких ворот: стойки и створка до пола следующего уровня, без щели на месте перекрытия
+      const leafTop = gateLeafTop(level, wall, cut);
       if (!startOpen) group.add(wallBox(orient, col, row, level, -extend, 0, 0, full, materials));
       if (!endOpen) group.add(wallBox(orient, col, row, level, TILE, TILE + extend, 0, full, materials));
       if (full > top + 0.01) group.add(wallBox(orient, col, row, level, startOpen ? 0 : -0.001, endOpen ? TILE : TILE + 0.001, top, full, materials));
       const frameMaterial = heavy ? MAT.yellow() : MAT.orange();
       const frame = Array(6).fill(frameMaterial);
-      if (!startOpen) group.add(wallBox(orient, col, row, level, 0, post, 0, top, frame, THICK + 0.08));
-      if (!endOpen) group.add(wallBox(orient, col, row, level, TILE - post, TILE, 0, top, frame, THICK + 0.08));
+      if (!startOpen) group.add(wallBox(orient, col, row, level, 0, post, 0, leafTop, frame, THICK + 0.08));
+      if (!endOpen) group.add(wallBox(orient, col, row, level, TILE - post, TILE, 0, leafTop, frame, THICK + 0.08));
       if (full > top + 0.01) group.add(wallBox(orient, col, row, level, left - 0.001, right + 0.001, top, top + 0.12, frame, THICK + 0.08));
-      group.add(wallBox(orient, col, row, level, left, right, 0, 0.03, Array(6).fill(MAT.darkSteel()), THICK + 0.14));
-      doorLeaves.add(buildGateLeaf(orient, col, row, level, left, right, top, heavy));
+      if (level === 0) group.add(wallBox(orient, col, row, level, left, right, 0, 0.03, Array(6).fill(MAT.darkSteel()), THICK + 0.14));
+      doorLeaves.add(buildGateLeaf(orient, col, row, level, left, right, leafTop, heavy, wall.gate.height));
     } else if (type === 'door') {
       const width = 0.92, top = Math.min(2.1, full);
       const left = (TILE - width) / 2, right = (TILE + width) / 2;
@@ -276,6 +279,12 @@ export function buildDoorLeaf(orient, col, row, level, left, right, top, kind = 
   return tag(group, orient === 'W' ? PART.doorW : PART.doorN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
 }
 
+// верх створки (и стоек) части ворот на уровне level: у нижней части высоких ворот — пол следующего уровня
+export function gateLeafTop(level, wall, cut) {
+  if (cut) return Math.min(wall.gate.height - level * LEVEL_H, 0.8);
+  return wall.gate.height > (level + 1) * LEVEL_H ? LEVEL_H : Math.min(wall.gate.height - level * LEVEL_H, PANEL_H);
+}
+
 // клетка широкого проёма: есть ли соседние клетки той же группы в начале и в конце грани (там нет стойки)
 export function gateShape(orient, col, row, level, wall) {
   const sameGroup = (neighbor) => !!(neighbor && neighbor.gate && neighbor.gate.group === wall.gate.group);
@@ -284,17 +293,19 @@ export function gateShape(orient, col, row, level, wall) {
   const endOpen = sameGroup(orient === 'W' ? (grid[row + 1] || [])[col] : grid[row][col + 1]);
   const post = 0.1, heavy = wall.gate.kind === 'gate';
   return { startOpen, endOpen, heavy, post, left: startOpen ? 0 : post, right: endOpen ? TILE : TILE - post,
-    signature: `gate:${wall.gate.kind}:${startOpen}:${endOpen}` };
+    signature: `gate:${wall.gate.kind}:${wall.gate.height}:${startOpen}:${endOpen}` };
 }
 
 // подъёмная створка широкого проёма: секции с рёбрами, у ворот шлюза — чёрно-жёлтая полоса внизу.
-// Сворачивается вверх: узел userData.rollUp масштабируется по высоте вокруг верха проёма (map3d.js, setDoor)
-export function buildGateLeaf(orient, col, row, level, left, right, top, heavy) {
+// Сворачивается вверх: узел userData.rollUp масштабируется по высоте вокруг верха своей части (map3d.js, setDoor).
+// Высокие ворота собраны из частей по уровням; gateHeight — высота всех ворот от пола уровня 0: нижний край створки
+// поднимается на open × gateHeight, каждая часть показывает то, что выше края
+export function buildGateLeaf(orient, col, row, level, left, right, top, heavy, gateHeight = top) {
   const group = new THREE.Group();
   const pivot = new THREE.Group();
   const topWorld = level * LEVEL_H + top;
   pivot.position.y = topWorld;
-  pivot.userData.rollUp = true;
+  pivot.userData.rollUp = { bottom: level * LEVEL_H, top: topWorld, gateHeight };
   const inner = new THREE.Group();
   inner.position.y = -topWorld;
   pivot.add(inner);
@@ -308,7 +319,7 @@ export function buildGateLeaf(orient, col, row, level, left, right, top, heavy) 
     const y = 0.01 + (height - 0.01) * index / sections;
     inner.add(wallBox(orient, col, row, level, left, right, y - 0.015, y + 0.015, rib, 0.085));
   }
-  if (heavy && height > 0.6) {
+  if (heavy && height > 0.6 && level === 0) {
     const stripes = 4, yellow = Array(6).fill(MAT.yellow()), black = Array(6).fill(MAT.darkSteel());
     for (let index = 0; index < stripes; index++) {
       const from = left + (right - left) * index / stripes, to = left + (right - left) * (index + 1) / stripes;

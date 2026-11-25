@@ -22,7 +22,9 @@ ZONES = [
     ('living', 'Жилая', (150, 120, 180), (31, 40, 25, 16), 'проходы из V4 и V5'),
     ('sport', 'Спортивная', (200, 150, 90), (59, 40, 7, 16), 'проход из V5'),
 ]
-# коридоры между зонами, 3 клетки
+# коридоры между зонами, 3 клетки; H1, V1 и V2 — маршрут K7 (ангар, шлюзы промышленной, военной, лабораторной зон
+# и изолятора): высотой в два уровня (5 м), как шлюзы, внутренние коридоры этих зон и их ворота
+K7_CORRIDORS = {'H1', 'V1', 'V2'}
 CORRIDORS = [
     ('H1', 0, 20, 56, 3), ('H2', 0, 37, 59, 3),
     ('V1', 24, 23, 3, 14), ('V2', 43, 0, 3, 20), ('V2', 43, 23, 3, 14),
@@ -34,18 +36,18 @@ ROOMS = [
     ('hangar', 'Платформа подъёмника', 0, 0, 20, 20, 4, 'room'),
     ('hangar', 'Техполоса', 20, 0, 4, 17, 4, 'room'),
     ('hangar', 'КПП', 20, 17, 4, 3, 1, 'room'),
-    ('hangar', 'Проезд к цеху', 24, 0, 3, 17, 1, 'corridor'),
-    ('hangar', 'Шлюз ангара', 24, 17, 3, 3, 1, 'airlock'),
+    ('hangar', 'Проезд к цеху', 24, 0, 3, 17, 2, 'corridor'),
+    ('hangar', 'Шлюз ангара', 24, 17, 3, 3, 2, 'airlock'),
     # промышленная
     ('industry', 'Цех (стенд K7)', 27, 5, 11, 10, 2, 'room'),
     ('industry', 'Склад материалов', 27, 0, 6, 5, 1, 'room'),
     ('industry', 'Мастерская', 33, 0, 5, 5, 1, 'room'),
-    ('industry', 'Грузовой лифт', 38, 0, 5, 5, 1, 'room'),
-    ('industry', 'Приёмка', 38, 5, 5, 5, 1, 'room'),
-    ('industry', 'Общий склад', 38, 10, 5, 5, 1, 'room'),
-    ('industry', 'Коридор', 27, 15, 16, 2, 1, 'corridor'),
+    ('industry', 'Грузовой лифт', 38, 0, 5, 5, 2, 'room'),
+    ('industry', 'Приёмка', 38, 5, 5, 5, 2, 'room'),
+    ('industry', 'Общий склад', 38, 10, 5, 5, 2, 'room'),
+    ('industry', 'Коридор', 27, 15, 16, 2, 2, 'corridor'),
     ('industry', 'Электроника', 27, 17, 6, 3, 1, 'room'),
-    ('industry', 'Шлюз', 33, 17, 4, 3, 1, 'airlock'),
+    ('industry', 'Шлюз', 33, 17, 4, 3, 2, 'airlock'),
     ('industry', 'Запчасти K7', 37, 17, 6, 3, 1, 'room'),
     # жизнеобеспечение
     ('support', 'Коридор', 46, 0, 2, 20, 1, 'corridor'),
@@ -58,25 +60,25 @@ ROOMS = [
     ('military', 'Командный центр', 0, 23, 9, 6, 1, 'room'),
     ('military', 'Брифинг', 9, 23, 5, 6, 1, 'room'),
     ('military', 'Снаряжение', 14, 23, 6, 6, 1, 'room'),
-    ('military', 'Коридор', 0, 29, 20, 2, 1, 'corridor'),
+    ('military', 'Коридор', 0, 29, 20, 2, 2, 'corridor'),
     ('military', 'Узел связи', 20, 23, 4, 5, 1, 'room'),
-    ('military', 'Шлюз', 20, 28, 4, 4, 1, 'airlock'),
+    ('military', 'Шлюз', 20, 28, 4, 4, 2, 'airlock'),
     ('military', 'Дежурная часть', 20, 32, 4, 5, 1, 'room'),
     ('military', 'Оружейная', 0, 31, 7, 6, 1, 'room'),
     ('military', 'Склад боеприпасов', 8, 31, 5, 5, 1, 'room'),
     ('military', 'Мастерская оружейника', 14, 31, 6, 6, 1, 'room'),
     # лабораторная
     ('labs', 'Кабинет учёных', 27, 23, 6, 3, 1, 'room'),
-    ('labs', 'Шлюз', 33, 23, 4, 3, 1, 'airlock'),
+    ('labs', 'Шлюз', 33, 23, 4, 3, 2, 'airlock'),
     ('labs', 'Приборная', 37, 23, 6, 3, 1, 'room'),
-    ('labs', 'Коридор', 27, 26, 16, 2, 1, 'corridor'),
+    ('labs', 'Коридор', 27, 26, 16, 2, 2, 'corridor'),
     ('labs', 'Химико-аналитическая', 27, 28, 5, 9, 1, 'room'),
     ('labs', 'Ксенобиологическая', 32, 28, 6, 9, 1, 'room'),
     ('labs', 'Физическая', 38, 28, 5, 9, 1, 'room'),
     # изолятор образцов
-    ('isolator', 'Шлюз санобработки', 46, 23, 4, 4, 1, 'airlock'),
+    ('isolator', 'Шлюз санобработки', 46, 23, 4, 4, 2, 'airlock'),
     ('isolator', 'Пост наблюдения', 50, 23, 6, 4, 1, 'room'),
-    ('isolator', 'Коридор', 46, 27, 2, 10, 1, 'corridor'),
+    ('isolator', 'Коридор', 46, 27, 2, 10, 2, 'corridor'),
     ('isolator', 'Бокс 1', 48, 27, 8, 3, 1, 'room'),
     ('isolator', 'Бокс 2', 48, 30, 8, 3, 1, 'room'),
     ('isolator', 'Бокс 3', 48, 33, 8, 4, 1, 'room'),
@@ -212,7 +214,7 @@ def render(path):
     for name, x, y, w, h in CORRIDORS:
         x0, y0 = at(x, y); x1, y1 = at(x + w, y + h)
         draw.rectangle([x0, y0, x1, y1], fill=(84, 88, 92))
-        draw.text(((x0 + x1) / 2, (y0 + y1) / 2), name, fill=(200, 204, 208), font=font(11, True), anchor='mm')
+        draw.text(((x0 + x1) / 2, (y0 + y1) / 2), name + ('\n2 ур.' if name in K7_CORRIDORS else ''), fill=(200, 204, 208), font=font(11, True), anchor='mm', align='center')
     for zone, name, x, y, w, h, levels, kind in ROOMS:
         x0, y0 = at(x, y); x1, y1 = at(x + w, y + h)
         base = zone_color[zone]
@@ -310,7 +312,7 @@ def render(path):
     draw.ellipse([cx - 1.1 * cell, cy - 1.1 * cell, cx + 1.1 * cell, cy + 1.1 * cell], outline=(40, 30, 30), width=2, fill=(110, 50, 40))
     # легенда
     ly = origin[1] + 17 * cell + 30
-    legend = [((84, 88, 92), 'коридор между зонами, 3 кл.'), ((226, 190, 60), 'шлюз / лифт'), ((255, 120, 30), 'широкие ворота (K7)'), ((230, 40, 30), 'дверь'),
+    legend = [((84, 88, 92), 'коридор, 3 кл.; «2 ур.» — маршрут K7'), ((226, 190, 60), 'шлюз / лифт'), ((255, 120, 30), 'широкие ворота (K7)'), ((230, 40, 30), 'дверь'),
               ((130, 126, 120), 'толстая стена (бетон 1,25 м)'), ((52, 48, 44), 'скала')]
     for index, (color, text) in enumerate(legend):
         y = ly + index * 22
@@ -390,7 +392,8 @@ def map_plan():
     return {'cellMeters': CELL_METERS, 'levelMeters': 2.5, 'grid': [GRID_W, GRID_H], 'modules': modules,
             'zones': [dict(key=z[0], module=module_of[z[0]], name=z[1], x=z[3][0], y=z[3][1], width=z[3][2], height=z[3][3]) for z in ZONES],
             'rooms': rooms,
-            'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4], note='коридор между зонами') for c in CORRIDORS],
+            'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4], levels=2 if c[0] in K7_CORRIDORS else 1,
+                               note='коридор между зонами' + (', маршрут K7, высота 5 м' if c[0] in K7_CORRIDORS else '')) for c in CORRIDORS],
             'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
             'doors': doors, 'cells': cells, 'total': sum(cells.values())}
 
@@ -412,7 +415,7 @@ if __name__ == '__main__':
     render(os.path.join(out, 'base_plan_v2.png'))
     json.dump({'cellMeters': CELL_METERS, 'grid': [GRID_W, GRID_H], 'square': [GRID, GRID],
                'zones': [dict(key=z[0], name=z[1], x=z[3][0], y=z[3][1], width=z[3][2], height=z[3][3], access=z[4]) for z in ZONES],
-               'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4]) for c in CORRIDORS],
+               'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4], levels=2 if c[0] in K7_CORRIDORS else 1) for c in CORRIDORS],
                'rooms': [dict(zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7]) for r in ROOMS],
                'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
                'gates': [dict(x=g[0], y=g[1], side=g[2], size=g[3]) for g in GATES],
