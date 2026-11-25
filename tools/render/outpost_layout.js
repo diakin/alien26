@@ -327,7 +327,7 @@ export function buildLayout() {
     };
     const HANGAR_HALL = new Set(['Платформа подъёмника', 'Техполоса']);
     plan.rooms.forEach((room, index) => fill(room, HANGAR_HALL.has(room.name) ? 'hangar' : room.kind === 'corridor' ? room.zone + ':corridor' : 'room' + index, room.levels));
-    plan.corridors.forEach((corridor) => fill(corridor, 'corridor', 1));
+    plan.corridors.forEach((corridor) => fill(corridor, 'corridor', corridor.levels || 1));
     const regionAt = (col, row) => (col >= 0 && row >= 0 && col < width && row < height ? region[row][col] : null);
     const levelsAt = (col, row) => (regionAt(col, row) ? roomLevels[row][col] : 0);
     // пол и «под крышей»
@@ -336,31 +336,41 @@ export function buildLayout() {
       setFloor(0, col, row, col, row, FLOOR.interior);
       for (let level = 0; level < roomLevels[row][col]; level++) setIndoor(level, col, row, col, row);
     }
-    // стены по граням
+    // стены по граням: между разными регионами — на высоту большего; внутри региона, где меняется высота
+    // (двухуровневый V1 выходит в одноуровневый H2), — только над низкой частью
+    const edgeWalls = (regionA, levelsA, regionB, levelsB, set) => {
+      const from = regionA !== regionB ? 0 : Math.min(levelsA, levelsB);
+      for (let level = from; level < Math.max(levelsA, levelsB); level++) set(level);
+    };
     for (let row = 0; row <= height; row++) for (let col = 0; col <= width; col++) {
-      if (row < height) {
-        const west = regionAt(col - 1, row), east = regionAt(col, row);
-        if (west !== east) for (let level = 0; level < Math.max(levelsAt(col - 1, row), levelsAt(col, row)); level++) setW(level, col, row, 'wall', 'inner');
-      }
-      if (col < width) {
-        const north = regionAt(col, row - 1), south = regionAt(col, row);
-        if (north !== south) for (let level = 0; level < Math.max(levelsAt(col, row - 1), levelsAt(col, row)); level++) setN(level, col, row, 'wall', 'inner');
-      }
+      if (row < height) edgeWalls(regionAt(col - 1, row), levelsAt(col - 1, row), regionAt(col, row), levelsAt(col, row), (level) => setW(level, col, row, 'wall', 'inner'));
+      if (col < width) edgeWalls(regionAt(col, row - 1), levelsAt(col, row - 1), regionAt(col, row), levelsAt(col, row), (level) => setN(level, col, row, 'wall', 'inner'));
     }
     // двери и ворота: (x, y) — клетка помещения, side — её грань, size — клеток вдоль грани. Проём шире клетки — группа
-    // дверей (gate: номер группы, вид), её грани перечислены в layout.gates
+    // дверей (gate: номер группы, вид), её грани перечислены в layout.gates. Ворота между помещениями в два уровня
+    // (маршрут K7) — высотой 4,4 м: грани двери на уровнях 0 и 1 одной группы, створка поднимается через оба уровня
+    const GATE_TOP = { gate: 2.35, double: 2.1 }, TALL_GATE = 4.4;
     plan.doors.forEach((door) => {
       const group = door.size > 1 ? gates.length : -1;
-      const edges = [];
+      const sides = [];
       for (let step = 0; step < door.size; step++) {
         const edge = door.side === 'N' ? ['N', door.x + step, door.y] : door.side === 'S' ? ['N', door.x + step, door.y + 1]
           : door.side === 'W' ? ['W', door.x, door.y + step] : ['W', door.x + 1, door.y + step];
         const [orient, col, row] = edge;
-        (orient === 'N' ? setN : setW)(0, col, row, 'door', 'inner');
-        if (group >= 0) (orient === 'N' ? wallN : wallW)[0][row + oy][col + ox].gate = { group, kind: door.kind };
-        edges.push([col + ox, row + oy, orient]);
+        const other = orient === 'N' ? [col, row - 1] : [col - 1, row];
+        sides.push({ orient, col, row, levels: Math.min(levelsAt(col, row), levelsAt(other[0], other[1])) });
       }
-      if (group >= 0) gates.push({ kind: door.kind, airlock: door.airlock, edges });
+      const tall = door.kind === 'gate' && sides.every((side) => side.levels >= 2);
+      const gateHeight = tall ? TALL_GATE : GATE_TOP[door.kind] || 2.1;
+      const edges = [];
+      for (const { orient, col, row } of sides) {
+        for (let level = 0; level < (tall ? 2 : 1); level++) {
+          (orient === 'N' ? setN : setW)(level, col, row, 'door', 'inner');
+          if (group >= 0) (orient === 'N' ? wallN : wallW)[level][row + oy][col + ox].gate = { group, kind: door.kind, height: gateHeight };
+          edges.push([col + ox, row + oy, orient, level]);
+        }
+      }
+      if (group >= 0) gates.push({ kind: door.kind, airlock: door.airlock, height: gateHeight, edges });
     });
     // скала вокруг помещений (в пределах поля); толстые стены склада боеприпасов — бетон
     const thick = new Set();
@@ -477,7 +487,7 @@ function rotateOnce(layout, turnsSoFar) {
     floor: cellGrid(layout.floor, 0), offset: cellGrid(layout.offset, 0), indoor: cellGrid(layout.indoor, 0),
     wallW, wallN, objects,
     blockedCells: layout.blockedCells.map(([level, col, row]) => [level, size - 1 - row, col]),
-    gates: (layout.gates || []).map((gate) => ({ ...gate, edges: gate.edges.map(([col, row, orient]) => (orient === 'W' ? [size - 1 - row, col, 'N'] : [size - row, col, 'W'])) })),
+    gates: (layout.gates || []).map((gate) => ({ ...gate, edges: gate.edges.map(([col, row, orient, level]) => (orient === 'W' ? [size - 1 - row, col, 'N', level] : [size - row, col, 'W', level])) })),
     extraction: layout.extraction ? layout.extraction.map(cellPoint) : layout.extraction,
     concrete: layout.concrete.map((zone) => zone.circle
       ? { ...zone, circle: [size * layout.TILE - zone.circle[1], zone.circle[0], zone.circle[2]] }

@@ -31,8 +31,8 @@ function mapFromLayout() {
   }
   // широкие проёмы: группы дверей (номера в doors) с общим состоянием; airlock — номер шлюза (у шлюза две группы)
   const doorNumber = new Map(doors.map((door, index) => [door.join('|'), index]));
-  const gates = (layout.gates || []).map((gate) => ({ kind: gate.kind, airlock: gate.airlock,
-    doors: gate.edges.map(([col, row, orient]) => doorNumber.get([col, row, 0, orient === 'W' ? 0 : 1].join('|'))) }));
+  const gates = (layout.gates || []).map((gate) => ({ kind: gate.kind, airlock: gate.airlock, height: gate.height,
+    doors: gate.edges.map(([col, row, orient, level]) => doorNumber.get([col, row, level || 0, orient === 'W' ? 0 : 1].join('|'))) }));
   const round3 = (value) => Math.round(value * 1000) / 1000;
   return {
     name: layout.name, combat: layout.combat, tiles, levels: LEVELS, levelHeight: LEVEL_H, tile: TILE,

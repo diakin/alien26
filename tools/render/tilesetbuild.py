@@ -277,8 +277,8 @@ def map_from_layout(layout):
                     if wall and wall['type'] == 'door':
                         doors.append([col, row, level, 0 if orient == 'W' else 1])
     door_number = {tuple(door): index for index, door in enumerate(doors)}
-    gates = [{'kind': gate['kind'], 'airlock': gate['airlock'],
-              'doors': [door_number[(col, row, 0, 0 if orient == 'W' else 1)] for col, row, orient in gate['edges']]} for gate in layout.get('gates', [])]
+    gates = [{'kind': gate['kind'], 'airlock': gate['airlock'], 'height': gate['height'],
+              'doors': [door_number[(edge[0], edge[1], edge[3] if len(edge) > 3 else 0, 0 if edge[2] == 'W' else 1)] for edge in gate['edges']]} for gate in layout.get('gates', [])]
     result = {
         'name': layout['name'], 'combat': layout['combat'], 'tiles': tiles, 'levels': levels, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
         'floor': flat(layout['floor'], tiles),
