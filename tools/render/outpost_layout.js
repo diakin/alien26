@@ -10,16 +10,17 @@
 // big — 48×48 из четырёх секторов 24×24: база (пришельцы), просторные здания, стоянка, посадка с конвертопланом;
 // base — подземная база в горе по плану docs/base/base_plan.json; city — центр города 96×96 (city_layout.js).
 import { BASE_PLAN } from './base_plan.js';
+import { furnishBase } from './base_furniture.js';
 import { buildCity } from './city_layout.js';
 const PARAMS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // globalThis.ALIENS_MAP задаёт карту страницам игры без параметра (game/base3d.html)
 export const MAP_NAME = (typeof globalThis !== 'undefined' && globalThis.ALIENS_MAP) || PARAMS.get('map') || 'outpost';
 export const SECTOR = 24;
 export const TILE = 1.25, LEVELS = 4, LEVEL_H = 2.5;
-// подземная база: план 56×33 (tools/base/plan.py) лежит посередине поля 58×58 — со столбца BASE_COL и строки BASE_ROW,
+// подземная база: план 66×56 (tools/base/plan_v2.py) лежит посередине поля 68×68 — со столбца BASE_COL и строки BASE_ROW,
 // чтобы скале вокруг помещений хватило клеток и с краёв плана
-export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 58 : MAP_NAME === 'city' ? 96 : SECTOR;
-export const BASE_COL = 1, BASE_ROW = 12;
+export const TILES = MAP_NAME === 'big' ? SECTOR * 2 : MAP_NAME === 'base' ? 68 : MAP_NAME === 'city' ? 96 : SECTOR;
+export const BASE_COL = 1, BASE_ROW = 6;
 
 // типы стен; blocks — нельзя пройти через грань
 export const WALL_TYPES = {
@@ -45,6 +46,7 @@ export function buildLayout() {
   const stairs = [];              // { level, col, row, dirCol, dirRow, count, style }
   const links = [];               // приставные лестницы: { from: [c, r, L], to: [c, r, L], cost, ... }
   const buildings = [];           // контуры для крыш, плит перекрытия и т.п.
+  const gates = [];               // проёмы шире клетки: { kind, airlock, edges: [[col, row, 'W' | 'N'], ...] } — двери с общим состоянием
 
   const concrete = [];             // бетонные площадки: { rect: [x0, z0, x1, z1] } или { circle: [x, z, r] }, м
   const blockedCells = [];         // занятые клетки без предмета на них (корпус конвертоплана): [level, col, row]
@@ -308,12 +310,13 @@ export function buildLayout() {
   }
 
   // ================= подземная база в горе (MAP=base) =================
-  // План — tools/base/plan.py (BASE_PLAN, тот же, что docs/base/base_plan.json): x плана — col, y — row со сдвигом
-  // (BASE_COL, BASE_ROW). Помещения и коридоры — пол «помещение», под крышей (indoor) на всю высоту помещения. Стены — по граням
-  // между разными помещениями и между помещением и скалой, высотой в большее из двух помещений (ангар — 3 уровня,
-  // цех — 2). Ангар (платформа подъёмника и техполоса) — один зал; коридоры между собой открыты. Ворота — проёмы
-  // на уровне 0 (выше — стена), двери и люки — двери. Клетки скалы вокруг помещений (соседи по 8 направлениям) —
-  // каменные блоки rockFill высотой в соседнее помещение: их верх — срез скалы; дальше — темнота.
+  // План — tools/base/plan_v2.py (BASE_PLAN): x плана — col, y — row со сдвигом (BASE_COL, BASE_ROW). Помещения и коридоры —
+  // пол «помещение», под крышей (indoor) на всю высоту помещения. Стены — по граням между разными регионами и между
+  // помещением и скалой, высотой в большее из двух помещений (ангар — 4 уровня, цех — 2). Регионы: ангар (платформа
+  // и техполоса — один зал), каждое помещение, внутренний коридор каждой зоны, коридоры между зонами (общие).
+  // Двери — по одной клетке; проёмы в 2 клетки и ворота шлюзов (2–3 клетки) — группы дверей с общим состоянием
+  // (layout.gates): створки ворот поднимаются, у шлюза ворота открываются по очереди. Клетки скалы вокруг помещений
+  // (соседи по 8 направлениям) — каменные блоки rockFill высотой в соседнее помещение: их верх — срез скалы.
   function baseMap() {
     ox = BASE_COL; oy = BASE_ROW;
     const plan = BASE_PLAN, width = plan.grid[0], height = plan.grid[1];
@@ -322,7 +325,8 @@ export function buildLayout() {
     const fill = (item, key, levels) => {
       for (let row = item.y; row < item.y + item.height; row++) for (let col = item.x; col < item.x + item.width; col++) { region[row][col] = key; roomLevels[row][col] = levels; }
     };
-    plan.rooms.forEach((room, index) => fill(room, room.module === 2 ? 'hangar' : 'room' + index, room.levels));
+    const HANGAR_HALL = new Set(['Платформа подъёмника', 'Техполоса']);
+    plan.rooms.forEach((room, index) => fill(room, HANGAR_HALL.has(room.name) ? 'hangar' : room.kind === 'corridor' ? room.zone + ':corridor' : 'room' + index, room.levels));
     plan.corridors.forEach((corridor) => fill(corridor, 'corridor', 1));
     const regionAt = (col, row) => (col >= 0 && row >= 0 && col < width && row < height ? region[row][col] : null);
     const levelsAt = (col, row) => (regionAt(col, row) ? roomLevels[row][col] : 0);
@@ -343,80 +347,44 @@ export function buildLayout() {
         if (north !== south) for (let level = 0; level < Math.max(levelsAt(col, row - 1), levelsAt(col, row)); level++) setN(level, col, row, 'wall', 'inner');
       }
     }
-    // двери и ворота: (x, y) — клетка помещения, side — её грань, size — клеток вдоль грани
-    for (const door of plan.doors) {
-      const type = door.kind === 'gate' ? null : 'door';
+    // двери и ворота: (x, y) — клетка помещения, side — её грань, size — клеток вдоль грани. Проём шире клетки — группа
+    // дверей (gate: номер группы, вид), её грани перечислены в layout.gates
+    plan.doors.forEach((door) => {
+      const group = door.size > 1 ? gates.length : -1;
+      const edges = [];
       for (let step = 0; step < door.size; step++) {
-        if (door.side === 'N') setN(0, door.x + step, door.y, type, 'inner');
-        else if (door.side === 'S') setN(0, door.x + step, door.y + 1, type, 'inner');
-        else if (door.side === 'W') setW(0, door.x, door.y + step, type, 'inner');
-        else setW(0, door.x + 1, door.y + step, type, 'inner');
+        const edge = door.side === 'N' ? ['N', door.x + step, door.y] : door.side === 'S' ? ['N', door.x + step, door.y + 1]
+          : door.side === 'W' ? ['W', door.x, door.y + step] : ['W', door.x + 1, door.y + step];
+        const [orient, col, row] = edge;
+        (orient === 'N' ? setN : setW)(0, col, row, 'door', 'inner');
+        if (group >= 0) (orient === 'N' ? wallN : wallW)[0][row + oy][col + ox].gate = { group, kind: door.kind };
+        edges.push([col + ox, row + oy, orient]);
       }
-    }
-    // скала вокруг помещений (в пределах поля)
+      if (group >= 0) gates.push({ kind: door.kind, airlock: door.airlock, edges });
+    });
+    // скала вокруг помещений (в пределах поля); толстые стены склада боеприпасов — бетон
+    const thick = new Set();
+    for (const wall of plan.thickWalls || []) for (let row = wall.y; row < wall.y + wall.height; row++) for (let col = wall.x; col < wall.x + wall.width; col++) thick.add(col + ',' + row);
     for (let row = -1; row <= height; row++) for (let col = -1; col <= width; col++) {
       if (regionAt(col, row) || row + oy < 0 || row + oy >= TILES || col + ox < 0 || col + ox >= TILES) continue;
       let levels = 0;
       for (let deltaRow = -1; deltaRow <= 1; deltaRow++) for (let deltaCol = -1; deltaCol <= 1; deltaCol++) levels = Math.max(levels, levelsAt(col + deltaCol, row + deltaRow));
       if (!levels) continue;
       const variant = ((col + ox) * 7 + (row + oy) * 13) % 3;
-      object('rockFill', 0, col, row, 1, 1, { type: `h${levels}v${variant}`, height: levels * LEVEL_H, variant });
+      object('rockFill', 0, col, row, 1, 1, { type: thick.has(col + ',' + row) ? `h${levels}c` : `h${levels}v${variant}`, height: levels * LEVEL_H, variant, concrete: thick.has(col + ',' + row) });
     }
 
-    // ---------- ангар 20×20 + техполоса 4×20, высота 4 уровня: платформа подъёмника с конвертопланом ----------
-    // (кроме ангара, координаты обстановки ниже — в плане до увеличения ангара, сдвинутые на 8 клеток к востоку и югу)
-    object('liftPlatform', 0, 0, 1, 20, 20, { blocks: false });
-    const extraction = tiltrotor(8, 9);                  // посередине платформы, нос на запад, рампа к техполосе
-    object('barrels', 0, 20, 1); object('barrels', 0, 21, 1); object('generator', 0, 22, 1, 2, 2);   // заправка
-    object('crate', 0, 20, 3); object('crate', 0, 21, 3); object('console', 0, 23, 4);                // пульт подъёмника
-    object('crate', 0, 22, 17); object('crate', 0, 23, 17); object('crate', 0, 23, 18);              // боеприпасы
-    // ---------- мастерские ----------
-    object('generator', 0, 24, 17, 2, 2); object('desk', 0, 24, 19, 2, 1); object('desk', 0, 27, 15, 2, 1);   // станки, верстаки
-    object('rack', 0, 31, 15); object('rack', 0, 31, 16); object('crate', 0, 31, 20); object('crate', 0, 30, 20);
-    object('rack', 0, 24, 11); object('rack', 0, 24, 12); object('crate', 0, 26, 11); object('crate', 0, 27, 11); object('crate', 0, 27, 12);   // склад материалов
-    object('generator', 0, 28, 11, 2, 2); object('generator', 0, 31, 11, 2, 2); object('rack', 0, 32, 13); object('barrels', 0, 32, 14);   // электростанция
-    // ---------- лаборатории, изолятор ----------
-    object('tank', 0, 35, 12, 2, 3); object('cabinet', 0, 33, 12); object('console', 0, 33, 14);
-    object('labTable', 0, 36, 16, 2, 1); object('labTable', 0, 36, 19, 2, 1); object('console', 0, 33, 17); object('cabinet', 0, 33, 20); object('rack', 0, 38, 16);
-    object('labTable', 0, 41, 17, 2, 1); object('labTable', 0, 42, 19, 2, 1); object('cabinet', 0, 39, 16); object('console', 0, 44, 16); object('crate', 0, 39, 20);
-    // ---------- грузовой шлюз ----------
-    object('liftPlatform', 0, 52, 9, 4, 4, { blocks: false });
-    object('crate', 0, 52, 9); object('crate', 0, 55, 12);
-    object('crate', 0, 55, 15); object('crate', 0, 52, 15);                                           // приёмка
-    object('console', 0, 52, 19); object('console', 0, 52, 20);                                     // КПП
-    object('rack', 0, 48, 15); object('rack', 0, 48, 16); object('rack', 0, 48, 17); object('crate', 0, 48, 19); object('crate', 0, 48, 20); object('crate', 0, 51, 19); object('crate', 0, 51, 20); object('crate', 0, 51, 15);   // общий склад
-    object('acUnit', 0, 48, 11, 2, 1); object('tank', 0, 50, 11, 2, 3); object('barrels', 0, 48, 13);   // жизнеобеспечение
-    // ---------- снаряжение, оружейная, боеприпасы ----------
-    for (const row of [24, 25, 26, 27]) object('locker', 0, 8, row);
-    object('locker', 0, 9, 27); object('locker', 0, 11, 27);
-    for (const col of [12, 13, 14, 15]) object('locker', 0, col, 27);                                   // стойки комплектов
-    object('desk', 0, 12, 24, 2, 1);                                                                 // верстак
-    for (const [col, row] of [[18, 24], [19, 24], [19, 25], [19, 27], [18, 27]]) object('crate', 0, col, row);
-    // ---------- медпункт, командный пункт ----------
-    object('bunk', 0, 20, 27, 2, 1); object('bunk', 0, 22, 27, 2, 1); object('cabinet', 0, 23, 24); object('console', 0, 20, 24);
-    for (const col of [25, 26, 28, 29]) object('console', 0, col, 27);
-    object('desk', 0, 28, 25, 2, 1); object('rack', 0, 25, 24);
-    // ---------- столовая, кухня, отдых ----------
-    object('desk', 0, 30, 25, 2, 1); object('desk', 0, 30, 27, 2, 1); object('desk', 0, 34, 26, 2, 1);
-    object('cabinet', 0, 38, 24); object('cabinet', 0, 38, 25); object('cabinet', 0, 38, 26); object('crate', 0, 36, 27);
-    object('desk', 0, 39, 25, 2, 1); object('console', 0, 43, 24);
-    // ---------- каюты и санблоки ----------
-    plan.rooms.filter((room) => room.width === 3 && room.height === 3).forEach((room) => {
-      const doorOnSouth = plan.doors.some((door) => door.side === 'S' && door.y === room.y + room.height - 1 && door.x >= room.x && door.x < room.x + room.width);
-      const bedRow = doorOnSouth ? room.y : room.y + room.height - 1;
-      object('bunk', 0, room.x, bedRow, 2, 1);
-      object('locker', 0, room.x + 2, doorOnSouth ? room.y + room.height - 1 : room.y);
-    });
-    object('locker', 0, 32, 29); object('locker', 0, 32, 30); object('locker', 0, 32, 31); object('cabinet', 0, 29, 31); object('cabinet', 0, 30, 31);
-    object('locker', 0, 51, 25); object('locker', 0, 51, 26); object('cabinet', 0, 48, 25); object('cabinet', 0, 49, 25);
+    // ---------- обстановка (base_furniture.js) и конвертоплан на платформе подъёмника ----------
+    furnishBase(plan, (kind, col, row, cols = 1, rows = 1, extra = {}) => object(kind, 0, col, row, cols, rows, extra));
+    const extraction = tiltrotor(8, 8);                  // посередине платформы, нос на запад, рампа к техполосе
 
     const at = (col, row, direction) => [col + ox, row + oy, 0, direction];
     return {
-      // отряд — в техполосе ангара напротив рампы, K7 — в галерее у ворот ангара;
-      // пришельцы вошли через грузовой лифт: в шахте, шлюзе и приёмке
-      squad: [at(21, 9, 1), at(22, 9, 1), at(21, 10, 1), at(22, 10, 1), at(21, 11, 1), at(22, 11, 1)],
-      mech: [at(16, 21, 7)],
-      aliens: [at(53, 10, 1), at(54, 10, 1), at(53, 11, 1), at(54, 11, 1), at(52, 13, 3), at(55, 14, 3), at(53, 16, 3), at(54, 17, 3)],
+      // отряд — в техполосе ангара напротив рампы, K7 — в проезде к цеху;
+      // пришельцы вошли через грузовой лифт: на платформе лифта, в приёмке и общем складе
+      squad: [at(21, 8, 1), at(22, 8, 1), at(21, 9, 1), at(22, 9, 1), at(21, 10, 1), at(22, 10, 1)],
+      mech: [at(24, 12, 3)],
+      aliens: [at(39, 1, 3), at(41, 1, 3), at(39, 3, 3), at(41, 3, 3), at(40, 6, 3), at(41, 8, 3), at(40, 11, 3), at(40, 13, 3)],
       extraction,
     };
   }
@@ -451,7 +419,7 @@ export function buildLayout() {
     ];
   }
 
-  return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, extraction, concrete, blockedCells,
+  return { MAP_NAME, TILE, TILES, LEVELS, LEVEL_H, floor, offset, wallW, wallN, indoor, objects, stairs, links, buildings, spawns, extraction, concrete, blockedCells, gates,
     surface, marking, floorStyle, mission, caption,
     name: cityName || (MAP_NAME === 'big' ? 'Посадка у базы (48×48)' : MAP_NAME === 'base' ? 'База «Ямантау»' : 'База на плато'),
     combat: MAP_NAME === 'big' || MAP_NAME === 'base' || MAP_NAME === 'city' };
@@ -509,6 +477,7 @@ function rotateOnce(layout, turnsSoFar) {
     floor: cellGrid(layout.floor, 0), offset: cellGrid(layout.offset, 0), indoor: cellGrid(layout.indoor, 0),
     wallW, wallN, objects,
     blockedCells: layout.blockedCells.map(([level, col, row]) => [level, size - 1 - row, col]),
+    gates: (layout.gates || []).map((gate) => ({ ...gate, edges: gate.edges.map(([col, row, orient]) => (orient === 'W' ? [size - 1 - row, col, 'N'] : [size - row, col, 'W'])) })),
     extraction: layout.extraction ? layout.extraction.map(cellPoint) : layout.extraction,
     concrete: layout.concrete.map((zone) => zone.circle
       ? { ...zone, circle: [size * layout.TILE - zone.circle[1], zone.circle[0], zone.circle[2]] }

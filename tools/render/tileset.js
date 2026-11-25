@@ -19,11 +19,13 @@ import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.
 import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
-  buildWall, buildDoorLeaf, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
+  buildWall, buildDoorLeaf, buildGateLeaf, gateShape, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
 } from './outpost_scene.js';
 import { SURFACE } from './city_layout.js';
 import { groundMaterialFor, cityGroundExtras, floorMaterial, CITY_MAT, roofCellKey } from './city_scene.js';
 import { groundBumpTexture } from './outpost_textures.js';
+import { touchedSlices, solidBoxes } from './solids.js';
+import { FLAT_FURNITURE } from './furniture.js';
 
 // ---------------- камера с целым шагом клетки ----------------
 // шаг клетки на экране ровно (61, 35): угол камеры asin(35/61) = 35,01°, масштаб 69,01 пикселя на метр
@@ -231,21 +233,6 @@ function slicePlanes(slice) {
 }
 
 // клетки и уровни, которые задевает группа (по рамкам отдельных мешей)
-function touchedSlices(group, levelCut, baseLevel) {
-  group.updateMatrixWorld(true);
-  const found = new Map();
-  group.traverse((node) => {
-    if (!node.isMesh) return;
-    const box = new THREE.Box3().setFromObject(node);
-    if (box.isEmpty()) return;
-    const col0 = Math.max(0, Math.floor(box.min.x / TILE)), col1 = Math.min(TILES - 1, Math.floor((box.max.x - 1e-6) / TILE));
-    const row0 = Math.max(0, Math.floor(box.min.z / TILE)), row1 = Math.min(TILES - 1, Math.floor((box.max.z - 1e-6) / TILE));
-    const level0 = levelCut ? Math.max(0, Math.floor((box.min.y - 0.05) / LEVEL_H)) : baseLevel;
-    const level1 = levelCut ? Math.min(LEVELS - 1, Math.floor((box.max.y - 0.05 - 1e-6) / LEVEL_H)) : baseLevel;
-    for (let level = level0; level <= level1; level++) for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) found.set(`${col},${row},${level}`, { col, row, level, levelCut });
-  });
-  return [...found.values()];
-}
 
 // ---------------- земля города: покрытие, бордюры, разметка, трава ----------------
 const surfaceAt = (col, row) => (col >= 0 && row >= 0 && col < TILES && row < TILES ? layout.surface[row][col] : -1);
@@ -366,13 +353,19 @@ for (let level = 0; level < LEVELS; level++) {
         const ids = [false, true].map((cut) => {
           const usesCut = wall.type === 'wall' || wall.type === 'door' || wall.type === 'window';
           const signature = simple ? `wall|${orient}|${level}|${wall.type}|${wall.style}`
-            : `wall|${orient}|${level}|${wall.type}|${wall.style}|${front}|${back}|${hashTile(col, row, level) % 3}|${usesCut && cut}`;
+            : `wall|${orient}|${level}|${wall.type}|${wall.style}|${front}|${back}|${hashTile(col, row, level) % 3}|${usesCut && cut}${wall.gate ? '|' + gateShape(orient, col, row, level, wall).signature : ''}`;
           return job(signature, { part: orient === 'W' ? PART.wallW : PART.wallN, level, col, row, shadow: true, slice: null },
             () => buildWall(orient, col, row, level, wall, usesCut && cut));
         });
         (orient === 'W' ? plan.wallW : plan.wallN)[level][row * stride + col] = ids[0];
         if (ids[1] !== ids[0]) plan.cutOf[ids[0]] = ids[1];
-        if (wall.type === 'door') {
+        if (wall.type === 'door' && wall.gate) {
+          // створка широкого проёма: на всю клетку (без стоек там, где группа продолжается), сдвигается вверх в игре
+          const shape = gateShape(orient, col, row, level, wall);
+          const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${shape.signature}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () =>
+            buildGateLeaf(orient, col, row, level, shape.left, shape.right, Math.min(shape.heavy ? 2.35 : 2.1, cut ? 0.8 : LEVEL_H), shape.heavy)));
+          plan.doors.push([col, row, level, orient, leaves[0], leaves[1]]);
+        } else if (wall.type === 'door') {
           const leafKind = doorLeafKind(wall);
           const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${leafKind}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () => {
             const width = 0.92, top = Math.min(2.1, cut ? 0.8 : LEVEL_H - 0.22);
@@ -456,7 +449,7 @@ for (const item of layout.objects) {
   if (item.kind === 'towerLeg') continue;
   if (item.kind === 'tiltrotor') { addTiltrotor(item); continue; }
   if (item.kind === 'rockFill') { addRock(item); continue; }
-  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform';
+  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor' || FLAT_FURNITURE.has(item.kind);
   const unique = ladder || RANDOM_KINDS.has(item.kind);
   const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
   // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;
@@ -597,71 +590,9 @@ window.renderTile = (id) => {
   return result;
 };
 
-// рамки отдельных деталей с пометкой solid (корпус конвертоплана), каждая — по клеткам: салон внутри свободен
-function preciseBoxes(group, level) {
-  const boxes = [], round = (value) => Math.round(value * 1000) / 1000;
-  group.traverse((node) => {
-    if (!node.isMesh || !node.userData.solid) return;
-    const whole = new THREE.Box3().setFromObject(node);
-    const col0 = Math.max(0, Math.floor(whole.min.x / TILE)), col1 = Math.min(TILES - 1, Math.floor((whole.max.x - 1e-6) / TILE));
-    const row0 = Math.max(0, Math.floor(whole.min.z / TILE)), row1 = Math.min(TILES - 1, Math.floor((whole.max.z - 1e-6) / TILE));
-    for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) {
-      const box = whole.clone().intersect(new THREE.Box3(V(col * TILE, -100, row * TILE), V((col + 1) * TILE, 100, (row + 1) * TILE)));
-      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
-      boxes.push([level, col, row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
-    }
-  });
-  return boxes;
-}
-
-// Предметы с просветами (крона над стволом, фонарь с кронштейном, чаша фонтана, качели): рамка на каждую часть
-// модели в каждой клетке, а не одна на весь предмет — иначе под кроной соседних со стволом клеток рамка шла бы
-// от земли до верха кроны и закрывала линию огня. Прозрачные части (струи фонтана) пулю не останавливают.
-const PER_PART = new Set(['tree', 'fountain', 'streetLamp', 'lamp', 'swing', 'slide', 'carousel', 'busStop', 'balcony', 'column']);
-function partBoxes(group, level) {
-  const boxes = [], round = (value) => Math.round(value * 1000) / 1000;
-  group.traverse((node) => {
-    if (!node.isMesh) return;
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    if (materials.every((material) => material.transparent && material.opacity < 0.6)) return;
-    const whole = new THREE.Box3().setFromObject(node);
-    const col0 = Math.max(0, Math.floor(whole.min.x / TILE)), col1 = Math.min(TILES - 1, Math.floor((whole.max.x - 1e-6) / TILE));
-    const row0 = Math.max(0, Math.floor(whole.min.z / TILE)), row1 = Math.min(TILES - 1, Math.floor((whole.max.z - 1e-6) / TILE));
-    for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) {
-      const box = whole.clone().intersect(new THREE.Box3(V(col * TILE, -100, row * TILE), V((col + 1) * TILE, 100, (row + 1) * TILE)));
-      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
-      boxes.push([level, col, row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
-    }
-  });
-  return boxes;
-}
-
-// Препятствия для пуль: рамки предметов по клеткам и уровням (без лестниц, вышки и мелочей фасада —
-// они тонкие или висят на стенах). [уровень, col, row, x0, z0, x1, z1, y0, y1]: x и z в клетках, y в метрах.
-function solidBoxes() {
-  const boxes = [];
-  for (const item of layout.objects) {
-    if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
-    if (item.kind === 'paint' || item.kind === 'liftPlatform') continue;
-    const group = buildObject(item, LEVELS - 1);
-    if (!group) continue;
-    group.updateMatrixWorld(true);
-    if (item.kind === 'tiltrotor') { boxes.push(...preciseBoxes(group, item.level)); continue; }
-    if (PER_PART.has(item.kind)) { boxes.push(...partBoxes(group, item.level)); continue; }
-    for (const slice of touchedSlices(group, false, item.level)) {
-      const box = new THREE.Box3();
-      group.traverse((node) => { if (node.isMesh) box.union(new THREE.Box3().setFromObject(node)); });
-      box.intersect(new THREE.Box3(V(slice.col * TILE, -100, slice.row * TILE), V((slice.col + 1) * TILE, 100, (slice.row + 1) * TILE)));
-      if (box.isEmpty() || box.max.y - box.min.y < 0.05) continue;
-      const round = (value) => Math.round(value * 1000) / 1000;
-      boxes.push([slice.level, slice.col, slice.row, round(box.min.x / TILE), round(box.min.z / TILE), round(box.max.x / TILE), round(box.max.z / TILE), round(box.min.y), round(box.max.y)]);
-    }
-  }
-  return boxes;
-}
 
 window.tilesetPlan = () => ({
-  solids: solidBoxes(),
+  solids: solidBoxes(layout, buildObject),
   jobs: jobs.map(({ id, signature, part, level, col, row, shadow, slice }) => ({ id, signature, part, level, col, row, shadow, slice })),
   plan,
   projection: { stepX: STEP_X, stepY: STEP_Y, pixelsPerMeter: PIXELS_PER_METER, upPixels: UP_PIXELS, elevation: ELEVATION, tile: TILE, levelHeight: LEVEL_H },

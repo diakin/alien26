@@ -276,7 +276,10 @@ def map_from_layout(layout):
                     wall = grid[level][row][col]
                     if wall and wall['type'] == 'door':
                         doors.append([col, row, level, 0 if orient == 'W' else 1])
-    return {
+    door_number = {tuple(door): index for index, door in enumerate(doors)}
+    gates = [{'kind': gate['kind'], 'airlock': gate['airlock'],
+              'doors': [door_number[(col, row, 0, 0 if orient == 'W' else 1)] for col, row, orient in gate['edges']]} for gate in layout.get('gates', [])]
+    result = {
         'name': layout['name'], 'combat': layout['combat'], 'tiles': tiles, 'levels': levels, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
         'floor': flat(layout['floor'], tiles),
         'offset': flat(layout['offset'], tiles, lambda value: round(value, 3)),
@@ -292,6 +295,9 @@ def map_from_layout(layout):
         'mission': layout.get('mission'),
         'caption': layout.get('caption'),
     }
+    if gates:
+        result['gates'] = gates
+    return result
 
 
 def view_edge(col, row, orient, turns):

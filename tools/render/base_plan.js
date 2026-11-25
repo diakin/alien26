@@ -1,769 +1,1946 @@
-// Сгенерировано tools/base/plan.py из того же плана, что docs/base/base_plan.json. Не править вручную.
+// Сгенерировано tools/base/plan_v2.py. Не править вручную.
 export const BASE_PLAN = {
  "cellMeters": 1.25,
  "levelMeters": 2.5,
  "grid": [
-  56,
-  33
+  66,
+  56
  ],
  "modules": {
-  "1": "Грузовой шлюз",
-  "2": "Ангар",
-  "3": "Каюты и столовая",
-  "4": "Оружейная",
-  "5": "Лаборатории",
-  "6": "Мастерские",
-  "7": "Жилой блок учёных и инженеров",
-  "8": "Обеспечение (рекомендуется)",
-  "0": "Коридоры"
+  "0": "Коридоры",
+  "1": "Ангар",
+  "2": "Промышленная",
+  "3": "Жизнеобеспечение",
+  "4": "Военная",
+  "5": "Лабораторная",
+  "6": "Изолятор образцов",
+  "7": "Медицинская",
+  "8": "Бытовая",
+  "9": "Жилая",
+  "10": "Спортивная"
  },
+ "zones": [
+  {
+   "key": "hangar",
+   "module": 1,
+   "name": "Ангар",
+   "x": 0,
+   "y": 0,
+   "width": 27,
+   "height": 20
+  },
+  {
+   "key": "industry",
+   "module": 2,
+   "name": "Промышленная",
+   "x": 27,
+   "y": 0,
+   "width": 16,
+   "height": 20
+  },
+  {
+   "key": "support",
+   "module": 3,
+   "name": "Жизнеобеспечение",
+   "x": 46,
+   "y": 0,
+   "width": 10,
+   "height": 20
+  },
+  {
+   "key": "military",
+   "module": 4,
+   "name": "Военная",
+   "x": 0,
+   "y": 23,
+   "width": 24,
+   "height": 14
+  },
+  {
+   "key": "labs",
+   "module": 5,
+   "name": "Лабораторная",
+   "x": 27,
+   "y": 23,
+   "width": 16,
+   "height": 14
+  },
+  {
+   "key": "isolator",
+   "module": 6,
+   "name": "Изолятор образцов",
+   "x": 46,
+   "y": 23,
+   "width": 10,
+   "height": 14
+  },
+  {
+   "key": "medical",
+   "module": 7,
+   "name": "Медицинская",
+   "x": 0,
+   "y": 40,
+   "width": 13,
+   "height": 16
+  },
+  {
+   "key": "domestic",
+   "module": 8,
+   "name": "Бытовая",
+   "x": 16,
+   "y": 40,
+   "width": 12,
+   "height": 16
+  },
+  {
+   "key": "living",
+   "module": 9,
+   "name": "Жилая",
+   "x": 31,
+   "y": 40,
+   "width": 25,
+   "height": 16
+  },
+  {
+   "key": "sport",
+   "module": 10,
+   "name": "Спортивная",
+   "x": 59,
+   "y": 40,
+   "width": 7,
+   "height": 16
+  }
+ ],
  "rooms": [
   {
-   "module": 2,
+   "module": 1,
+   "zone": "hangar",
    "name": "Платформа подъёмника",
    "x": 0,
-   "y": 1,
+   "y": 0,
    "width": 20,
    "height": 20,
    "levels": 4,
-   "note": "платформа 25 × 25 м, высота 10 м: под корабли до 22 м; конвертоплан КТ-6 — 10×12 клеток с опущенной рампой; шахта до поверхности"
+   "kind": "room",
+   "note": "платформа 25 × 25 м, высота 10 м; конвертоплан КТ-6; шахта до поверхности"
   },
   {
-   "module": 2,
-   "name": "Техническая полоса",
+   "module": 1,
+   "zone": "hangar",
+   "name": "Техполоса",
    "x": 20,
-   "y": 1,
+   "y": 0,
    "width": 4,
-   "height": 20,
+   "height": 17,
    "levels": 4,
+   "kind": "room",
    "note": "заправка, подвоз боеприпасов, пульт подъёмника"
   },
   {
-   "module": 6,
-   "name": "Цех",
-   "x": 24,
-   "y": 15,
-   "width": 8,
-   "height": 6,
-   "levels": 2,
-   "note": "стенд ремонта K7, станки; ворота 3 клетки в галерею"
-  },
-  {
-   "module": 6,
-   "name": "Склад материалов",
-   "x": 24,
-   "y": 11,
+   "module": 1,
+   "zone": "hangar",
+   "name": "КПП",
+   "x": 20,
+   "y": 17,
    "width": 4,
-   "height": 4,
+   "height": 3,
    "levels": 1,
-   "note": "дверь в цех"
-  },
-  {
-   "module": 8,
-   "name": "Электростанция",
-   "x": 28,
-   "y": 11,
-   "width": 5,
-   "height": 4,
-   "levels": 1,
-   "note": "генераторы, аккумуляторы; дверь в цех"
-  },
-  {
-   "module": 5,
-   "name": "Лаборатория 1",
-   "x": 33,
-   "y": 16,
-   "width": 6,
-   "height": 5,
-   "levels": 1,
-   "note": ""
-  },
-  {
-   "module": 5,
-   "name": "Лаборатория 2",
-   "x": 39,
-   "y": 16,
-   "width": 6,
-   "height": 5,
-   "levels": 1,
-   "note": ""
-  },
-  {
-   "module": 5,
-   "name": "Изолятор образцов",
-   "x": 33,
-   "y": 12,
-   "width": 4,
-   "height": 4,
-   "levels": 1,
-   "note": "вход только через лабораторию 1"
+   "kind": "room",
+   "note": "пост у шлюза ангара"
   },
   {
    "module": 1,
-   "name": "Грузовой лифт",
-   "x": 52,
-   "y": 9,
-   "width": 4,
-   "height": 4,
+   "zone": "hangar",
+   "name": "Проезд к цеху",
+   "x": 24,
+   "y": 0,
+   "width": 3,
+   "height": 17,
    "levels": 1,
+   "kind": "corridor",
+   "note": "K7 из ангара в цех, не выходя к остальной базе"
+  },
+  {
+   "module": 1,
+   "zone": "hangar",
+   "name": "Шлюз ангара",
+   "x": 24,
+   "y": 17,
+   "width": 3,
+   "height": 3,
+   "levels": 1,
+   "kind": "airlock",
+   "note": "ворота в проезд и в коридор H1, открываются по очереди"
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Цех (стенд K7)",
+   "x": 27,
+   "y": 5,
+   "width": 11,
+   "height": 10,
+   "levels": 2,
+   "kind": "room",
+   "note": "стенд ремонта K7, кран-балка, станки; высота 2 уровня"
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Склад материалов",
+   "x": 27,
+   "y": 0,
+   "width": 6,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Мастерская",
+   "x": 33,
+   "y": 0,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Грузовой лифт",
+   "x": 38,
+   "y": 0,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
    "note": "платформа 5×5 м, шахта до поверхности"
   },
   {
-   "module": 1,
-   "name": "Шлюз",
-   "x": 52,
-   "y": 13,
-   "width": 4,
-   "height": 2,
+   "module": 2,
+   "zone": "industry",
+   "name": "Приёмка",
+   "x": 38,
+   "y": 5,
+   "width": 5,
+   "height": 5,
    "levels": 1,
-   "note": "две гермодвери"
+   "kind": "room",
+   "note": "разгрузка с лифта"
   },
   {
-   "module": 1,
-   "name": "Приёмка",
-   "x": 52,
+   "module": 2,
+   "zone": "industry",
+   "name": "Общий склад",
+   "x": 38,
+   "y": 10,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "стеллажи, контейнеры"
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Коридор",
+   "x": 27,
    "y": 15,
+   "width": 16,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Электроника",
+   "x": 27,
+   "y": 17,
+   "width": 6,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Шлюз",
+   "x": 33,
+   "y": 17,
+   "width": 4,
+   "height": 3,
+   "levels": 1,
+   "kind": "airlock",
+   "note": ""
+  },
+  {
+   "module": 2,
+   "zone": "industry",
+   "name": "Запчасти K7",
+   "x": 37,
+   "y": 17,
+   "width": 6,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 3,
+   "zone": "support",
+   "name": "Коридор",
+   "x": 46,
+   "y": 0,
+   "width": 2,
+   "height": 20,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 3,
+   "zone": "support",
+   "name": "Пост контроля реактора",
+   "x": 48,
+   "y": 0,
    "width": 4,
    "height": 4,
    "levels": 1,
-   "note": "разгрузка"
+   "kind": "room",
+   "note": "пульт энергоблока, связь с ярусом −5"
   },
   {
-   "module": 1,
-   "name": "КПП",
+   "module": 3,
+   "zone": "support",
+   "name": "Лифт к реактору",
    "x": 52,
-   "y": 19,
-   "width": 2,
-   "height": 2,
+   "y": 0,
+   "width": 4,
+   "height": 4,
    "levels": 1,
-   "note": "пост охраны у выхода в галерею"
+   "kind": "room",
+   "note": "отдельный лифт на ярус −5"
   },
   {
-   "module": 1,
-   "name": "Общий склад",
+   "module": 3,
+   "zone": "support",
+   "name": "Энергоцентр",
    "x": 48,
-   "y": 15,
-   "width": 4,
+   "y": 4,
+   "width": 8,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "распределительные щиты, аккумуляторы, резервный генератор"
+  },
+  {
+   "module": 3,
+   "zone": "support",
+   "name": "Вентиляция, фильтры",
+   "x": 48,
+   "y": 9,
+   "width": 8,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 3,
+   "zone": "support",
+   "name": "Водоснабжение",
+   "x": 48,
+   "y": 14,
+   "width": 8,
    "height": 6,
    "levels": 1,
-   "note": "двери в приёмку и галерею"
-  },
-  {
-   "module": 8,
-   "name": "Жизнеобеспечение",
-   "x": 48,
-   "y": 11,
-   "width": 4,
-   "height": 4,
-   "levels": 1,
-   "note": "вентиляция от шахты лифта, вода, фильтры; дверь в склад"
+   "kind": "room",
+   "note": ""
   },
   {
    "module": 4,
+   "zone": "military",
+   "name": "Командный центр",
+   "x": 0,
+   "y": 23,
+   "width": 9,
+   "height": 6,
+   "levels": 1,
+   "kind": "room",
+   "note": "пульты, карта-глобус, связь"
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Брифинг",
+   "x": 9,
+   "y": 23,
+   "width": 5,
+   "height": 6,
+   "levels": 1,
+   "kind": "room",
+   "note": "стол, экран"
+  },
+  {
+   "module": 4,
+   "zone": "military",
    "name": "Снаряжение",
-   "x": 8,
-   "y": 24,
-   "width": 4,
-   "height": 4,
+   "x": 14,
+   "y": 23,
+   "width": 6,
+   "height": 6,
    "levels": 1,
-   "note": "раздевалка, сборы перед вылетом"
+   "kind": "room",
+   "note": "шкафчики бойцов, сборы перед вылетом"
   },
   {
    "module": 4,
+   "zone": "military",
+   "name": "Коридор",
+   "x": 0,
+   "y": 29,
+   "width": 20,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Узел связи",
+   "x": 20,
+   "y": 23,
+   "width": 4,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "аппаратура связи, радары"
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Шлюз",
+   "x": 20,
+   "y": 28,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "airlock",
+   "note": ""
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Дежурная часть",
+   "x": 20,
+   "y": 32,
+   "width": 4,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "дежурный офицер по базе и помощник, мониторы камер"
+  },
+  {
+   "module": 4,
+   "zone": "military",
    "name": "Оружейная",
-   "x": 12,
-   "y": 24,
+   "x": 0,
+   "y": 31,
+   "width": 7,
+   "height": 6,
+   "levels": 1,
+   "kind": "room",
+   "note": "стойки с оружием, верстак"
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Склад боеприпасов",
+   "x": 8,
+   "y": 31,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "бетонные стены, бронедверь"
+  },
+  {
+   "module": 4,
+   "zone": "military",
+   "name": "Мастерская оружейника",
+   "x": 14,
+   "y": 31,
+   "width": 6,
+   "height": 6,
+   "levels": 1,
+   "kind": "room",
+   "note": "ремонт и пристрелка оружия"
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Кабинет учёных",
+   "x": 27,
+   "y": 23,
+   "width": 6,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": "столы, шкафы"
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Шлюз",
+   "x": 33,
+   "y": 23,
+   "width": 4,
+   "height": 3,
+   "levels": 1,
+   "kind": "airlock",
+   "note": ""
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Приборная",
+   "x": 37,
+   "y": 23,
+   "width": 6,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": "измерительные приборы"
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Коридор",
+   "x": 27,
+   "y": 26,
+   "width": 16,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Химико-аналитическая",
+   "x": 27,
+   "y": 28,
+   "width": 5,
+   "height": 9,
+   "levels": 1,
+   "kind": "room",
+   "note": "вытяжные шкафы, хроматограф, спектрометр"
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Ксенобиологическая",
+   "x": 32,
+   "y": 28,
+   "width": 6,
+   "height": 9,
+   "levels": 1,
+   "kind": "room",
+   "note": "боксы биобезопасности, микроскопы, стол для вскрытия"
+  },
+  {
+   "module": 5,
+   "zone": "labs",
+   "name": "Физическая",
+   "x": 38,
+   "y": 28,
+   "width": 5,
+   "height": 9,
+   "levels": 1,
+   "kind": "room",
+   "note": "стенды испытаний, осциллографы, источники питания"
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Шлюз санобработки",
+   "x": 46,
+   "y": 23,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "airlock",
+   "note": "обработка перед входом к образцам"
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Пост наблюдения",
+   "x": 50,
+   "y": 23,
+   "width": 6,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "мониторы боксов"
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Коридор",
+   "x": 46,
+   "y": 27,
+   "width": 2,
+   "height": 10,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Бокс 1",
+   "x": 48,
+   "y": 27,
+   "width": 8,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Бокс 2",
+   "x": 48,
+   "y": 30,
+   "width": 8,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 6,
+   "zone": "isolator",
+   "name": "Бокс 3",
+   "x": 48,
+   "y": 33,
+   "width": 8,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Приёмный покой",
+   "x": 0,
+   "y": 40,
    "width": 5,
    "height": 4,
    "levels": 1,
-   "note": "стойки на 14 комплектов, верстак"
+   "kind": "room",
+   "note": ""
   },
   {
-   "module": 4,
-   "name": "Склад боеприпасов",
-   "x": 17,
-   "y": 24,
-   "width": 3,
-   "height": 4,
-   "levels": 1,
-   "note": "бронедверь, вход через оружейную"
-  },
-  {
-   "module": 8,
-   "name": "Медпункт",
-   "x": 20,
-   "y": 24,
+   "module": 7,
+   "zone": "medical",
+   "name": "Процедурная, аптека",
+   "x": 5,
+   "y": 40,
    "width": 4,
    "height": 4,
    "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Кабинет врача",
+   "x": 9,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Коридор",
+   "x": 0,
+   "y": 44,
+   "width": 13,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Коридор",
+   "x": 6,
+   "y": 46,
+   "width": 2,
+   "height": 10,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Операционная",
+   "x": 0,
+   "y": 46,
+   "width": 6,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "операционный стол, светильник, наркозный аппарат"
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "ПИТ-1",
+   "x": 0,
+   "y": 51,
+   "width": 6,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "палата интенсивной терапии, одиночные кровати"
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "Реанимация",
+   "x": 8,
+   "y": 46,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "реанимационная кровать, мониторы"
+  },
+  {
+   "module": 7,
+   "zone": "medical",
+   "name": "ПИТ-2",
+   "x": 8,
+   "y": 51,
+   "width": 5,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "палата интенсивной терапии, одиночные кровати"
+  },
+  {
+   "module": 8,
+   "zone": "domestic",
+   "name": "Столовая и отдых",
+   "x": 16,
+   "y": 40,
+   "width": 8,
+   "height": 7,
+   "levels": 1,
+   "kind": "room",
+   "note": "столы на 16 мест, диваны"
+  },
+  {
+   "module": 8,
+   "zone": "domestic",
+   "name": "Камбуз",
+   "x": 24,
+   "y": 40,
+   "width": 4,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "плита, мойка, холодильник, остров"
+  },
+  {
+   "module": 8,
+   "zone": "domestic",
+   "name": "Продсклад",
+   "x": 24,
+   "y": 45,
+   "width": 4,
+   "height": 2,
+   "levels": 1,
+   "kind": "room",
    "note": ""
   },
   {
    "module": 8,
-   "name": "Командный пункт",
-   "x": 25,
-   "y": 24,
-   "width": 5,
-   "height": 4,
+   "zone": "domestic",
+   "name": "Коридор",
+   "x": 16,
+   "y": 47,
+   "width": 12,
+   "height": 2,
    "levels": 1,
-   "note": "связь, радар, глобус"
-  },
-  {
-   "module": 3,
-   "name": "Столовая",
-   "x": 30,
-   "y": 24,
-   "width": 6,
-   "height": 4,
-   "levels": 1,
-   "note": "16 мест, 2 смены"
-  },
-  {
-   "module": 3,
-   "name": "Кухня",
-   "x": 36,
-   "y": 24,
-   "width": 3,
-   "height": 4,
-   "levels": 1,
-   "note": "с продскладом"
+   "kind": "corridor",
+   "note": ""
   },
   {
    "module": 8,
-   "name": "Комната отдыха",
+   "zone": "domestic",
+   "name": "Санблок 1 (душевые)",
+   "x": 16,
+   "y": 49,
+   "width": 6,
+   "height": 7,
+   "levels": 1,
+   "kind": "room",
+   "note": "душевые кабины, умывальники, туалеты"
+  },
+  {
+   "module": 8,
+   "zone": "domestic",
+   "name": "Санблок 2 (душевые)",
+   "x": 22,
+   "y": 49,
+   "width": 6,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "душевые кабины, умывальники, туалеты"
+  },
+  {
+   "module": 8,
+   "zone": "domestic",
+   "name": "Прачечная",
+   "x": 22,
+   "y": 53,
+   "width": 6,
+   "height": 3,
+   "levels": 1,
+   "kind": "room",
+   "note": ""
+  },
+  {
+   "module": 10,
+   "zone": "sport",
+   "name": "Спортзал",
+   "x": 59,
+   "y": 40,
+   "width": 7,
+   "height": 11,
+   "levels": 1,
+   "kind": "room",
+   "note": "дорожки, велотренажёры, силовые станции, штанги, маты"
+  },
+  {
+   "module": 10,
+   "zone": "sport",
+   "name": "Раздевалка, душевые",
+   "x": 59,
+   "y": 51,
+   "width": 7,
+   "height": 5,
+   "levels": 1,
+   "kind": "room",
+   "note": "шкафчики, скамьи, душевые кабины"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Коридор",
+   "x": 31,
+   "y": 44,
+   "width": 25,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Коридор",
+   "x": 31,
+   "y": 50,
+   "width": 25,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "note": ""
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 1",
+   "x": 31,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 2",
+   "x": 35,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 3",
    "x": 39,
-   "y": 24,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 4",
+   "x": 43,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 5",
+   "x": 47,
+   "y": 40,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 6",
+   "x": 51,
+   "y": 40,
    "width": 5,
    "height": 4,
    "levels": 1,
-   "note": "общая для всех"
-  },
-  {
-   "module": 3,
-   "name": "Каюта 1",
-   "x": 8,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
+   "kind": "room",
    "note": "2 места"
   },
   {
-   "module": 3,
-   "name": "Каюта 2",
-   "x": 11,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
-   "name": "Каюта 3",
-   "x": 14,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
-   "name": "Каюта 4",
-   "x": 17,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
-   "name": "Каюта 5",
-   "x": 20,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
-   "name": "Каюта 6",
-   "x": 23,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
+   "module": 9,
+   "zone": "living",
    "name": "Каюта 7",
-   "x": 26,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 3,
-   "name": "Санблок",
-   "x": 29,
-   "y": 29,
+   "x": 31,
+   "y": 52,
    "width": 4,
-   "height": 3,
+   "height": 4,
    "levels": 1,
-   "note": "душ, туалеты"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У1",
-   "x": 33,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
+   "kind": "room",
    "note": "2 места"
   },
   {
-   "module": 7,
-   "name": "Каюта У2",
-   "x": 36,
-   "y": 29,
-   "width": 3,
-   "height": 3,
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 8",
+   "x": 35,
+   "y": 52,
+   "width": 4,
+   "height": 4,
    "levels": 1,
+   "kind": "room",
    "note": "2 места"
   },
   {
-   "module": 7,
-   "name": "Каюта У3",
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 9",
    "x": 39,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У4",
-   "x": 42,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У5",
-   "x": 45,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У6",
-   "x": 48,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У7",
-   "x": 51,
-   "y": 29,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Каюта У8",
-   "x": 45,
-   "y": 25,
-   "width": 3,
-   "height": 3,
-   "levels": 1,
-   "note": "2 места"
-  },
-  {
-   "module": 7,
-   "name": "Санблок",
-   "x": 48,
-   "y": 25,
+   "y": 52,
    "width": 4,
-   "height": 3,
+   "height": 4,
    "levels": 1,
-   "note": "душ, туалеты"
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 10",
+   "x": 43,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 11",
+   "x": 47,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 12",
+   "x": 51,
+   "y": 52,
+   "width": 5,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Командир базы",
+   "x": 31,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Нач. штаба",
+   "x": 34,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Ком. отряда",
+   "x": 37,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Гл. врач",
+   "x": 40,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Хирург",
+   "x": 43,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Гл. учёный",
+   "x": 46,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Гл. инженер",
+   "x": 49,
+   "y": 46,
+   "width": 3,
+   "height": 4,
+   "levels": 1,
+   "kind": "single",
+   "note": "одноместная"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 13",
+   "x": 52,
+   "y": 46,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "note": "2 места"
   }
  ],
  "corridors": [
   {
-   "name": "Главная галерея",
+   "name": "H1",
    "x": 0,
-   "y": 21,
+   "y": 20,
    "width": 56,
    "height": 3,
-   "note": "ширина 3 клетки (3,75 м): K7 в модели 3,1 м шириной; ангар, цех, склад и приёмка выходят в неё"
+   "note": "коридор между зонами"
   },
   {
-   "name": "Выход приёмки",
-   "x": 54,
-   "y": 19,
-   "width": 2,
-   "height": 2,
-   "note": "к галерее"
+   "name": "H2",
+   "x": 0,
+   "y": 37,
+   "width": 59,
+   "height": 3,
+   "note": "коридор между зонами"
   },
   {
-   "name": "Жилой коридор",
-   "x": 8,
-   "y": 28,
-   "width": 46,
-   "height": 1,
-   "note": "вдоль всех кают"
-  },
-  {
-   "name": "Проход к жилому коридору",
+   "name": "V1",
    "x": 24,
-   "y": 24,
-   "width": 1,
-   "height": 4,
-   "note": ""
+   "y": 23,
+   "width": 3,
+   "height": 14,
+   "note": "коридор между зонами"
   },
   {
-   "name": "Проход к каютам учёных",
-   "x": 44,
-   "y": 24,
+   "name": "V2",
+   "x": 43,
+   "y": 0,
+   "width": 3,
+   "height": 20,
+   "note": "коридор между зонами"
+  },
+  {
+   "name": "V2",
+   "x": 43,
+   "y": 23,
+   "width": 3,
+   "height": 14,
+   "note": "коридор между зонами"
+  },
+  {
+   "name": "V3",
+   "x": 13,
+   "y": 40,
+   "width": 3,
+   "height": 16,
+   "note": "коридор между зонами"
+  },
+  {
+   "name": "V4",
+   "x": 28,
+   "y": 40,
+   "width": 3,
+   "height": 16,
+   "note": "коридор между зонами"
+  },
+  {
+   "name": "V5",
+   "x": 56,
+   "y": 40,
+   "width": 3,
+   "height": 16,
+   "note": "коридор между зонами"
+  }
+ ],
+ "thickWalls": [
+  {
+   "x": 7,
+   "y": 31,
    "width": 1,
-   "height": 4,
-   "note": ""
+   "height": 6
+  },
+  {
+   "x": 13,
+   "y": 31,
+   "width": 1,
+   "height": 6
+  },
+  {
+   "x": 8,
+   "y": 36,
+   "width": 5,
+   "height": 1
   }
  ],
  "doors": [
   {
-   "x": 20,
-   "y": 20,
-   "side": "S",
-   "size": 4,
-   "kind": "gate"
-  },
-  {
-   "x": 26,
-   "y": 20,
-   "side": "S",
+   "x": 23,
+   "y": 8,
+   "side": "E",
    "size": 3,
-   "kind": "gate"
-  },
-  {
-   "x": 25,
-   "y": 15,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 29,
-   "y": 15,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 35,
-   "y": 20,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 41,
-   "y": 20,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 38,
-   "y": 18,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 34,
-   "y": 16,
-   "side": "N",
-   "size": 1,
-   "kind": "hatch"
-  },
-  {
-   "x": 53,
-   "y": 12,
-   "side": "S",
-   "size": 2,
-   "kind": "hatch"
-  },
-  {
-   "x": 53,
-   "y": 14,
-   "side": "S",
-   "size": 2,
-   "kind": "hatch"
-  },
-  {
-   "x": 52,
-   "y": 16,
-   "side": "W",
-   "size": 2,
-   "kind": "door"
-  },
-  {
-   "x": 54,
-   "y": 18,
-   "side": "S",
-   "size": 2,
-   "kind": "gate"
-  },
-  {
-   "x": 53,
-   "y": 19,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 49,
-   "y": 20,
-   "side": "S",
-   "size": 2,
-   "kind": "gate"
-  },
-  {
-   "x": 49,
-   "y": 15,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 10,
-   "y": 24,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 11,
-   "y": 25,
-   "side": "E",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 14,
-   "y": 24,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 17,
-   "y": 26,
-   "side": "W",
-   "size": 1,
-   "kind": "hatch"
-  },
-  {
-   "x": 21,
-   "y": 24,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 27,
-   "y": 24,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 32,
-   "y": 24,
-   "side": "N",
-   "size": 2,
-   "kind": "door"
-  },
-  {
-   "x": 33,
-   "y": 27,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 36,
-   "y": 25,
-   "side": "W",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 41,
-   "y": 24,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 41,
-   "y": 27,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 46,
-   "y": 27,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 49,
-   "y": 27,
-   "side": "S",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 9,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 12,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 15,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 18,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
-  },
-  {
-   "x": 21,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
+   "kind": "gate",
+   "airlock": -1
   },
   {
    "x": 24,
-   "y": 29,
+   "y": 17,
    "side": "N",
-   "size": 1,
-   "kind": "door"
+   "size": 3,
+   "kind": "gate",
+   "airlock": 4
+  },
+  {
+   "x": 24,
+   "y": 19,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": 4
   },
   {
    "x": 27,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
+   "y": 9,
+   "side": "W",
+   "size": 3,
+   "kind": "gate",
+   "airlock": -1
   },
   {
-   "x": 34,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
+   "x": 39,
+   "y": 9,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": -1
   },
   {
-   "x": 37,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
+   "x": 33,
+   "y": 19,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": 13
   },
   {
-   "x": 40,
-   "y": 29,
+   "x": 33,
+   "y": 17,
    "side": "N",
-   "size": 1,
-   "kind": "door"
+   "size": 3,
+   "kind": "gate",
+   "airlock": 13
   },
   {
-   "x": 43,
+   "x": 23,
    "y": 29,
+   "side": "E",
+   "size": 3,
+   "kind": "gate",
+   "airlock": 26
+  },
+  {
+   "x": 20,
+   "y": 29,
+   "side": "W",
+   "size": 2,
+   "kind": "gate",
+   "airlock": 26
+  },
+  {
+   "x": 33,
+   "y": 23,
    "side": "N",
-   "size": 1,
-   "kind": "door"
+   "size": 3,
+   "kind": "gate",
+   "airlock": 32
+  },
+  {
+   "x": 33,
+   "y": 25,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": 32
   },
   {
    "x": 46,
-   "y": 29,
-   "side": "N",
-   "size": 1,
-   "kind": "door"
+   "y": 24,
+   "side": "W",
+   "size": 3,
+   "kind": "gate",
+   "airlock": 38
   },
   {
-   "x": 49,
-   "y": 29,
+   "x": 46,
+   "y": 26,
+   "side": "S",
+   "size": 2,
+   "kind": "gate",
+   "airlock": 38
+  },
+  {
+   "x": 28,
+   "y": 14,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": -1
+  },
+  {
+   "x": 39,
+   "y": 14,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": -1
+  },
+  {
+   "x": 39,
+   "y": 4,
+   "side": "S",
+   "size": 3,
+   "kind": "gate",
+   "airlock": -1
+  },
+  {
+   "x": 28,
+   "y": 4,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 35,
+   "y": 4,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 29,
+   "y": 17,
    "side": "N",
    "size": 1,
-   "kind": "door"
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 39,
+   "y": 17,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 1,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
   },
   {
    "x": 52,
-   "y": 29,
-   "side": "N",
+   "y": 1,
+   "side": "W",
    "size": 1,
-   "kind": "door"
+   "kind": "door",
+   "airlock": -1
   },
   {
-   "x": 30,
-   "y": 29,
+   "x": 48,
+   "y": 6,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 11,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 16,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 46,
+   "y": 19,
+   "side": "S",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 46,
+   "y": 17,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 23,
+   "y": 18,
+   "side": "E",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 4,
+   "y": 28,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 11,
+   "y": 28,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 16,
+   "y": 28,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 20,
+   "y": 25,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 3,
+   "y": 31,
    "side": "N",
    "size": 1,
-   "kind": "door"
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 10,
+   "y": 31,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 16,
+   "y": 31,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 21,
+   "y": 32,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 29,
+   "y": 25,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 39,
+   "y": 25,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 29,
+   "y": 28,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 34,
+   "y": 28,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 40,
+   "y": 28,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 50,
+   "y": 24,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 28,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 31,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 34,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 2,
+   "y": 40,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 2,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 6,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 10,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 12,
+   "y": 44,
+   "side": "E",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 5,
+   "y": 48,
+   "side": "E",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 5,
+   "y": 53,
+   "side": "E",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 8,
+   "y": 48,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 8,
+   "y": 53,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 19,
+   "y": 40,
+   "side": "N",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 19,
+   "y": 46,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 24,
+   "y": 42,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 25,
+   "y": 45,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 18,
+   "y": 49,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 24,
+   "y": 49,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 24,
+   "y": 53,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 16,
+   "y": 47,
+   "side": "W",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 27,
+   "y": 47,
+   "side": "E",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 31,
+   "y": 44,
+   "side": "W",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 31,
+   "y": 50,
+   "side": "W",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 55,
+   "y": 44,
+   "side": "E",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 55,
+   "y": 50,
+   "side": "E",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 59,
+   "y": 44,
+   "side": "W",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1
+  },
+  {
+   "x": 59,
+   "y": 52,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 61,
+   "y": 51,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 32,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 32,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 36,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 36,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 40,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 40,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 44,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 44,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 48,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 52,
+   "y": 43,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 52,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 32,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 35,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 38,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 41,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 44,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 47,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 50,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
+  },
+  {
+   "x": 53,
+   "y": 46,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1
   }
  ],
  "cells": {
-  "2": 480,
-  "6": 64,
-  "8": 92,
-  "5": 76,
-  "1": 68,
-  "4": 48,
-  "3": 111,
-  "7": 84,
-  "0": 226
+  "1": 540,
+  "2": 320,
+  "3": 200,
+  "4": 319,
+  "5": 224,
+  "6": 140,
+  "7": 208,
+  "8": 192,
+  "10": 112,
+  "9": 400,
+  "0": 633
  },
- "total": 1249
+ "total": 3288
 };

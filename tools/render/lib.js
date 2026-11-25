@@ -507,7 +507,8 @@ export function setEnvIntensity(root, value) {
   root.traverse((node) => {
     if (!node.material) return;
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
-      if ('envMapIntensity' in material) material.envMapIntensity = value;
+      // userData.envBoost — материалу нужно больше отражений окружения (шлифованная сталь камбуза)
+      if ('envMapIntensity' in material) material.envMapIntensity = value * (material.userData.envBoost || 1);
     }
   });
 }

@@ -20,6 +20,7 @@ var Settings = (function () {
     { key: 'musicPause', label: 'Паузы в музыке', type: 'select', value: 30, options: [[30, '30 с играет, 30 с тишина'], [60, '30 с играет, 60 с тишина'], [0, 'Без пауз']] },
     { key: 'ambienceVolume', label: 'Громкость фона (ветер)', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
     { group: 'ГРАФИКА' },
+    { key: 'render3d', label: '3D-карта (WebGL, база): поворот камеры «,» / «.»', type: 'check', value: true },
     { key: 'renderScale', label: 'Разрешение отрисовки', type: 'select', value: 1, options: [[1, 'Полное'], [0.75, '75 % — быстрее'], [0.5, '50 % — для слабых машин']] },
     { key: 'fullscreen', label: 'Полный экран', type: 'check', value: false, live: true },
     { key: 'showHelp', label: 'Подсказки управления справа вверху', type: 'check', value: true },
