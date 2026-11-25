@@ -178,6 +178,12 @@ function applyMask(geometry, mask) {
   for (let index = 0; index < mask.length; index++) colors.set([1, 1, 1, mask[index]], index * 4);
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
 }
+const doubleMaterials = new Map();
+function doubleSided(material) {
+  if (material.side === THREE.DoubleSide) return material;
+  if (!doubleMaterials.has(material)) { const copy = material.clone(); copy.side = THREE.DoubleSide; doubleMaterials.set(material, copy); }
+  return doubleMaterials.get(material);
+}
 const maskedMaterials = new Map();
 function maskedMaterial(material) {
   if (!maskedMaterials.has(material)) {
@@ -258,6 +264,31 @@ function relax(geometry, iterations = 6) {
   geometry.computeVertexNormals();
 }
 
+// общая основа одежды: вся сетка «колготок» вида, сглаженная целиком, с нормалями — все слои строятся от неё,
+// поэтому соседние слои (жилет и полосы на нём) не расходятся из-за разного сглаживания по краям кусков
+const clothBases = new Map();
+function clothBase(kind, iterations) {
+  const key = kind + ':' + iterations;
+  if (!clothBases.has(key)) {
+    const rest = restOf(kind), part = PARTS.tights;
+    const geometry = partGeometry(part, (index) => rest.point(part.source[index]), { uvMode: 'none', skin: false });
+    if (iterations) {
+      relax(geometry, iterations);
+      smoothNormals(geometry);
+      // сглаживание только наружу: на выпуклостях (плечи, ключицы) основа не уходит под кожу, иначе тело проступает сквозь ткань
+      const position = geometry.attributes.position, normal = geometry.attributes.normal;
+      for (let index = 0; index < position.count; index++) {
+        const raw = rest.point(part.source[index]);
+        const inward = (position.getX(index) - raw.x) * normal.getX(index) + (position.getY(index) - raw.y) * normal.getY(index) + (position.getZ(index) - raw.z) * normal.getZ(index);
+        if (inward < 0) position.setXYZ(index, position.getX(index) - normal.getX(index) * inward, position.getY(index) - normal.getY(index) * inward, position.getZ(index) - normal.getZ(index) * inward);
+      }
+    }
+    smoothNormals(geometry);
+    clothBases.set(key, { position: geometry.attributes.position.array.slice(), normal: geometry.attributes.normal.array.slice() });
+  }
+  return clothBases.get(key);
+}
+
 // приподнять вершины над телом по нормали на offset(вершина)
 function inflate(geometry, offsetOf) {
   const position = geometry.attributes.position, normal = geometry.attributes.normal;
@@ -272,7 +303,13 @@ function inflate(geometry, offsetOf) {
 // ---------------- одежда ----------------
 // garment: { region, offset, material } — region(вершина-источник, положение покоя) → true, если вершина покрыта
 // края одежды — по плоскостям (ровная кромка по рядам сетки): вырез у шеи, манжеты у запястий, низ брюк у щиколоток
-const neckCut = (frame, point) => point.y < frame.joints.neck_01[0].y - 0.012 + (point.z < frame.joints.neck_01[0].z - 0.01 ? 0.025 : 0) - Math.max(0, point.z - frame.joints.neck_01[0].z) * 0.6;
+// вырез: высота плавно меняется по углу вокруг шеи — сзади выше, спереди ниже (та же линия, что у основания воротника)
+const neckLine = (frame, point) => {
+  const neck = frame.joints.neck_01[0];
+  const frontness = (1 + Math.cos(Math.atan2(point.x, point.z - (neck.z - 0.005)))) / 2;
+  return neck.y + 0.013 - 0.055 * frontness ** 1.5;
+};
+const neckCut = (frame, point) => point.y < neckLine(frame, point);
 // сторона по x: левая рука у модели в +x
 const armSide = (point) => point.x > 0 ? 'l' : 'r';
 const beforeWrist = (frame, point, margin = 0.015, source = null) => {
@@ -289,6 +326,7 @@ const shortSleeve = (frame, point) => [armSide(point)].every((side) => {
 });
 // тело под одеждой убирается, только если одежда есть и вокруг (кромка по сглаженной маске может отступить)
 const COVER_PROBES = [V(0, 0, 0), V(0, 0.035, 0), V(0, -0.035, 0), V(0.03, 0, 0), V(-0.03, 0, 0), V(0, 0, 0.03), V(0, 0, -0.03)];
+const band = (value, center, half) => Math.min(1, Math.max(0, 0.5 + (half - Math.abs(value - center)) / 0.04));
 export const REGIONS = {
   // рубашка, китель, куртка: корпус и рукава до запястья, низ — до верха бёдер
   top: (frame) => (source, point) => boneWeight(source, HEAD) < 0.05 && boneWeight(source, FOOT) === 0 && neckCut(frame, point) && beforeWrist(frame, point, 0.015, source)
@@ -300,11 +338,10 @@ export const REGIONS = {
   // комбинезон: всё, кроме головы, шеи, кистей и стоп
   coverall: (frame) => (source, point) => boneWeight(source, HEAD) < 0.05 && neckCut(frame, point) && beforeWrist(frame, point, 0.015, source) && aboveAnkle(frame, point, 0.04),
   // жилет: корпус без рукавов
-  vest: (frame) => (source, point) => boneWeight(source, TORSO) + boneWeight(source, PELVIS) * 0.5 > 0.55 && boneWeight(source, UPPER_ARM) < 0.25 && point.y > frame.waist - 0.08
+  vest: (frame) => (source, point) => boneWeight(source, THIGH) < 0.3 && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) < 0.25 && point.y > frame.waist - 0.08
     && neckCut(frame, point) && point.y < frame.joints.neck_01[0].y - 0.05,
   // световозвращающие полосы жилета: две горизонтальные ленты
-  vestStripes: (frame) => (source, point) => REGIONS.vest(frame)(source, point)
-    && (Math.abs(point.y - (frame.shoulderY - 0.17)) < 0.02 || Math.abs(point.y - (frame.waist + 0.04)) < 0.02),
+  vestStripes: (frame) => (source, point) => REGIONS.vest(frame)(source, point) ? Math.max(band(point.y, frame.shoulderY - 0.17, 0.02), band(point.y, frame.waist + 0.04, 0.02)) : 0,
   // перчатки: кисть и низ предплечья (длинные у костюма биозащиты)
   glove: (frame) => (source, point) => boneWeight(source, HAND) > 0.15 || !beforeWrist(frame, point, 0.1, source),
   // обувь по стопе: туфли до щиколотки, ботинки и сапоги — выше по голени
@@ -312,7 +349,8 @@ export const REGIONS = {
   boot: (frame) => (source, point) => boneWeight(source, FOOT) > 0.2 || point.y < frame.joints.foot_l[0].y + 0.24,
   workBoot: (frame) => (source, point) => boneWeight(source, FOOT) > 0.2 || point.y < frame.joints.foot_l[0].y + 0.11,
   // ремень: лента по поясу брюк
-  belt: (frame) => (source, point) => REGIONS.legs(frame)(source, point) && point.y > frame.waist - 0.005 && point.y < frame.waist + 0.035,
+  // узкие ленты возвращают долю 0..1 (линейно по высоте): кромка по изолинии 0,5 ровная и на крупной сетке
+  belt: (frame) => (source, point) => boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.1 ? band(point.y, frame.waist + 0.012, 0.02) : 0,
   // фартук: спереди от груди до колен
   apron: (frame) => (source, point) => point.z > frame.pelvis.z + 0.02 && point.y < frame.shoulderY - 0.08 && point.y > frame.joints.calf_l[0].y + 0.08
     && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.1 && Math.abs(point.x) < 0.2,
@@ -386,6 +424,133 @@ function hairCoverage(relative, style) {
   return smooth(line - 0.08, line + 0.06, relative.y);
 }
 function smooth(edge0, edge1, value) { const amount = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0))); return amount * amount * (3 - 2 * amount); }
+
+// ---------------- свободный крой ----------------
+// Поле смещения одежды от тела: штанины и рукава тянутся к цилиндру вокруг оси кости, корпус ниже груди — к профилю груди
+// (ткань не повторяет талию и поясницу). Смещение считается по точке тела в покое, поэтому все слои одежды смещаются
+// одинаково и сохраняют порядок (жилет и ремень остаются поверх комбинезона).
+const bagCache = new Map();
+function bagFrame(kind) {
+  if (bagCache.has(kind)) return bagCache.get(kind);
+  const rest = restOf(kind), frame = rest.frame, joints = rest.joints, part = PARTS.tights;
+  // ось конечности из двух костей; t — доля длины от начала
+  const limb = (names) => {
+    const nodes = names.map((name) => joints[name][0]);
+    const lengths = [nodes[0].distanceTo(nodes[1]), nodes[1].distanceTo(nodes[2])];
+    const total = lengths[0] + lengths[1];
+    return (point) => {
+      let best = null;
+      for (let piece = 0; piece < 2; piece++) {
+        const start = nodes[piece], direction = nodes[piece + 1].clone().sub(start).divideScalar(lengths[piece]);
+        const along = Math.min(lengths[piece], Math.max(0, point.clone().sub(start).dot(direction)));
+        const axis = start.clone().addScaledVector(direction, along);
+        const distance = point.distanceTo(axis);
+        if (!best || distance < best.distance) best = { axis, distance, t: ((piece ? lengths[0] : 0) + along) / total };
+      }
+      return best;
+    };
+  };
+  const legs = { l: limb(['thigh_l', 'calf_l', 'foot_l']), r: limb(['thigh_r', 'calf_r', 'foot_r']) };
+  const arms = { l: limb(['upperarm_l', 'lowerarm_l', 'hand_l']), r: limb(['upperarm_r', 'lowerarm_r', 'hand_r']) };
+  // радиус бедра и плеча — медиана расстояний до оси в верхней части
+  const median = (values) => { values.sort((a, b) => a - b); return values[Math.floor(values.length / 2)] || 0.06; };
+  const thighValues = [], armValues = [];
+  const chestY = frame.shoulderY - 0.13, slice = [];
+  for (const source of part.source) {
+    const point = rest.point(source);
+    const side = point.x > 0 ? 'l' : 'r';
+    if (boneWeight(source, THIGH) > 0.8) { const near = legs[side](point); if (near.t > 0.1 && near.t < 0.22) thighValues.push(near.distance); }
+    if (boneWeight(source, UPPER_ARM) > 0.8) { const near = arms[side](point); if (near.t > 0.15 && near.t < 0.35) armValues.push(near.distance); }
+    if (Math.abs(point.y - chestY) < 0.045 && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) < 0.2) slice.push(point);
+  }
+  // профиль груди: по 48 направлениям вокруг вертикальной оси наибольший радиус
+  const zValues = slice.map((point) => point.z);
+  const chestZ = (Math.min(...zValues) + Math.max(...zValues)) / 2;
+  const BINS = 48, profile = new Float32Array(BINS);
+  for (const point of slice) {
+    const angle = Math.atan2(point.x, point.z - chestZ);
+    const bin = Math.floor((angle / (Math.PI * 2) + 0.5) * BINS) % BINS;
+    profile[bin] = Math.max(profile[bin], Math.hypot(point.x, point.z - chestZ));
+  }
+  const smoothed = profile.map((value, bin) => (profile[(bin + BINS - 1) % BINS] + value * 2 + profile[(bin + 1) % BINS]) / 4);
+  const profileAt = (angle) => {
+    const position = (angle / (Math.PI * 2) + 0.5) * BINS - 0.5;
+    const low = Math.floor(position), mix = position - low;
+    return smoothed[(low + BINS) % BINS] * (1 - mix) + smoothed[(low + 1) % BINS] * mix;
+  };
+  // перед таза на уровне тазобедренных суставов: до этой плоскости ткань перекрывает промежность спереди
+  let crotchFront = -Infinity;
+  for (const source of part.source) {
+    const point = rest.point(source);
+    if (Math.abs(point.x) < 0.03 && Math.abs(point.y - joints.thigh_l[0].y) < 0.02) crotchFront = Math.max(crotchFront, point.z);
+  }
+  const result = { crotchFront, legs, arms, thighRadius: median(thighValues), armRadius: median(armValues), chestY, chestZ, profileAt,
+    hipY: joints.thigh_l[0].y, kneeY: joints.calf_l[0].y, footY: joints.foot_l[0].y };
+  bagCache.set(kind, result);
+  return result;
+}
+
+// смещение точки одежды; bag: { torso, legs, arms } — доля (0..1), tucked — штанины заправлены в ботинки
+function bagDisplace(kind, point, source, bag) {
+  const shape = bagFrame(kind), frame = restOf(kind).frame, out = V(0, 0, 0);
+  const armWeight = source == null ? 0 : boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND);
+  const legWeight = source == null ? 0 : boneWeight(source, THIGH) + boneWeight(source, CALF) + boneWeight(source, FOOT);
+  if (bag.torso && armWeight < 0.6) {
+    const fade = smooth(frame.waist - 0.21, frame.waist - 0.09, point.y) * (1 - smooth(shape.chestY - 0.01, shape.chestY + 0.07, point.y))
+      * Math.max(0, 1 - legWeight) * (1 - armWeight / 0.6);
+    if (fade > 0) {
+      const dx = point.x, dz = point.z - shape.chestZ, radius = Math.hypot(dx, dz);
+      const push = Math.max(0, shape.profileAt(Math.atan2(dx, dz)) * 0.985 - radius) * bag.torso * fade;
+      if (radius > 1e-4) { out.x += dx / radius * push; out.z += dz / radius * push; }
+    }
+  }
+  if (bag.legs && legWeight > 0.2 && point.y < shape.hipY + 0.03) {
+    const near = shape.legs[point.x > 0 ? 'l' : 'r'](point);
+    const radial = point.clone().sub(near.axis), radius = radial.length() || 1e-4;
+    radial.divideScalar(radius);
+    let push = Math.max(0, shape.thighRadius * (1.06 - 0.3 * near.t) - radius) * bag.legs * Math.min(1, legWeight) * smooth(shape.hipY + 0.03, shape.hipY - 0.07, point.y);
+    // заправлено в ботинки — к голенищу сужается; иначе низ штанины лежит на обуви
+    push *= bag.tucked ? smooth(shape.footY + 0.07, shape.footY + 0.2, point.y) : 1 - 0.35 * smooth(shape.footY + 0.15, shape.footY + 0.04, point.y);
+    // внутренняя сторона бедра — не к другой ноге
+    const inward = -Math.sign(point.x) * radial.x;
+    if (inward > 0) push *= 1 - 0.75 * inward * smooth(shape.kneeY - 0.05, shape.hipY - 0.05, point.y);
+    out.addScaledVector(radial, push);
+  }
+  // спереди между бёдрами ткань натянута от бедра к бедру, а не обтягивает промежность
+  if (bag.legs && point.z > frame.pelvis.z && Math.abs(point.x) < 0.12) {
+    const fade = smooth(shape.hipY - 0.2, shape.hipY - 0.06, point.y) * (1 - smooth(shape.hipY + 0.01, shape.hipY + 0.07, point.y)) * (1 - smooth(0.05, 0.12, Math.abs(point.x)));
+    out.z += Math.max(0, shape.crotchFront - 0.012 - point.z) * bag.legs * fade;
+  }
+  if (bag.arms && armWeight > 0.3 && boneWeight(source, HAND) < 0.3) {
+    const near = shape.arms[point.x > 0 ? 'l' : 'r'](point);
+    const radial = point.clone().sub(near.axis), radius = radial.length() || 1e-4;
+    radial.divideScalar(radius);
+    let push = Math.max(0, shape.armRadius * (1.12 - 0.38 * near.t) - radius) * bag.arms * Math.min(1, armWeight);
+    // манжета собрана у запястья
+    push *= 1 - 0.75 * smooth(0.82, 0.97, near.t);
+    // к корпусу (подмышка) — меньше
+    const inward = -Math.sign(point.x) * radial.x;
+    if (inward > 0) push *= 1 - 0.85 * inward * (1 - smooth(0.25, 0.5, near.t));
+    out.addScaledVector(radial, push);
+  }
+  return out;
+}
+
+// ---------------- воротник и лацканы ----------------
+// радиус поверхности тела вокруг оси шеи на высоте y в направлении angle (0 — вперёд, ±π — назад)
+function surfaceRadius(kind, y, angle, centerZ) {
+  const rest = restOf(kind);
+  let best = 0;
+  for (const source of PARTS.tights.source) {
+    if (boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) > 0.3 || boneWeight(source, HEAD) > 0.3) continue;
+    const point = rest.point(source);
+    if (Math.abs(point.y - y) > 0.012) continue;
+    const delta = Math.atan2(point.x, point.z - centerZ) - angle;
+    if (Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) > 0.16) continue;
+    best = Math.max(best, Math.hypot(point.x, point.z - centerZ));
+  }
+  return best || 0.06;
+}
 
 // options: kind, look (civilian.js), female, garments: [{ region: 'top'|..., offset, material }], hideHair, hairStyle
 // pose: { pelvis, pelvisQuat, torsoQuat, headQuat, hands: [правая, левая] (центр кисти), elbowPoles, feet (лодыжки), kneePole,
@@ -525,6 +690,7 @@ export function buildHumanBody(options, pose) {
 
   // одежда: слои по порядку, каждый над предыдущим
   const frame0 = rest.frame;
+  const bag = options.baggy || {};
   for (const garment of garments) {
     const part = garment.part === 'skirt' ? PARTS.skirt : PARTS.tights;
     const region = garment.part === 'skirt' ? () => true : REGIONS[garment.region](rest.frame);
@@ -537,24 +703,58 @@ export function buildHumanBody(options, pose) {
       }
       // полы до колена (халат): ниже колена отрезаны
       if (garment.part === 'skirt' && garment.toKnee && rest.point(source).y < frame0.joints.calf_l[0].y + 0.02) return 0;
-      return region(source, rest.point(source)) ? 1 : 0;
+      const inside = region(source, rest.point(source));
+      return typeof inside === 'number' ? inside : inside ? 1 : 0;
     };
     // кромка по изолинии сглаженной маски
-    const mask = softMask(part, restPoint(part), inside, garment.part === 'skirt' ? 1 : 2);
+    const mask = softMask(part, restPoint(part), inside, garment.maskSmooth ?? (garment.part === 'skirt' ? 1 : 2));
+    const looseness = garment.loose ?? 0.006;
+    // вырез у шеи прилегает к коже: иначе в зазор между тканью и телом видно тёмную щель
+    const tuck = garment.offset <= 0.012;
+    const offsetOf = (index) => {
+      const point = rest.point(part.source[index]);
+      let offset = garment.offset + looseness * smooth(frame0.waist - 0.1, frame0.joints.foot_l[0].y + 0.1, point.y);
+      if (tuck && point.y > frame0.shoulderY - 0.06) offset *= 0.2 + 0.8 * smooth(0.5, 0.97, mask[index]);
+      // подол куртки отходит от брюк — видна кромка
+      if (garment.flare) offset += garment.flare * smooth(frame0.waist + 0.02, frame0.waist - 0.11, point.y);
+      return offset + (garment.part === 'skirt' && bag.legs ? 0.012 * bag.legs : 0);
+    };
+    const baggy = bag.torso || bag.legs || bag.arms;
+    if (part === PARTS.tights) {
+      // слой над общей основой: точка основы + нормаль × отступ + свободный крой
+      const base = clothBase(kind, garment.relax ?? 12);
+      const geometry = partGeometry(part, (index) => {
+        const offset = offsetOf(index);
+        const point = V(base.position[index * 3] + base.normal[index * 3] * offset, base.position[index * 3 + 1] + base.normal[index * 3 + 1] * offset, base.position[index * 3 + 2] + base.normal[index * 3 + 2] * offset);
+        // у выреза — к несглаженной коже (сглаженная основа во впадине у шеи отходит от тела, видна щель)
+        const raw = rest.point(part.source[index]);
+        if (tuck && raw.y > frame0.shoulderY - 0.06) {
+          const edge = smooth(0.5, 0.97, mask[index]);
+          point.lerp(raw.addScaledVector(V(base.normal[index * 3], base.normal[index * 3 + 1], base.normal[index * 3 + 2]), offset), 1 - edge);
+        }
+        return baggy ? point.add(bagDisplace(kind, rest.point(part.source[index]), part.source[index], bag)) : point;
+      }, { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
+      applyMask(geometry, mask);
+      smoothNormals(geometry);
+      boxUV(geometry, garment.density || 2.4);
+      addSkinned(geometry, maskedMaterial(garment.material), 'garment');
+      continue;
+    }
     const geometry = partGeometry(part, restPoint(part), { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
     applyMask(geometry, mask);
     if (garment.relax !== 0) relax(geometry, garment.relax || 5);
     smoothNormals(geometry);
-    // свободная ткань: у брюк и рукавов внизу чуть шире
-    const looseness = garment.loose ?? 0.006;
-    // вырез у шеи прилегает к коже: иначе в зазор между тканью и телом видно тёмную щель
-    const tuck = garment.offset <= 0.012;
-    inflate(geometry, (index) => {
-      const point = rest.point(part.source[index]);
-      let offset = garment.offset + looseness * smooth(frame0.waist - 0.1, frame0.joints.foot_l[0].y + 0.1, point.y);
-      if (tuck && point.y > frame0.shoulderY - 0.06) offset *= 0.2 + 0.8 * smooth(0.5, 0.97, mask[index]);
-      return offset;
-    });
+    // полы халата: отступ по нормали и свободный крой только корпуса
+    inflate(geometry, offsetOf);
+    if (baggy) {
+      const position = geometry.attributes.position, skirtBag = { torso: bag.torso };
+      for (let index = 0; index < position.count; index++) {
+        const source = part.source[index];
+        const shift = bagDisplace(kind, rest.point(source), source, skirtBag);
+        position.setXYZ(index, position.getX(index) + shift.x, position.getY(index) + shift.y, position.getZ(index) + shift.z);
+      }
+      geometry.computeVertexNormals();
+    }
     boxUV(geometry, garment.density || 2.4);
     addSkinned(geometry, maskedMaterial(garment.material), 'garment');
   }
@@ -569,7 +769,9 @@ export function buildHumanBody(options, pose) {
     // длинные волосы спадают на шею и верх спины: полотно над одеждой (ниже затылка — выше слоя одежды)
     const coverage = (index) => hairCoverage(relative(rest.point(bodyPart.source[index])), style);
     // линия роста — изолиния сглаженной маски (alphaTest), без зубцов по треугольникам
-    const onHead = (index) => boneWeight(bodyPart.source[index], HEAD) + boneWeight(bodyPart.source[index], NECK) > 0.5;
+    // волосы — только выше основания шеи: ниже лежит одежда (иначе пряди проступают на плечах)
+    const neckBase = frame.joints.neck_01[0].y - 0.01;
+    const onHead = (index) => boneWeight(bodyPart.source[index], HEAD) + boneWeight(bodyPart.source[index], NECK) > 0.5 && rest.point(bodyPart.source[index]).y > neckBase;
     const hairMask = softMask(bodyPart, restPoint(bodyPart), (index) => onHead(index) ? Math.min(1, coverage(index) * 2.5) : 0, 2);
     const geometry = partGeometry(bodyPart, restPoint(bodyPart), { uvMode: 'none', keepAny: true, keep: (index) => onHead(index) && hairMask[index] > 0.5 });
     applyMask(geometry, hairMask);
@@ -601,5 +803,101 @@ export function buildHumanBody(options, pose) {
   const restSpine = rest.joints.spine_03[0], restPelvis = rest.joints.pelvis[0];
   const torsoPoint = (x, y, z) => V(x, y, z).sub(restSpine).applyMatrix4(spineMatrix);
   const hipPoint = (x, y, z) => V(x, y, z).sub(restPelvis).applyMatrix4(pelvisMatrix);
-  return { group, skeleton, bones, joints, headCenter, headLocal, torsoPoint, hipPoint, rest, bodyMesh, front: (x, y, spread) => frontOf(kind, x, y, spread), headMatrix };
+  // поверхность спереди с учётом свободного кроя (для пуговиц, галстука, лацканов)
+  const garmentFront = (x, y, spread) => {
+    const z = frontOf(kind, x, y, spread);
+    return z + bagDisplace(kind, V(x, y, z), null, bag).z;
+  };
+  const posedMesh = (positions, indices, material) => {
+    const geometry = new THREE.BufferGeometry();
+    const posed = new Float32Array(positions.length);
+    for (let index = 0; index < positions.length; index += 3) posed.set(torsoPoint(positions[index], positions[index + 1], positions[index + 2]).toArray(), index);
+    geometry.setAttribute('position', new THREE.BufferAttribute(posed, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    boxUV(geometry, 2.4);
+    const mesh = new THREE.Mesh(geometry, doubleSided(material));
+    mesh.castShadow = mesh.receiveShadow = true;
+    return mesh;
+  };
+  // сетка-полоса: rows рядов по columns точек, точки — функция (ряд, столбец) → [x, y, z] в покое
+  const strip = (rows, columns, pointAt, material) => {
+    const positions = [], indices = [];
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) positions.push(...pointAt(row, column));
+    for (let row = 0; row < rows - 1; row++) for (let column = 0; column < columns - 1; column++) {
+      const corner = row * columns + column;
+      indices.push(corner, corner + columns, corner + 1, corner + 1, corner + columns, corner + columns + 1);
+    }
+    return posedMesh(positions, indices, material);
+  };
+  const neck = rest.joints.neck_01[0];
+  // воротник: стойка по вырезу и отложной край, лежащий на плечах; gap — половина разреза спереди (рад), offset — слой одежды
+  const collar = ({ material, gap = 0.12, offset = 0.009, stand = 0.03, fall = 0.045, tips = 0.03, lower = 0, spread = 0.04 }) => {
+    const centerZ = neck.z - 0.005, columns = 41;
+    const radiusCache = new Map();
+    const radiusAt = (y, angle) => {
+      const key = Math.round(y * 500) + ',' + Math.round(angle * 40);
+      if (!radiusCache.has(key)) radiusCache.set(key, surfaceRadius(kind, y, angle, centerZ));
+      return radiusCache.get(key);
+    };
+    const columnAngle = (column) => { const phi = gap + (Math.PI * 2 - gap * 2) * column / (columns - 1); return phi > Math.PI ? phi - Math.PI * 2 : phi; };
+    const base = (angle) => { const frontness = (1 + Math.cos(angle)) / 2; return neck.y + 0.013 - 0.055 * frontness ** 1.5 - lower; };
+    const at = (angle, y, radius) => [Math.sin(angle) * radius, y, centerZ + Math.cos(angle) * radius];
+    // радиусы по столбцам сглаживаются вдоль воротника: поверхность тела неровная, ткань — нет
+    const smoothRow = (values) => {
+      let row = values.slice();
+      for (let pass = 0; pass < 4; pass++) row = row.map((value, column) => (row[Math.max(0, column - 1)] + value * 2 + row[Math.min(columns - 1, column + 1)]) / 4);
+      return row;
+    };
+    const angles = [], standBottom = [], standTop = [], fallBottom = [], heights = [];
+    for (let column = 0; column < columns; column++) {
+      const angle = columnAngle(column), frontness = (1 + Math.cos(angle)) / 2;
+      const nearGap = Math.max(0, 1 - Math.min(Math.abs(angle - gap), Math.abs(angle + gap)) / 0.4);
+      const low = base(angle) - 0.004, top = base(angle) + stand * (1 - 0.3 * frontness);
+      const bottom = top - fall - 0.012 * frontness - tips * nearGap ** 1.5;
+      angles.push(angle); heights.push([low, top, bottom]);
+      // стойка облегает шею: не шире шеи на уровне сустава (иначе по бокам уходит на трапецию)
+      const neckRadius = radiusAt(neck.y + 0.005, angle);
+      standBottom.push(Math.min(radiusAt(low, angle), neckRadius + 0.012)); standTop.push(Math.min(radiusAt(top, angle), neckRadius + 0.006)); fallBottom.push(radiusAt(bottom, angle));
+    }
+    const radiusLow = smoothRow(standBottom), radiusTop = smoothRow(standTop), radiusFall = smoothRow(fallBottom);
+    const meshes = [];
+    // стойка
+    meshes.push(strip(2, columns, (row, column) => {
+      const [low, top] = heights[column];
+      return row ? at(angles[column], top, Math.max(radiusTop[column], radiusLow[column] - 0.004) + offset + 0.005) : at(angles[column], low, radiusLow[column] + offset + 0.003);
+    }, material));
+    // отложной край: от верха стойки вниз и наружу, не дальше 3 см от стойки; у разреза — уголки
+    if (fall) meshes.push(strip(3, columns, (row, column) => {
+      const [, top, bottom] = heights[column];
+      const topRadius = Math.max(radiusTop[column], radiusLow[column] - 0.004) + offset + 0.009;
+      if (row === 0) return at(angles[column], top + 0.003, topRadius);
+      const bottomRadius = Math.min(topRadius + spread, Math.max(topRadius + Math.min(0.01, spread), radiusFall[column] + offset + 0.005));
+      if (row === 1) return at(angles[column], (top * 0.55 + bottom * 0.45), Math.max(topRadius + 0.006, (topRadius + bottomRadius) / 2 + 0.003));
+      return at(angles[column], bottom, bottomRadius);
+    }, material));
+    const group = new THREE.Group();
+    meshes.forEach((mesh) => group.add(mesh));
+    return group;
+  };
+  // лацканы: две полосы по краям V-образного выреза от шеи до точки застёжки; под ними — вставка (рубашка) по выбору
+  const lapels = ({ material, shirt = null, top, bottom, width = 0.07, lift = 0.012, apart = 0.035 }) => {
+    const group = new THREE.Group();
+    const surface = (x, y, extra) => [x, y, garmentFront(x, y, 0.02) + lift + extra];
+    for (const side of [-1, 1]) {
+      group.add(strip(9, 4, (row, column) => {
+        const along = row / 8, across = column / 3;
+        const x = side * (apart * (1 - along) + 0.004 * along + width * (1 - along) ** 0.8 * across);
+        const y = top + (bottom - top) * along - 0.012 * across * (1 - along);
+        return surface(x, y, 0.005 * Math.sin(across * Math.PI) + 0.006 + 0.003 * across);
+      }, material));
+    }
+    if (shirt) group.add(strip(9, 5, (row, column) => {
+      const along = row / 8, across = column / 4 * 2 - 1;
+      const half = apart * (1 - along) + 0.004 * along + 0.006;
+      return surface(across * half, top + 0.012 + (bottom - top - 0.012) * along, 0.002);
+    }, shirt));
+    return group;
+  };
+  return { group, skeleton, bones, joints, headCenter, headLocal, torsoPoint, hipPoint, rest, bodyMesh, front: garmentFront, headMatrix, collar, lapels };
 }

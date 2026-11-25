@@ -66,6 +66,7 @@ function materialsFor(kind) {
   const legsWeave = look.legsWeave || (kind === 'man' || kind === 'boy' ? 'denim' : look.legs === look.top ? topWeave : 'twill');
   const cloth = (color, roughness = 0.92, weave = 'plain') => fabric(color, weave, { roughness });
   const materials = {
+    shirt: cloth(look.shirt || 0xcfc7a8, 0.9, 'plain'),
     top: look.hazmat ? pvc(look.top) : cloth(look.top, 0.92, topWeave), legs: look.hazmat ? pvc(look.legs) : cloth(look.legs, 0.92, legsWeave),
     skin: new THREE.MeshStandardMaterial({ color: look.skin, roughness: 0.7 }),
     hair: new THREE.MeshStandardMaterial({ color: look.hair, roughness: 0.85 }),
@@ -183,24 +184,30 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
     layer('coverall', materials.top, 0.009);
   } else {
     layer('legs', materials.legs, 0.005);
-    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009);
+    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008 });
   }
   if (look.coat) {
-    layer('top', materials.coat, 0.017);
+    layer('top', materials.coat, 0.017, { flare: 0.012 });
     if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, material: materials.coat, offset: 0.02 });
   }
   if (look.vest) {
     layer('vest', materials.vest, 0.022);
-    layer('vestStripes', materials.stripe, 0.025, { thin: true });
+    layer('vestStripes', materials.stripe, 0.025, { thin: true, maskSmooth: 0 });
   }
   if (look.apron) layer('apron', materials.apron, look.coat ? 0.026 : 0.02, { thin: true });
   if (look.gloves && !look.hazmat) layer('glove', materials.glove, 0.004, { thin: true, relax: 0, loose: 0 });
   // обувь — по форме стопы; ремень — лента по поясу брюк
   if (!look.hazmat) layer(look.boots ? 'workBoot' : 'shoes', look.boots ? materials.boot : materials.shoe, look.boots ? 0.014 : 0.009, { relax: 2, loose: 0, thin: true });
-  const belted = look.belt || (!coverall && !look.coat && !look.apron && !look.hazmat && kind !== 'girl' && kind !== 'woman');
-  if (belted) layer('belt', materials.dark, 0.016, { thin: true, relax: 0, loose: 0 });
+  const belted = look.belt || look.uniform || kind === 'man' || kind === 'boy';
+  if (belted) layer('belt', materials.dark, look.uniform ? 0.03 : 0.016, { thin: true, relax: 12, loose: 0, maskSmooth: 0 });
 
-  const human = buildHumanBody({ kind, look, garments, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
+  // свободный крой (доля 0..1): форма и рабочие комбинезоны — мешковатые; остальная одежда — чуть свободнее тела
+  const baggy = look.uniform ? { torso: 0.85, legs: 1, arms: 0.65 }
+    : look.hazmat ? { torso: 0.6, legs: 0.7, arms: 0.5, tucked: true }
+    : coverall ? { torso: 1, legs: 1, arms: 0.8, tucked: !!look.boots }
+    : look.coat ? { torso: 0.75, legs: 0.45, arms: 0.45 }
+    : { torso: 0.45, legs: 0.4, arms: 0.3 };
+  const human = buildHumanBody({ kind, look, garments, baggy, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
     pelvis, pelvisQuat, torsoQuat, headQuat, hands: spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead,
     elbowPoles: spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
   });
@@ -333,16 +340,37 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   }
 
   // ---- корпус: детали одежды ----
+  // ---- воротники и лацканы (human.js: по поверхности тела, жёстко с грудной клеткой) ----
+  const neckY = rest.joints.neck_01[0].y;
   if (look.uniform) {
-    // китель: пуговицы, нагрудные карманы с клапанами, воротник, ремень
-    for (let button = 0; button < 5; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.005, 12), materials.button), front(0.0, chestY + 0.11 - button * 0.075, 0.015), torsoQuat).rotateX(Math.PI / 2);
+    // китель с отложным воротником и лацканами, в вырезе — рубашка с галстуком
+    add(human.collar({ material: materials.shirt, gap: 0.05, offset: 0.004, stand: 0.03, fall: 0.022, tips: 0.035, spread: 0.008 }));
+    add(human.collar({ material: materials.top, gap: 0.6, offset: 0.016, stand: 0.022, fall: 0.05, tips: 0.02, lower: 0.004 }));
+    add(human.lapels({ material: materials.top, shirt: materials.shirt, top: neckY - 0.04, bottom: chestY - 0.05, width: 0.068, lift: 0.012, apart: 0.04 }));
+    // пуговицы ниже выреза, нагрудные карманы с клапанами
+    for (let button = 0; button < 3; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.005, 12), materials.button), front(0.0, chestY - 0.075 - button * 0.08, 0.016), torsoQuat).rotateX(Math.PI / 2);
     for (const side of [-1, 1]) {
-      placed(box(0.085, 0.03, 0.01, materials.top, 0.004), front(side * 0.075, chestY + 0.035, 0.016), torsoQuat);
-      placed(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.004, 10), materials.button), front(side * 0.075, chestY + 0.03, 0.023), torsoQuat).rotateX(Math.PI / 2);
+      placed(box(0.075, 0.028, 0.008, materials.top, 0.004), front(side * 0.1, chestY + 0.0, 0.016), torsoQuat);
+      placed(new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.004, 10), materials.button), front(side * 0.1, chestY - 0.004, 0.022), torsoQuat).rotateX(Math.PI / 2);
     }
+  } else if (coverall && !look.hazmat) {
+    // рабочий комбинезон: отложной воротник и короткие отвороты у молнии
+    add(human.collar({ material: materials.top, gap: 0.32, offset: 0.009, stand: 0.026, fall: 0.042, tips: 0.03 }));
+    if (!look.vest) add(human.lapels({ material: materials.top, top: neckY - 0.04, bottom: chestY + 0.03, width: 0.045, lift: 0.01, apart: 0.032 }));
+    if (!look.vest) add(segment(front(0, chestY + 0.03, 0.013), front(0, waistY - 0.12, 0.013), 0.004, 0.004, materials.dark, 6));
+  } else if (look.coat) {
+    // халат: отложной воротник и лацканы; у учёного под халатом — рубашка с воротником
+    if (kind === 'scientist') add(human.collar({ material: materials.top, gap: 0.2, offset: 0.004, stand: 0.028, fall: 0.022, tips: 0.03, spread: 0.008 }));
+    add(human.collar({ material: materials.coat, gap: 0.55, offset: 0.019, stand: 0.024, fall: 0.052, tips: 0.02, lower: 0.004 }));
+    add(human.lapels({ material: materials.coat, shirt: materials.top, top: neckY - 0.04, bottom: chestY - 0.07, width: 0.075, lift: 0.02, apart: 0.04 }));
+  } else if (look.chefHat) {
+    // поварская куртка: воротник-стойка
+    add(human.collar({ material: materials.top, gap: 0.12, offset: 0.009, stand: 0.034, fall: 0 }));
+  } else if (look.nurseCap) {
+    add(human.collar({ material: materials.top, gap: 0.3, offset: 0.009, stand: 0.02, fall: 0.035, tips: 0.02 }));
   }
   if (look.tie) {
-    add(segment(front(0, frame.shoulderY + 0.04, 0.016), front(0, chestY - 0.06, 0.016), 0.012, 0.02, materials.tie, 4)).scale.set(1, 1, 0.3);
+    add(segment(front(0, frame.shoulderY + 0.04, 0.019), front(0, chestY - 0.04, 0.019), 0.012, 0.022, materials.tie, 4)).scale.set(1, 1, 0.3);
   }
   if (look.epaulets) for (const [number, side] of [[0, -1], [1, 1]]) {
     const top = joints.shoulders[number].clone().add(V(0, 0.045, 0).applyQuaternion(torsoQuat)).add(V(-side * 0.035, 0, 0).applyQuaternion(torsoQuat));
@@ -350,29 +378,16 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   }
   if (look.coat) {
     // халат: лацканы, три пуговицы, нагрудный карман с ручкой, боковые карманы
-    for (const side of [-1, 1]) {
-      const lapel = add(segment(front(side * 0.05, frame.shoulderY + 0.02, 0.022), front(side * 0.015, chestY - 0.06, 0.022), 0.02, 0.01, materials.coat, 4));
-      lapel.scale.set(1, 1, 0.25);
-    }
-    for (let button = 0; button < 3; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.005, 12), materials.button), front(0.012, chestY - 0.08 - button * 0.08, 0.024), torsoQuat).rotateX(Math.PI / 2);
-    placed(box(0.08, 0.095, 0.006, materials.coat, 0.004), front(0.085, chestY - 0.01, 0.024), torsoQuat);
-    placed(box(0.009, 0.08, 0.009, materials.dark, 0.003), front(0.1, chestY + 0.02, 0.03), torsoQuat);
+    for (let button = 0; button < 3; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.005, 12), materials.button), front(0.012, chestY - 0.1 - button * 0.08, 0.024), torsoQuat).rotateX(Math.PI / 2);
+    placed(box(0.07, 0.09, 0.006, materials.coat, 0.004), front(0.105, chestY - 0.04, 0.024), torsoQuat);
+    placed(box(0.009, 0.08, 0.009, materials.dark, 0.003), front(0.115, chestY - 0.01, 0.03), torsoQuat);
   }
-  if (look.belt || (!coverall && !look.coat && !look.apron && !look.hazmat && kind !== 'girl' && kind !== 'woman')) {
-    // ремень по талии: эллипс по сечению брюк
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.018, 6, 32), materials.dark);
-    const half = Math.abs(human.front(0, waistY - 0.04) - rest.joints.pelvis[0].z) + 0.012;
-    ring.scale.set(half * 1.32, half * 1.0, 1);
-    ring.rotation.x = Math.PI / 2;
-    const holder = new THREE.Group();
-    holder.add(ring);
-    holder.position.copy(human.hipPoint(0, waistY - 0.035, rest.joints.pelvis[0].z - 0.005));
-    holder.quaternion.copy(pelvisQuat);
-    add(holder);
-    placed(box(0.05, 0.035, 0.01, materials.chrome || materials.button, 0.004), human.hipPoint(0, waistY - 0.035, human.front(0, waistY - 0.04) + 0.016), pelvisQuat);
+  if (belted) {
+    // пряжка; у рабочих — подсумок и чехол инструмента сбоку, по поверхности одежды
+    placed(box(0.05, 0.034, 0.01, materials.chrome || materials.button, 0.004), human.hipPoint(0, waistY + 0.012, human.front(0, waistY + 0.012) + (look.uniform ? 0.034 : 0.02)), pelvisQuat);
     if (look.belt) {
-      placed(box(0.08, 0.12, 0.06, materials.dark, 0.015), human.hipPoint(0.16, waistY - 0.1, rest.joints.pelvis[0].z + 0.03), pelvisQuat);
-      placed(box(0.025, 0.2, 0.025, materials.dark, 0.006), human.hipPoint(-0.17, waistY - 0.12, rest.joints.pelvis[0].z + 0.02), pelvisQuat);
+      placed(box(0.07, 0.11, 0.06, materials.dark, 0.015), human.hipPoint(0.15, waistY - 0.05, human.front(0.13, waistY - 0.05) - 0.02), pelvisQuat);
+      placed(box(0.025, 0.2, 0.025, materials.dark, 0.006), human.hipPoint(-0.16, waistY - 0.09, human.front(-0.14, waistY - 0.05) - 0.03), pelvisQuat);
     }
   }
   if (look.armband) add(segment(joints.shoulders[0].clone().lerp(joints.elbows[0], 0.3), joints.shoulders[0].clone().lerp(joints.elbows[0], 0.55), 0.06, 0.056, materials.armband, 16));
