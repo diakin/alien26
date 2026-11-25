@@ -320,38 +320,43 @@ export function buildLayout() {
   function baseMap() {
     ox = BASE_COL; oy = BASE_ROW;
     const plan = BASE_PLAN, width = plan.grid[0], height = plan.grid[1];
-    const region = Array.from({ length: height }, () => new Array(width).fill(null));
-    const roomLevels = Array.from({ length: height }, () => new Array(width).fill(0));
-    const fill = (item, key, levels) => {
-      for (let row = item.y; row < item.y + item.height; row++) for (let col = item.x; col < item.x + item.width; col++) { region[row][col] = key; roomLevels[row][col] = levels; }
+    // регионы по уровням: помещение с полом на уровне floor и высотой levels занимает уровни floor .. floor + levels − 1
+    const region = Array.from({ length: LEVELS }, () => Array.from({ length: height }, () => new Array(width).fill(null)));
+    const groundLevels = Array.from({ length: height }, () => new Array(width).fill(0));   // высота помещения с полом на уровне 0
+    const floorLevel = Array.from({ length: LEVELS }, () => Array.from({ length: height }, () => new Array(width).fill(false)));
+    const fill = (item, key, levels, floor = 0) => {
+      for (let row = item.y; row < item.y + item.height; row++) for (let col = item.x; col < item.x + item.width; col++) {
+        for (let level = floor; level < Math.min(LEVELS, floor + levels); level++) region[level][row][col] = key;
+        floorLevel[floor][row][col] = true;
+        if (!floor) groundLevels[row][col] = levels;
+      }
     };
     const HANGAR_HALL = new Set(['Платформа подъёмника', 'Техполоса']);
-    plan.rooms.forEach((room, index) => fill(room, HANGAR_HALL.has(room.name) ? 'hangar' : room.kind === 'corridor' ? room.zone + ':corridor' : 'room' + index, room.levels));
+    plan.rooms.forEach((room, index) => fill(room, HANGAR_HALL.has(room.name) ? 'hangar' : room.kind === 'corridor' ? room.zone + ':corridor' : 'room' + index, room.levels, room.floor || 0));
     plan.corridors.forEach((corridor) => fill(corridor, 'corridor', corridor.levels || 1));
-    const regionAt = (col, row) => (col >= 0 && row >= 0 && col < width && row < height ? region[row][col] : null);
-    const levelsAt = (col, row) => (regionAt(col, row) ? roomLevels[row][col] : 0);
+    const inPlan = (col, row) => col >= 0 && row >= 0 && col < width && row < height;
+    const regionAt = (level, col, row) => (inPlan(col, row) ? region[level][row][col] : null);
+    const levelsAt = (col, row) => (inPlan(col, row) ? groundLevels[row][col] : 0);
+    const topAt = (col, row) => { let top = 0; for (let level = 0; level < LEVELS; level++) if (regionAt(level, col, row)) top = level + 1; return top; };
     // пол и «под крышей»
-    for (let row = 0; row < height; row++) for (let col = 0; col < width; col++) {
-      if (!region[row][col]) continue;
-      setFloor(0, col, row, col, row, FLOOR.interior);
-      for (let level = 0; level < roomLevels[row][col]; level++) setIndoor(level, col, row, col, row);
+    for (let level = 0; level < LEVELS; level++) for (let row = 0; row < height; row++) for (let col = 0; col < width; col++) {
+      if (!region[level][row][col]) continue;
+      if (floorLevel[level][row][col]) setFloor(level, col, row, col, row, FLOOR.interior);
+      setIndoor(level, col, row, col, row);
     }
-    // стены по граням: между разными регионами — на высоту большего; внутри региона, где меняется высота
-    // (двухуровневый V1 выходит в одноуровневый H2), — только над низкой частью
-    const edgeWalls = (regionA, levelsA, regionB, levelsB, set) => {
-      const from = regionA !== regionB ? 0 : Math.min(levelsA, levelsB);
-      for (let level = from; level < Math.max(levelsA, levelsB); level++) set(level);
-    };
-    for (let row = 0; row <= height; row++) for (let col = 0; col <= width; col++) {
-      if (row < height) edgeWalls(regionAt(col - 1, row), levelsAt(col - 1, row), regionAt(col, row), levelsAt(col, row), (level) => setW(level, col, row, 'wall', 'inner'));
-      if (col < width) edgeWalls(regionAt(col, row - 1), levelsAt(col, row - 1), regionAt(col, row), levelsAt(col, row), (level) => setN(level, col, row, 'wall', 'inner'));
+    // стены по граням на каждом уровне: где по сторонам разные регионы (или с одной стороны пусто) — стена.
+    // Так двухуровневый V1, выходящий в одноуровневый H2, получает стену над проходом, а второй уровень жилой зоны —
+    // свои стены над каютами
+    for (let level = 0; level < LEVELS; level++) for (let row = 0; row <= height; row++) for (let col = 0; col <= width; col++) {
+      if (row < height && regionAt(level, col - 1, row) !== regionAt(level, col, row)) setW(level, col, row, 'wall', 'inner');
+      if (col < width && regionAt(level, col, row - 1) !== regionAt(level, col, row)) setN(level, col, row, 'wall', 'inner');
     }
     // двери и ворота: (x, y) — клетка помещения, side — её грань, size — клеток вдоль грани. Проём шире клетки — группа
     // дверей (gate: номер группы, вид), её грани перечислены в layout.gates. Ворота между помещениями в два уровня
     // (маршрут K7) — высотой 4,4 м: грани двери на уровнях 0 и 1 одной группы, створка поднимается через оба уровня
     const GATE_TOP = { gate: 2.35, double: 2.1 }, TALL_GATE = 4.4;
     plan.doors.forEach((door) => {
-      const group = door.size > 1 ? gates.length : -1;
+      const group = door.size > 1 ? gates.length : -1, floor = door.floor || 0;
       const sides = [];
       for (let step = 0; step < door.size; step++) {
         const edge = door.side === 'N' ? ['N', door.x + step, door.y] : door.side === 'S' ? ['N', door.x + step, door.y + 1]
@@ -360,11 +365,11 @@ export function buildLayout() {
         const other = orient === 'N' ? [col, row - 1] : [col - 1, row];
         sides.push({ orient, col, row, levels: Math.min(levelsAt(col, row), levelsAt(other[0], other[1])) });
       }
-      const tall = door.kind === 'gate' && sides.every((side) => side.levels >= 2);
+      const tall = !floor && door.kind === 'gate' && sides.every((side) => side.levels >= 2);
       const gateHeight = tall ? TALL_GATE : GATE_TOP[door.kind] || 2.1;
       const edges = [];
       for (const { orient, col, row } of sides) {
-        for (let level = 0; level < (tall ? 2 : 1); level++) {
+        for (let level = floor; level < floor + (tall ? 2 : 1); level++) {
           (orient === 'N' ? setN : setW)(level, col, row, 'door', 'inner');
           if (group >= 0) (orient === 'N' ? wallN : wallW)[level][row + oy][col + ox].gate = { group, kind: door.kind, height: gateHeight };
           edges.push([col + ox, row + oy, orient, level]);
@@ -372,20 +377,38 @@ export function buildLayout() {
       }
       if (group >= 0) gates.push({ kind: door.kind, airlock: door.airlock, height: gateHeight, edges });
     });
+    // лестницы между уровнями (жилая зона): ступени на уровне 0, проём над ними; вокруг проёма наверху — перила там, где нет стены
+    for (const stair of plan.stairs || []) {
+      stairRun(0, stair.x, stair.y, stair.dirX, stair.dirY, stair.count, 'hab');
+      const hole = new Set(), exit = (stair.x + stair.dirX * stair.count) + ',' + (stair.y + stair.dirY * stair.count);
+      for (let step = 0; step < stair.count; step++) hole.add((stair.x + stair.dirX * step) + ',' + (stair.y + stair.dirY * step));
+      for (const key of hole) {
+        const [col, row] = key.split(',').map(Number);
+        const edges = [[col - 1, row, () => wallW[1][row + oy][col + ox], () => setW(1, col, row, 'rail', 'inner')],
+          [col + 1, row, () => wallW[1][row + oy][col + 1 + ox], () => setW(1, col + 1, row, 'rail', 'inner')],
+          [col, row - 1, () => wallN[1][row + oy][col + ox], () => setN(1, col, row, 'rail', 'inner')],
+          [col, row + 1, () => wallN[1][row + 1 + oy][col + ox], () => setN(1, col, row + 1, 'rail', 'inner')]];
+        for (const [nextCol, nextRow, existing, rail] of edges) {
+          const nextKey = nextCol + ',' + nextRow;
+          if (hole.has(nextKey) || nextKey === exit || existing()) continue;
+          rail();
+        }
+      }
+    }
     // скала вокруг помещений (в пределах поля); толстые стены склада боеприпасов — бетон
     const thick = new Set();
     for (const wall of plan.thickWalls || []) for (let row = wall.y; row < wall.y + wall.height; row++) for (let col = wall.x; col < wall.x + wall.width; col++) thick.add(col + ',' + row);
     for (let row = -1; row <= height; row++) for (let col = -1; col <= width; col++) {
-      if (regionAt(col, row) || row + oy < 0 || row + oy >= TILES || col + ox < 0 || col + ox >= TILES) continue;
+      if (topAt(col, row) || row + oy < 0 || row + oy >= TILES || col + ox < 0 || col + ox >= TILES) continue;
       let levels = 0;
-      for (let deltaRow = -1; deltaRow <= 1; deltaRow++) for (let deltaCol = -1; deltaCol <= 1; deltaCol++) levels = Math.max(levels, levelsAt(col + deltaCol, row + deltaRow));
+      for (let deltaRow = -1; deltaRow <= 1; deltaRow++) for (let deltaCol = -1; deltaCol <= 1; deltaCol++) levels = Math.max(levels, topAt(col + deltaCol, row + deltaRow));
       if (!levels) continue;
       const variant = ((col + ox) * 7 + (row + oy) * 13) % 3;
       object('rockFill', 0, col, row, 1, 1, { type: thick.has(col + ',' + row) ? `h${levels}c` : `h${levels}v${variant}`, height: levels * LEVEL_H, variant, concrete: thick.has(col + ',' + row) });
     }
 
     // ---------- обстановка (base_furniture.js) и конвертоплан на платформе подъёмника ----------
-    furnishBase(plan, (kind, col, row, cols = 1, rows = 1, extra = {}) => object(kind, 0, col, row, cols, rows, extra));
+    furnishBase(plan, (kind, col, row, cols = 1, rows = 1, extra = {}) => object(kind, extra.level || 0, col, row, cols, rows, extra));
     const extraction = tiltrotor(8, 8);                  // посередине платформы, нос на запад, рампа к техполосе
 
     const at = (col, row, direction) => [col + ox, row + oy, 0, direction];

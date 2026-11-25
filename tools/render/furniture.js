@@ -96,6 +96,13 @@ const MATS = {
   yellow: () => standard('fYellow', { color: 0xd8b024, roughness: 0.5, metalness: 0.2 }),
   green: () => standard('fGreen', { color: 0x2f8a52, roughness: 0.5 }),
   leather: () => standard('fLeather', { color: 0x3a2a22, roughness: 0.6 }),
+  soil: () => standard('fSoil', { color: 0x3a2a1e, roughness: 1 }),
+  leaf: (tone) => standard('fLeaf' + tone, { color: [0x3f7a34, 0x56923e, 0x2f6a3a, 0x6a9a3a][tone % 4], roughness: 0.8 }),
+  bark: () => standard('fBark', { color: 0x5a4030, roughness: 0.9 }),
+  terracotta: () => standard('fTerracotta', { color: 0xa8583a, roughness: 0.8 }),
+  water: () => standard('fWater', { color: 0x3a7aa0, roughness: 0.05, metalness: 0.2, emissive: 0x0a2a3a, emissiveIntensity: 0.5 }),
+  growLight: () => standard('fGrowLight', { color: 0x401040, emissive: 0xd060ff, emissiveIntensity: 1.1 }),
+  velvet: () => standard('fVelvet', { map: fabricTexture('128,28,36', 13), roughness: 0.95 }),
   lamp: () => standard('fLamp', { color: 0xfff6e0, emissive: 0xfff0d0, emissiveIntensity: 1.3 }),
   ledGreen: () => standard('fLedGreen', { color: 0x103010, emissive: 0x40ff60, emissiveIntensity: 1.0 }),
   ledRed: () => standard('fLedRed', { color: 0x301010, emissive: 0xff3020, emissiveIntensity: 1.0 }),
@@ -589,6 +596,104 @@ const BUILDERS = {
         x += width + 0.005;
       }
     }
+    return group;
+  },
+  // экран кинозала у стены: рама, полотно, колонки по краям
+  cinemaScreen(item, along) {
+    const group = new THREE.Group(), z = WALL_FACE + 0.05;
+    group.add(box(along - 0.2, 1.75, 0.06, MATS.black(), along / 2, 1.35, z));
+    group.add(box(along - 0.36, 1.6, 0.01, MATS.screen(item.seed || 2, 'wave'), along / 2, 1.35, z + 0.035));
+    for (const x of [0.25, along - 0.25]) group.add(box(0.36, 1.1, 0.34, MATS.black(), x, 0.55, z + 0.17));
+    group.add(box(along - 0.2, 0.25, 0.4, MATS.darkSteel(), along / 2, 0.125, z + 0.2));
+    return group;
+  },
+  // ряд кресел кинозала: мягкие кресла с подлокотниками, спинками к «спине» предмета, лицом к экрану
+  cinemaSeats(item, along, deep) {
+    const group = new THREE.Group(), count = Math.max(1, Math.round(along / 0.62)), z = deep / 2 + 0.05;
+    group.add(box(along - 0.04, 0.12, 0.7, MATS.darkSteel(), along / 2, 0.06, z));
+    for (let index = 0; index < count; index++) {
+      const x = (index + 0.5) * along / count;
+      group.add(box(0.5, 0.14, 0.5, MATS.velvet(), x, 0.42, z + 0.04));
+      const back = box(0.5, 0.62, 0.1, MATS.velvet(), x, 0.76, z - 0.24);
+      back.rotation.x = -0.12;
+      group.add(back);
+    }
+    for (let index = 0; index <= count; index++) group.add(box(0.06, 0.62, 0.55, MATS.black(), index * along / count, 0.31, z));
+    return group;
+  },
+  // кинопроектор на тумбе
+  projector(item, along) {
+    const group = new THREE.Group(), x = along / 2, z = WALL_FACE + 0.35;
+    group.add(box(0.6, 0.9, 0.55, MATS.black(), x, 0.45, z));
+    group.add(box(0.45, 0.3, 0.6, MATS.darkSteel(), x, 1.05, z + 0.05));
+    group.add(cylinder(0.09, 0.14, MATS.tintedGlass(), x, 1.05, z + 0.42, 14).rotateX(Math.PI / 2));
+    group.add(box(0.06, 0.03, 0.01, MATS.ledGreen(), x + 0.15, 1.15, z + 0.355));
+    return group;
+  },
+  // грядка: бортик, земля, ряд кустов
+  planter(item, along, deep) {
+    const group = new THREE.Group(), rng = mulberry32(item.col * 13 + item.row * 7), z = WALL_FACE + 0.36, depth = Math.min(0.7, deep - 0.2);
+    group.add(box(along - 0.1, 0.5, depth, MATS.wood(), along / 2, 0.25, z));
+    group.add(box(along - 0.2, 0.04, depth - 0.1, MATS.soil(), along / 2, 0.5, z));
+    const count = Math.max(2, Math.round(along / 0.35));
+    for (let index = 0; index < count; index++) {
+      const x = 0.15 + (index + 0.5) * (along - 0.3) / count, size = 0.16 + rng() * 0.1;
+      const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 1), MATS.leaf(Math.floor(rng() * 4)));
+      bush.position.set(x, 0.55 + size * 0.8, z + (rng() - 0.5) * 0.2);
+      bush.scale.set(1, 0.8 + rng() * 0.6, 1);
+      group.add(bush);
+    }
+    return group;
+  },
+  // дерево в кадке
+  pottedTree(item, along, deep) {
+    const group = new THREE.Group(), rng = mulberry32(item.col * 17 + item.row * 5), x = along / 2, z = deep / 2;
+    group.add(cylinder(0.3, 0.5, MATS.terracotta(), x, 0.25, z, 16, 0.36));
+    group.add(cylinder(0.33, 0.03, MATS.soil(), x, 0.5, z, 16));
+    group.add(cylinder(0.05, 1.2, MATS.bark(), x, 1.1, z, 8, 0.035));
+    for (let index = 0; index < 6; index++) {
+      const angle = rng() * Math.PI * 2, size = 0.28 + rng() * 0.15, height = 1.55 + rng() * 0.5;
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 1), MATS.leaf(Math.floor(rng() * 4)));
+      crown.position.set(x + Math.cos(angle) * 0.22, height, z + Math.sin(angle) * 0.22);
+      group.add(crown);
+    }
+    return group;
+  },
+  // стеллаж гидропоники: полки с лотками, зелень, фитолампы
+  hydroponicRack(item, along) {
+    const group = new THREE.Group(), rng = mulberry32(item.col * 11 + item.row * 3), z = WALL_FACE + 0.3;
+    for (const x of [0.08, along - 0.08]) group.add(box(0.04, 2.0, 0.5, MATS.steel(), x, 1.0, z));
+    for (let shelf = 0; shelf < 4; shelf++) {
+      const y = 0.25 + shelf * 0.5;
+      group.add(box(along - 0.12, 0.08, 0.48, MATS.white(), along / 2, y, z));
+      group.add(box(along - 0.2, 0.03, 0.4, MATS.growLight(), along / 2, y + 0.42, z));
+      for (let plant = 0; plant < 5; plant++) {
+        const size = 0.06 + rng() * 0.05;
+        const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), MATS.leaf(Math.floor(rng() * 4)));
+        leaf.position.set(0.18 + plant * (along - 0.36) / 4, y + 0.05 + size, z + (rng() - 0.5) * 0.2);
+        group.add(leaf);
+      }
+    }
+    return group;
+  },
+  // фонтан: чаша, вода, центральная колонна
+  fountain(item, along, deep) {
+    const group = new THREE.Group(), x = along / 2, z = deep / 2, radius = Math.min(along, deep) / 2 - 0.15;
+    group.add(cylinder(radius, 0.45, MATS.cream(), x, 0.225, z, 28));
+    group.add(cylinder(radius - 0.1, 0.02, MATS.water(), x, 0.42, z, 28));
+    group.add(cylinder(0.12, 0.8, MATS.cream(), x, 0.8, z, 12));
+    group.add(cylinder(0.4, 0.08, MATS.cream(), x, 1.2, z, 18, 0.32));
+    group.add(cylinder(0.32, 0.02, MATS.water(), x, 1.25, z, 18));
+    return group;
+  },
+  // автомат с напитками
+  vendingMachine(item, along) {
+    const group = new THREE.Group(), x = along / 2, z = WALL_FACE + 0.4;
+    group.add(box(0.85, 1.85, 0.75, MATS.red(), x, 0.925, z));
+    group.add(box(0.55, 1.2, 0.01, MATS.tintedGlass(), x - 0.1, 1.15, z + 0.38));
+    for (let shelf = 0; shelf < 5; shelf++) group.add(box(0.5, 0.02, 0.01, MATS.lamp(), x - 0.1, 0.65 + shelf * 0.24, z + 0.385));
+    group.add(box(0.15, 0.3, 0.01, MATS.black(), x + 0.3, 1.2, z + 0.38));
+    group.add(box(0.4, 0.15, 0.02, MATS.black(), x - 0.1, 0.25, z + 0.38));
     return group;
   },
 };

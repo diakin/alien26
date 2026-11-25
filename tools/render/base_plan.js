@@ -122,6 +122,7 @@ export const BASE_PLAN = {
    "height": 20,
    "levels": 4,
    "kind": "room",
+   "floor": 0,
    "note": "платформа 25 × 25 м, высота 10 м; конвертоплан КТ-6; шахта до поверхности"
   },
   {
@@ -134,6 +135,7 @@ export const BASE_PLAN = {
    "height": 17,
    "levels": 4,
    "kind": "room",
+   "floor": 0,
    "note": "заправка, подвоз боеприпасов, пульт подъёмника"
   },
   {
@@ -146,6 +148,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "пост у шлюза ангара"
   },
   {
@@ -158,6 +161,7 @@ export const BASE_PLAN = {
    "height": 17,
    "levels": 2,
    "kind": "corridor",
+   "floor": 0,
    "note": "K7 из ангара в цех, не выходя к остальной базе"
   },
   {
@@ -170,6 +174,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 2,
    "kind": "airlock",
+   "floor": 0,
    "note": "ворота в проезд и в коридор H1, открываются по очереди"
   },
   {
@@ -182,6 +187,7 @@ export const BASE_PLAN = {
    "height": 10,
    "levels": 2,
    "kind": "room",
+   "floor": 0,
    "note": "стенд ремонта K7, кран-балка, станки; высота 2 уровня"
   },
   {
@@ -194,6 +200,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -206,6 +213,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -218,6 +226,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 2,
    "kind": "room",
+   "floor": 0,
    "note": "платформа 5×5 м, шахта до поверхности"
   },
   {
@@ -230,6 +239,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 2,
    "kind": "room",
+   "floor": 0,
    "note": "разгрузка с лифта"
   },
   {
@@ -242,6 +252,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 2,
    "kind": "room",
+   "floor": 0,
    "note": "стеллажи, контейнеры"
   },
   {
@@ -254,6 +265,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 2,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -266,6 +278,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -278,6 +291,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 2,
    "kind": "airlock",
+   "floor": 0,
    "note": ""
   },
   {
@@ -290,6 +304,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -302,6 +317,7 @@ export const BASE_PLAN = {
    "height": 20,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -314,6 +330,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "пульт энергоблока, связь с ярусом −5"
   },
   {
@@ -326,6 +343,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "отдельный лифт на ярус −5"
   },
   {
@@ -338,6 +356,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "распределительные щиты, аккумуляторы, резервный генератор"
   },
   {
@@ -350,6 +369,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -362,6 +382,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -374,6 +395,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "пульты, карта-глобус, связь"
   },
   {
@@ -386,6 +408,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "стол, экран"
   },
   {
@@ -398,6 +421,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "шкафчики бойцов, сборы перед вылетом"
   },
   {
@@ -410,6 +434,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 2,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -422,6 +447,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "аппаратура связи, радары"
   },
   {
@@ -434,6 +460,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 2,
    "kind": "airlock",
+   "floor": 0,
    "note": ""
   },
   {
@@ -446,6 +473,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "дежурный офицер по базе и помощник, мониторы камер"
   },
   {
@@ -458,6 +486,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "стойки с оружием, верстак"
   },
   {
@@ -470,6 +499,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "бетонные стены, бронедверь"
   },
   {
@@ -482,6 +512,7 @@ export const BASE_PLAN = {
    "height": 6,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "ремонт и пристрелка оружия"
   },
   {
@@ -494,6 +525,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "столы, шкафы"
   },
   {
@@ -506,6 +538,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 2,
    "kind": "airlock",
+   "floor": 0,
    "note": ""
   },
   {
@@ -518,6 +551,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "измерительные приборы"
   },
   {
@@ -530,6 +564,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 2,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -542,6 +577,7 @@ export const BASE_PLAN = {
    "height": 9,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "вытяжные шкафы, хроматограф, спектрометр"
   },
   {
@@ -554,6 +590,7 @@ export const BASE_PLAN = {
    "height": 9,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "боксы биобезопасности, микроскопы, стол для вскрытия"
   },
   {
@@ -566,6 +603,7 @@ export const BASE_PLAN = {
    "height": 9,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "стенды испытаний, осциллографы, источники питания"
   },
   {
@@ -578,6 +616,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 2,
    "kind": "airlock",
+   "floor": 0,
    "note": "обработка перед входом к образцам"
   },
   {
@@ -590,6 +629,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "мониторы боксов"
   },
   {
@@ -602,6 +642,7 @@ export const BASE_PLAN = {
    "height": 10,
    "levels": 2,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -614,6 +655,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -626,6 +668,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -638,6 +681,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -650,6 +694,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -662,6 +707,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -674,6 +720,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -686,6 +733,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -698,6 +746,7 @@ export const BASE_PLAN = {
    "height": 10,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -710,6 +759,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "операционный стол, светильник, наркозный аппарат"
   },
   {
@@ -722,6 +772,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "палата интенсивной терапии, одиночные кровати"
   },
   {
@@ -734,6 +785,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "реанимационная кровать, мониторы"
   },
   {
@@ -746,6 +798,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "палата интенсивной терапии, одиночные кровати"
   },
   {
@@ -758,6 +811,7 @@ export const BASE_PLAN = {
    "height": 7,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "столы на 16 мест, диваны"
   },
   {
@@ -770,6 +824,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "плита, мойка, холодильник, остров"
   },
   {
@@ -782,6 +837,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -794,6 +850,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -806,6 +863,7 @@ export const BASE_PLAN = {
    "height": 7,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "душевые кабины, умывальники, туалеты"
   },
   {
@@ -818,6 +876,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "душевые кабины, умывальники, туалеты"
   },
   {
@@ -830,6 +889,7 @@ export const BASE_PLAN = {
    "height": 3,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": ""
   },
   {
@@ -842,6 +902,7 @@ export const BASE_PLAN = {
    "height": 11,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "дорожки, велотренажёры, силовые станции, штанги, маты"
   },
   {
@@ -854,6 +915,7 @@ export const BASE_PLAN = {
    "height": 5,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "шкафчики, скамьи, душевые кабины"
   },
   {
@@ -866,6 +928,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -878,6 +941,7 @@ export const BASE_PLAN = {
    "height": 2,
    "levels": 1,
    "kind": "corridor",
+   "floor": 0,
    "note": ""
   },
   {
@@ -890,6 +954,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -902,6 +967,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -914,6 +980,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -926,6 +993,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -938,6 +1006,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -950,6 +1019,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -962,6 +1032,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -974,6 +1045,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -986,6 +1058,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -998,6 +1071,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -1010,6 +1084,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -1022,6 +1097,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
    "note": "2 места"
   },
   {
@@ -1034,6 +1110,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1046,6 +1123,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1058,6 +1136,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1070,6 +1149,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1082,6 +1162,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1094,6 +1175,7 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
@@ -1106,18 +1188,150 @@ export const BASE_PLAN = {
    "height": 4,
    "levels": 1,
    "kind": "single",
+   "floor": 0,
    "note": "одноместная"
   },
   {
    "module": 9,
    "zone": "living",
-   "name": "Каюта 13",
+   "name": "Каюта 19",
    "x": 52,
    "y": 46,
    "width": 4,
    "height": 4,
    "levels": 1,
    "kind": "room",
+   "floor": 0,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Кинозал",
+   "x": 31,
+   "y": 40,
+   "width": 12,
+   "height": 10,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "второй уровень: экран, ряды кресел, проектор"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Фойе",
+   "x": 43,
+   "y": 40,
+   "width": 3,
+   "height": 10,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "второй уровень: вход в кинозал и оранжерею"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Оранжерея",
+   "x": 46,
+   "y": 40,
+   "width": 10,
+   "height": 10,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "второй уровень: место отдыха с растениями, гидропоника, фонтан"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Коридор",
+   "x": 31,
+   "y": 50,
+   "width": 25,
+   "height": 2,
+   "levels": 1,
+   "kind": "corridor",
+   "floor": 1,
+   "note": ""
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 13",
+   "x": 31,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 14",
+   "x": 35,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 15",
+   "x": 39,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 16",
+   "x": 43,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 17",
+   "x": 47,
+   "y": 52,
+   "width": 4,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
+   "note": "2 места"
+  },
+  {
+   "module": 9,
+   "zone": "living",
+   "name": "Каюта 18",
+   "x": 51,
+   "y": 52,
+   "width": 5,
+   "height": 4,
+   "levels": 1,
+   "kind": "room",
+   "floor": 1,
    "note": "2 места"
   }
  ],
@@ -1222,7 +1436,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 24,
@@ -1230,7 +1445,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 3,
    "kind": "gate",
-   "airlock": 4
+   "airlock": 4,
+   "floor": 0
   },
   {
    "x": 24,
@@ -1238,7 +1454,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": 4
+   "airlock": 4,
+   "floor": 0
   },
   {
    "x": 27,
@@ -1246,7 +1463,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 39,
@@ -1254,7 +1472,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 33,
@@ -1262,7 +1481,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": 13
+   "airlock": 13,
+   "floor": 0
   },
   {
    "x": 33,
@@ -1270,7 +1490,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 3,
    "kind": "gate",
-   "airlock": 13
+   "airlock": 13,
+   "floor": 0
   },
   {
    "x": 23,
@@ -1278,7 +1499,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 3,
    "kind": "gate",
-   "airlock": 26
+   "airlock": 26,
+   "floor": 0
   },
   {
    "x": 20,
@@ -1286,7 +1508,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 2,
    "kind": "gate",
-   "airlock": 26
+   "airlock": 26,
+   "floor": 0
   },
   {
    "x": 33,
@@ -1294,7 +1517,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 3,
    "kind": "gate",
-   "airlock": 32
+   "airlock": 32,
+   "floor": 0
   },
   {
    "x": 33,
@@ -1302,7 +1526,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": 32
+   "airlock": 32,
+   "floor": 0
   },
   {
    "x": 46,
@@ -1310,7 +1535,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 3,
    "kind": "gate",
-   "airlock": 38
+   "airlock": 38,
+   "floor": 0
   },
   {
    "x": 46,
@@ -1318,7 +1544,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 2,
    "kind": "gate",
-   "airlock": 38
+   "airlock": 38,
+   "floor": 0
   },
   {
    "x": 28,
@@ -1326,7 +1553,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 39,
@@ -1334,7 +1562,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 39,
@@ -1342,7 +1571,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 3,
    "kind": "gate",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 28,
@@ -1350,7 +1580,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 35,
@@ -1358,7 +1589,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 29,
@@ -1366,7 +1598,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 39,
@@ -1374,7 +1607,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1382,7 +1616,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 52,
@@ -1390,7 +1625,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1398,7 +1634,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1406,7 +1643,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1414,7 +1652,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 46,
@@ -1422,7 +1661,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 46,
@@ -1430,7 +1670,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 23,
@@ -1438,7 +1679,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 4,
@@ -1446,7 +1688,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 11,
@@ -1454,7 +1697,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 16,
@@ -1462,7 +1706,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 20,
@@ -1470,7 +1715,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 3,
@@ -1478,7 +1724,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 10,
@@ -1486,7 +1733,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 16,
@@ -1494,7 +1742,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 21,
@@ -1502,7 +1751,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 29,
@@ -1510,7 +1760,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 39,
@@ -1518,7 +1769,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 29,
@@ -1526,7 +1778,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 34,
@@ -1534,7 +1787,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 40,
@@ -1542,7 +1796,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 50,
@@ -1550,7 +1805,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1558,7 +1814,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1566,7 +1823,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1574,7 +1832,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 2,
@@ -1582,7 +1841,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 2,
@@ -1590,7 +1850,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 6,
@@ -1598,7 +1859,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 10,
@@ -1606,7 +1868,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 12,
@@ -1614,7 +1877,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 5,
@@ -1622,7 +1886,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 5,
@@ -1630,7 +1895,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 8,
@@ -1638,7 +1904,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 8,
@@ -1646,7 +1913,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 19,
@@ -1654,7 +1922,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 19,
@@ -1662,7 +1931,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 24,
@@ -1670,7 +1940,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 25,
@@ -1678,7 +1949,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 18,
@@ -1686,7 +1958,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 24,
@@ -1694,7 +1967,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 24,
@@ -1702,7 +1976,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 16,
@@ -1710,7 +1985,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 27,
@@ -1718,7 +1994,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 31,
@@ -1726,7 +2003,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 31,
@@ -1734,7 +2012,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 55,
@@ -1742,7 +2021,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 55,
@@ -1750,7 +2030,8 @@ export const BASE_PLAN = {
    "side": "E",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 59,
@@ -1758,7 +2039,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 2,
    "kind": "double",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 59,
@@ -1766,7 +2048,8 @@ export const BASE_PLAN = {
    "side": "W",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 61,
@@ -1774,7 +2057,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 32,
@@ -1782,7 +2066,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 32,
@@ -1790,7 +2075,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 36,
@@ -1798,7 +2084,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 36,
@@ -1806,7 +2093,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 40,
@@ -1814,7 +2102,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 40,
@@ -1822,7 +2111,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 44,
@@ -1830,7 +2120,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 44,
@@ -1838,7 +2129,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1846,7 +2138,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 48,
@@ -1854,7 +2147,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 52,
@@ -1862,7 +2156,8 @@ export const BASE_PLAN = {
    "side": "S",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 52,
@@ -1870,7 +2165,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 32,
@@ -1878,7 +2174,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 35,
@@ -1886,7 +2183,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 38,
@@ -1894,7 +2192,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 41,
@@ -1902,7 +2201,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 44,
@@ -1910,7 +2210,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 47,
@@ -1918,7 +2219,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 50,
@@ -1926,7 +2228,8 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
   },
   {
    "x": 53,
@@ -1934,7 +2237,116 @@ export const BASE_PLAN = {
    "side": "N",
    "size": 1,
    "kind": "door",
-   "airlock": -1
+   "airlock": -1,
+   "floor": 0
+  },
+  {
+   "x": 35,
+   "y": 49,
+   "side": "S",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 44,
+   "y": 49,
+   "side": "S",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 53,
+   "y": 49,
+   "side": "S",
+   "size": 2,
+   "kind": "double",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 43,
+   "y": 44,
+   "side": "W",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 45,
+   "y": 44,
+   "side": "E",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 32,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 36,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 40,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 44,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 48,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  },
+  {
+   "x": 52,
+   "y": 52,
+   "side": "N",
+   "size": 1,
+   "kind": "door",
+   "airlock": -1,
+   "floor": 1
+  }
+ ],
+ "stairs": [
+  {
+   "x": 47,
+   "y": 50,
+   "dirX": 1,
+   "dirY": 0,
+   "count": 4
   }
  ],
  "cells": {
@@ -1947,8 +2359,8 @@ export const BASE_PLAN = {
   "7": 208,
   "8": 192,
   "10": 112,
-  "9": 400,
+  "9": 800,
   "0": 633
  },
- "total": 3288
+ "total": 3688
 };

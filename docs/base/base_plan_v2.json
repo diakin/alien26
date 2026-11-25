@@ -999,7 +999,7 @@
   },
   {
    "zone": "living",
-   "name": "Каюта 13",
+   "name": "Каюта 19",
    "x": 52,
    "y": 46,
    "width": 4,
@@ -1571,5 +1571,176 @@
    "side": "N",
    "size": 1
   }
- ]
+ ],
+ "floor2": {
+  "rooms": [
+   {
+    "zone": "living",
+    "name": "Кинозал",
+    "x": 31,
+    "y": 40,
+    "width": 12,
+    "height": 10,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Фойе",
+    "x": 43,
+    "y": 40,
+    "width": 3,
+    "height": 10,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Оранжерея",
+    "x": 46,
+    "y": 40,
+    "width": 10,
+    "height": 10,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Коридор",
+    "x": 31,
+    "y": 50,
+    "width": 25,
+    "height": 2,
+    "kind": "corridor"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 13",
+    "x": 31,
+    "y": 52,
+    "width": 4,
+    "height": 4,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 14",
+    "x": 35,
+    "y": 52,
+    "width": 4,
+    "height": 4,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 15",
+    "x": 39,
+    "y": 52,
+    "width": 4,
+    "height": 4,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 16",
+    "x": 43,
+    "y": 52,
+    "width": 4,
+    "height": 4,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 17",
+    "x": 47,
+    "y": 52,
+    "width": 4,
+    "height": 4,
+    "kind": "room"
+   },
+   {
+    "zone": "living",
+    "name": "Каюта 18",
+    "x": 51,
+    "y": 52,
+    "width": 5,
+    "height": 4,
+    "kind": "room"
+   }
+  ],
+  "doors": [
+   {
+    "x": 35,
+    "y": 49,
+    "side": "S",
+    "size": 2
+   },
+   {
+    "x": 44,
+    "y": 49,
+    "side": "S",
+    "size": 1
+   },
+   {
+    "x": 53,
+    "y": 49,
+    "side": "S",
+    "size": 2
+   },
+   {
+    "x": 43,
+    "y": 44,
+    "side": "W",
+    "size": 1
+   },
+   {
+    "x": 45,
+    "y": 44,
+    "side": "E",
+    "size": 1
+   },
+   {
+    "x": 32,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   },
+   {
+    "x": 36,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   },
+   {
+    "x": 40,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   },
+   {
+    "x": 44,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   },
+   {
+    "x": 48,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   },
+   {
+    "x": 52,
+    "y": 52,
+    "side": "N",
+    "size": 1
+   }
+  ],
+  "stairs": [
+   {
+    "x": 47,
+    "y": 50,
+    "dirX": 1,
+    "dirY": 0,
+    "count": 4
+   }
+  ]
+ }
 }

@@ -113,8 +113,9 @@ var BaseMenu = (function () {
         return '<tr><td><b>' + escape(soldier.callsign) + '</b> ' + escape(soldier.name) + '</td><td>' + escape(soldier.rank) + ' · ' + escape((soldier.role || '').toLowerCase()) + '</td><td>' +
           placeLink('Каюта ' + (Math.floor(index / 2) + 1)) + '</td><td class="state' + (aboard ? '' : ' wait') + '">' + (aboard ? 'в экипаже КТ-6' : 'на базе') + '</td></tr>';
       }).join('');
-      return { facts: 'Учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
-        body: '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) +
+      var support = state.support || [];
+      return { facts: 'Учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', обслуживающего персонала ' + support.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
+        body: '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) + '<h4>ОБСЛУЖИВАЮЩИЙ ПЕРСОНАЛ</h4>' + people(support) +
           '<h4>ОТРЯД</h4><table><tr><th>БОЕЦ</th><th>ЗВАНИЕ · РОЛЬ</th><th>КАЮТА</th><th>СОСТОЯНИЕ</th></tr>' + soldiers +
           '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех (стенд K7)') + '</td><td class="state' + (BaseStore.state.ship.mech ? '' : ' wait') + '">' +
           (BaseStore.state.ship.mech ? 'в экипаже КТ-6' : 'на базе') + '</td></tr></table>' };
@@ -248,11 +249,15 @@ var BaseMenu = (function () {
     var link = event.target.closest('[data-room]');
     if (!link || !window.__game) return;
     var room = BASE_PLAN.rooms[Number(link.dataset.room)];
-    window.__game.centerOn(PLAN_COL + room.x + room.width / 2, PLAN_ROW + room.y + room.height / 2, 0);
+    var level = room.floor || 0;
+    // помещение второго уровня (жилая зона) — вид переходит на его уровень
+    var view = window.__game.view;
+    if (window.__game.setView && view && view.level !== level) window.__game.setView(level, view.cut);
+    window.__game.centerOn(PLAN_COL + room.x + room.width / 2, PLAN_ROW + room.y + room.height / 2, level * BASE_PLAN.levelMeters);
     // помещение — посередине свободной части экрана слева от окна, а не под окном
     var camera = window.__game.camera, left = panel.getBoundingClientRect().left;
     if (camera && left > 200) camera.x += (window.innerWidth - left) / 2;
-    if (window.__game.highlightArea) window.__game.highlightArea(PLAN_COL + room.x, PLAN_ROW + room.y, room.width, room.height, 0, 3);
+    if (window.__game.highlightArea) window.__game.highlightArea(PLAN_COL + room.x, PLAN_ROW + room.y, room.width, room.height, level, 3);
   });
   panel.addEventListener('change', function (event) {
     if (event.target.dataset.crew || event.target.dataset.mech) updateCrew();

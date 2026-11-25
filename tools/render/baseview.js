@@ -144,7 +144,11 @@ const labels = BASE_PLAN.rooms.filter((room) => room.module !== 0 || room.width 
   element.style.borderColor = MODULE_COLORS[room.module] || '#808080';
   labelLayer.appendChild(element);
   const position = new THREE.Vector3((BASE_COL + room.x + room.width / 2) * TILE, 0, (BASE_ROW + room.y + room.height / 2) * TILE);
-  return { element, room, position, baseLevel: room.level || 0 };
+  // помещение под вторым уровнем жилой зоны: подпись скрывается, когда показан верхний уровень
+  const centerX = room.x + room.width / 2, centerY = room.y + room.height / 2;
+  const coveredBy = BASE_PLAN.rooms.filter((other) => (other.floor || 0) > (room.floor || 0) &&
+    centerX > other.x && centerX < other.x + other.width && centerY > other.y && centerY < other.y + other.height).map((other) => other.floor);
+  return { element, room, position, baseLevel: room.floor || 0, coveredAt: coveredBy.length ? Math.min(...coveredBy) : Infinity };
 });
 let labelsVisible = true;
 
@@ -152,7 +156,7 @@ function updateLabels() {
   for (const label of labels) {
     const topLevel = Math.min(shownLevels, label.baseLevel + (label.room.levels || 1) - 1);
     label.position.y = Math.max(label.baseLevel, Math.min(topLevel, shownLevels)) * LEVEL_H + 0.4;
-    label.hidden = label.baseLevel > shownLevels;
+    label.hidden = label.baseLevel > shownLevels || label.coveredAt <= shownLevels;
   }
 }
 

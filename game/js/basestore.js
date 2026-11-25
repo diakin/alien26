@@ -6,7 +6,7 @@
 var BaseStore = (function () {
   'use strict';
   var KEY = 'aliens26.base.v1';
-  var VERSION = 2;                    // 2 — база по плану модернизации (tools/base/plan_v2.py): новые помещения и каюты
+  var VERSION = 3;                    // 2 — база по плану модернизации (tools/base/plan_v2.py); 3 — обслуживающий персонал, каюты 13–18 на втором уровне
   var SHIP_SEATS = 6;                 // места в салоне КТ-6, K7 — на рампе отдельно
   var SHIP_CAPACITY = 60;             // груз, единиц веса (вес предметов — Items: магазин 2, граната 3, аптечка 5, карабин 8)
 
@@ -24,10 +24,23 @@ var BaseStore = (function () {
     ['Артём Зимин', 'авионика КТ-6', 'Техполоса'], ['Карина Ли', 'сварка и сплавы', 'Цех (стенд K7)'],
     ['Фёдор Макаров', 'жизнеобеспечение', 'Вентиляция, фильтры'], ['Юрий Пахомов', 'связь', 'Узел связи']
   ];
-  function staff(list, chiefCabin, firstCabin) {
+  function staff(list, chiefCabin, cabins) {
     return list.map(function (entry, index) {
-      return { name: entry[0], specialty: entry[1], workplace: entry[2], cabin: index === 0 ? chiefCabin : 'Каюта ' + (firstCabin + Math.floor((index - 1) / 2)) };
+      return { name: entry[0], specialty: entry[1], workplace: entry[2], cabin: index === 0 ? chiefCabin : 'Каюта ' + cabins[Math.floor((index - 1) / 2)] };
     });
+  }
+  // обслуживающий персонал: каюты 13–16 на втором уровне жилой зоны; 17 и 18 — резерв для спасённых
+  var SUPPORT = [
+    ['Анна Белова', 'повар', 'Камбуз', 'Каюта 13'], ['Сергей Котов', 'повар', 'Камбуз', 'Каюта 13'],
+    ['Людмила Рябова', 'уборка помещений', 'Прачечная', 'Каюта 14'], ['Николай Гусев', 'уборка помещений', 'Прачечная', 'Каюта 14'],
+    ['Ольга Дёмина', 'медсестра', 'Процедурная, аптека', 'Каюта 15'],
+    ['Виталий Сомов', 'электрик', 'Энергоцентр', 'Каюта 16'], ['Игорь Лаптев', 'сантехник', 'Водоснабжение', 'Каюта 16']
+  ];
+  function supportStaff() { return SUPPORT.map(function (entry) { return { name: entry[0], specialty: entry[1], workplace: entry[2], cabin: entry[3] }; }); }
+  // каюта для спасённого: резервные 17 и 18 по двое, дальше — свободное место в каюте 9 у учёных
+  function rescueCabin(people) {
+    var used = function (cabin) { return people.filter(function (person) { return person.cabin === cabin; }).length; };
+    return used('Каюта 17') < 2 ? 'Каюта 17' : used('Каюта 18') < 2 ? 'Каюта 18' : 'Каюта 9';
   }
   // имущество — то, что не берут в руки на задании (учёт без предметов в инвентаре)
   var PROPERTY = [
@@ -37,8 +50,9 @@ var BaseStore = (function () {
   function defaults() {
     return {
       version: VERSION,
-      scientists: staff(SCIENTISTS, 'Гл. учёный', 6),
-      engineers: staff(ENGINEERS, 'Гл. инженер', 10),
+      scientists: staff(SCIENTISTS, 'Гл. учёный', [6, 7, 8, 9]),
+      engineers: staff(ENGINEERS, 'Гл. инженер', [10, 11, 12, 19]),
+      support: supportStaff(),
       store: { carbine: 4, carbineM: 2, carbineMag: 40, grenade: 16, medkit: 8 },
       property: PROPERTY.map(function (entry) { return { name: entry[0], unit: entry[1], count: entry[2] }; }),
       artifacts: [],                   // [{ name, count, from }]
@@ -51,12 +65,13 @@ var BaseStore = (function () {
     try {
       var saved = JSON.parse(window.localStorage.getItem(KEY) || 'null');
       if (saved && saved.version === VERSION) return saved;
-      // база прежнего плана: склад, артефакты и корабль остаются, персонал переезжает в новые помещения
-      if (saved && saved.version === 1) {
+      // база прежнего плана (1) или без второго уровня жилой зоны (2): склад, артефакты и корабль остаются,
+      // персонал по новым помещениям, спасённые — в резервные каюты 17 и 18
+      if (saved && (saved.version === 1 || saved.version === 2)) {
         var fresh = defaults();
         ['store', 'property', 'artifacts', 'ship', 'log', 'received'].forEach(function (key) { if (saved[key] !== undefined) fresh[key] = saved[key]; });
-        saved.scientists.forEach(function (person) {
-          if (person.rescued) fresh.scientists.push({ name: person.name, specialty: person.specialty, workplace: 'Ксенобиологическая', cabin: 'Каюта 9', rescued: true });
+        (saved.scientists || []).forEach(function (person) {
+          if (person.rescued) fresh.scientists.push({ name: person.name, specialty: person.specialty, workplace: 'Ксенобиологическая', cabin: rescueCabin(fresh.scientists), rescued: true });
         });
         return fresh;
       }
@@ -102,7 +117,7 @@ var BaseStore = (function () {
     if (summary.artifacts && summary.artifacts.length) state.log.push('Сданы артефакты: ' + summary.map);
     var rescue = summary.rescue;
     if (rescue && rescue.vipRescued && rescue.vip && !state.scientists.some(function (person) { return person.name === rescue.vip.name; })) {
-      state.scientists.push({ name: rescue.vip.name, specialty: 'исследования пришельцев', workplace: 'Ксенобиологическая', cabin: 'Каюта 9', rescued: true });
+      state.scientists.push({ name: rescue.vip.name, specialty: 'исследования пришельцев', workplace: 'Ксенобиологическая', cabin: rescueCabin(state.scientists), rescued: true });
       state.log.push('Прибыл учёный: ' + rescue.vip.name);
     }
     save();

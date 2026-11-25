@@ -14,6 +14,7 @@
       атлас в game/assets/maps/outpost_base_r1/, вид — в game/js/maps/outpost_tiles_base_r1.js (MAP_VIEWS[1]: проекция,
       мини-карта, слои тайлов; створки дверей — в порядке MAP.doors основной карты, с клеткой и гранью в повёрнутом виде).
 """
+import math
 import json, os, re, sys
 import numpy as np
 from PIL import Image
@@ -282,7 +283,7 @@ def map_from_layout(layout):
     result = {
         'name': layout['name'], 'combat': layout['combat'], 'tiles': tiles, 'levels': levels, 'levelHeight': layout['LEVEL_H'], 'tile': layout['TILE'],
         'floor': flat(layout['floor'], tiles),
-        'offset': flat(layout['offset'], tiles, lambda value: round(value, 3)),
+        'offset': flat(layout['offset'], tiles, lambda value: math.floor(value * 1000 + 0.5) / 1000),   # как Math.round в baselogic.js
         'wallW': flat(layout['wallW'], tiles + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
         'wallN': flat(layout['wallN'], tiles + 1, lambda wall: WALL_CODES[wall['type'] if wall else None]),
         'indoor': flat(layout['indoor'], tiles),
