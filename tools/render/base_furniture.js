@@ -18,19 +18,20 @@ function roomFrame(room, front) {
     if (front === 'E') return [room.x + v, room.y + u, alongV, alongU];
     return [room.x + room.width - v - alongV, room.y + u, alongV, alongU];
   };
-  return { across, depth, faces, cell };
+  return { across, depth, faces, cell, level: room.floor || 0 };
 }
 
 export function furnishBase(plan, place) {
-  const doorOf = (room) => plan.doors.find((door) => door.size === 1 && door.x >= room.x && door.x < room.x + room.width && door.y >= room.y && door.y < room.y + room.height);
+  const doorOf = (room) => plan.doors.find((door) => door.size === 1 && (door.floor || 0) === (room.floor || 0) &&
+    door.x >= room.x && door.x < room.x + room.width && door.y >= room.y && door.y < room.y + room.height);
   const put = (frame, kind, u, v, alongU, alongV, face, extra = {}) => {
     const [x, y, cols, rows] = frame.cell(u, v, alongU, alongV);
-    place(kind, x, y, cols, rows, { face: frame.faces[face] || face, ...extra });
+    place(kind, x, y, cols, rows, { face: frame.faces[face] || face, level: frame.level, ...extra });
   };
   const BLANKETS = ['64,82,110', '110,64,58', '70,96,70', '120,100,60', '80,70,110'];
 
   // ---------- каюты ----------
-  plan.rooms.filter((room) => room.zone === 'living' && room.kind !== 'corridor').forEach((room, index) => {
+  plan.rooms.filter((room) => room.zone === 'living' && room.kind !== 'corridor' && room.name.startsWith('Каюта') || room.kind === 'single').forEach((room, index) => {
     const door = doorOf(room);
     const frame = roomFrame(room, door.side);
     const blanket = BLANKETS[index % BLANKETS.length];
@@ -188,6 +189,24 @@ export function furnishBase(plan, place) {
   // прачечная
   for (const x of [25, 26, 27]) place('washer', x, 55, 1, 1, { face: 'S' });
   place('washer', 22, 55, 1, 1, { face: 'S' }); place('labTable', 27, 53, 1, 1); place('rack', 22, 53);
+
+  // ---------- второй уровень жилой зоны (уровень 1) ----------
+  const up = { level: 1 };
+  // кинозал: экран у западной стены, ряды кресел лицом к нему (проход посередине и у дверей), проектор у восточной стены
+  place('cinemaScreen', 31, 42, 1, 6, { ...up, face: 'W' });
+  for (const x of [34, 36, 38, 40]) { place('cinemaSeats', x, 41, 1, 4, { ...up, face: 'E' }); place('cinemaSeats', x, 46, 1, 3, { ...up, face: 'E' }); }
+  place('projector', 42, 40, 1, 1, { ...up, face: 'E' });
+  // фойе: диван, автомат с напитками, растения
+  place('sofa', 43, 40, 2, 1, { ...up, face: 'N', color: '70,84,96' }); place('vendingMachine', 45, 40, 1, 1, { ...up, face: 'N' });
+  place('pottedTree', 43, 48, 1, 1, up); place('pottedTree', 45, 48, 1, 1, up); place('pottedTree', 45, 46, 1, 1, up);
+  // оранжерея: стеллажи гидропоники у северной стены, грядки, деревья в кадках, фонтан со скамьями
+  for (const x of [47, 48, 50, 51, 52, 53]) place('hydroponicRack', x, 40, 1, 1, { ...up, face: 'N' });
+  place('pottedTree', 46, 40, 1, 1, up); place('pottedTree', 55, 40, 1, 1, up); place('pottedTree', 46, 48, 1, 1, up); place('pottedTree', 55, 48, 1, 1, up);
+  place('planter', 47, 42, 2, 1, { ...up, face: 'N' }); place('planter', 52, 42, 2, 1, { ...up, face: 'N' });
+  place('planter', 47, 47, 2, 1, { ...up, face: 'S' }); place('planter', 51, 47, 2, 1, { ...up, face: 'S' });
+  place('planter', 55, 42, 1, 2, { ...up, face: 'E' }); place('planter', 55, 45, 1, 2, { ...up, face: 'E' });
+  place('fountain', 50, 44, 2, 2, up);
+  place('bench', 50, 43, 2, 1, { ...up, face: 'N' }); place('bench', 50, 46, 2, 1, { ...up, face: 'S' }); place('bench', 49, 44, 1, 2, { ...up, face: 'W' });
 
   // ---------- спортивная ----------
   for (const x of [59, 60, 61]) place('treadmill', x, 40, 1, 2, { face: 'N' });

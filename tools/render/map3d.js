@@ -13,7 +13,7 @@
 // Сборка в игру: tools/render/build_map3d.sh -> game/js/map3d.js (window.Map3D). Карта — globalThis.ALIENS_MAP.
 import * as THREE from 'three';
 import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.js';
-import {
+import { buildStairs,
   layout, renderer, scene, sun, SIZE, CENTER, MAT, buildWall, floorTile, buildObject, getDoorLeaves, resetDoorLeaves,
 } from './outpost_scene.js';
 import { setEnvIntensity } from './lib.js';
@@ -124,6 +124,7 @@ async function buildBase(doors, onProgress) {
         }
       }
     }
+    for (const stair of layout.stairs) if (stair.level === level) objects.add(buildStairs(stair));
     for (const item of layout.objects) {
       if (item.kind === 'rockFill') {
         const full = rockSlab(item, level, false), cut = rockSlab(item, level, true);

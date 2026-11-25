@@ -116,8 +116,21 @@ for y in (40, 52):
 SINGLES = ['Командир базы', 'Нач. штаба', 'Ком. отряда', 'Гл. врач', 'Хирург', 'Гл. учёный', 'Гл. инженер']
 for index, name in enumerate(SINGLES):
     ROOMS.append(('living', name, 31 + index * 3, 46, 3, 4, 1, 'single'))
-cabin += 1
-ROOMS.append(('living', 'Каюта %d' % cabin, 52, 46, 4, 4, 1, 'room'))
+ROOMS.append(('living', 'Каюта 19', 52, 46, 4, 4, 1, 'room'))
+# второй уровень жилой зоны (пол на уровне 1, над каютами): над каютами 7–12 — каюты 13–18 (обслуживающий персонал
+# и резерв для спасённых), над комсоставом и каютами 1–6 — кинозал, фойе и оранжерея; лестница — в южном коридоре
+# первого уровня (ряд 50, клетки 47–50, подъём на восток), выход наверх — в коридор второго уровня в клетке 51, 50
+FLOOR2_ROOMS = [
+    ('living', 'Кинозал', 31, 40, 12, 10, 1, 'room'),
+    ('living', 'Фойе', 43, 40, 3, 10, 1, 'room'),
+    ('living', 'Оранжерея', 46, 40, 10, 10, 1, 'room'),
+    ('living', 'Коридор', 31, 50, 25, 2, 1, 'corridor'),
+]
+for index, (x, width) in enumerate(DOUBLE_ROW):
+    FLOOR2_ROOMS.append(('living', 'Каюта %d' % (13 + index), x, 52, width, 4, 1, 'room'))
+FLOOR2_DOORS = [(35, 49, 'S', 2), (44, 49, 'S', 1), (53, 49, 'S', 2), (43, 44, 'W', 1), (45, 44, 'E', 1)]
+FLOOR2_DOORS += [(x + 1, 52, 'N', 1) for x, width in DOUBLE_ROW]
+STAIRS = [dict(x=47, y=50, dirX=1, dirY=0, count=4)]   # ступени на уровне 0, выход на уровень 1 за последней
 # толстые стены (бетон, клетки): склад боеприпасов с трёх сторон и снизу
 THICK = [(7, 31, 1, 6), (13, 31, 1, 6), (8, 36, 5, 1)]
 # ворота шлюзов и ангара: (x, y, сторона клетки, клеток) — широкие, для K7
@@ -170,6 +183,15 @@ for zone, name, x, y, width, height, levels, kind in ROOMS:
     claim(x, y, width, height, name)
 for x, y, width, height in THICK:
     claim(x, y, width, height, 'толстая стена')
+occupied2 = {}
+for zone, name, x, y, width, height, levels, kind in FLOOR2_ROOMS:
+    for row in range(y, y + height):
+        for col in range(x, x + width):
+            if (col, row) in occupied2:
+                problems.append('2-й уровень: %s пересекается с %s' % (name, occupied2[(col, row)]))
+            elif (col, row) not in occupied:
+                problems.append('2-й уровень: %s не над помещением (%d, %d)' % (name, col, row))
+            occupied2[(col, row)] = name
 # каждая клетка зоны занята помещением
 for key, title, color, (zx, zy, zw, zh), access in ZONES:
     empty = [(col, row) for row in range(zy, zy + zh) for col in range(zx, zx + zw) if (col, row) not in occupied]
@@ -184,6 +206,9 @@ for key, title, color, (zx, zy, zw, zh), access in ZONES:
     lines.append('%-20s %2d×%-2d %4d кл. %6.0f м²  %s' % (title, zw, zh, zw * zh, area(zw * zh), access))
     for room in rooms:
         lines.append('    %-26s %2d×%-2d %5.1f м²' % (room[1], room[4], room[5], area(room[4] * room[5])))
+lines.append('Жилая зона, 2-й уровень:')
+for room in FLOOR2_ROOMS:
+    lines.append('    %-26s %2d×%-2d %5.1f м²' % (room[1], room[4], room[5], area(room[4] * room[5])))
 corridor_cells = sum(item[3] * item[4] for item in CORRIDORS)
 lines.append('Коридоры между зонами: %d кл., %.0f м²' % (corridor_cells, area(corridor_cells)))
 lines.append('Всего: основной квадрат %d×%d кл. = %.0f×%.0f м, со спортивной зоной %d×%d кл.' % (GRID, GRID, GRID * CELL_METERS, GRID * CELL_METERS, GRID_W, GRID_H))
@@ -268,6 +293,13 @@ def render(path):
             xx = x if side == 'W' else x + 1
             x0, y0 = at(xx, y); _, y1 = at(xx, y + size)
             draw.line([x0, y0 + 2, x0, y1 - 2], fill=(255, 120, 30), width=5)
+    # лестница на второй уровень жилой зоны
+    for stair in STAIRS:
+        x0, y0 = at(stair['x'], stair['y']); x1, y1 = at(stair['x'] + stair['count'], stair['y'] + 1)
+        draw.rectangle([x0 + 1, y0 + 1, x1 - 1, y1 - 1], fill=(200, 200, 200), outline=(30, 30, 30))
+        for step in range(1, stair['count'] * 3):
+            sx = x0 + (x1 - x0) * step / (stair['count'] * 3)
+            draw.line([sx, y0 + 2, sx, y1 - 2], fill=(90, 90, 90))
     for x, y, side, size in DOORS:
         if side in 'NS':
             yy = y if side == 'N' else y + 1
@@ -318,6 +350,36 @@ def render(path):
         y = ly + index * 22
         draw.rectangle([ix, y, ix + 18, y + 14], fill=color, outline=(200, 200, 200))
         draw.text((ix + 26, y), text, fill=(220, 220, 220), font=font(12))
+    # врезка: второй уровень жилой зоны
+    cell2 = 13
+    oy2 = ly + len(legend) * 22 + 40
+    draw.text((ix, oy2 - 24), 'Жилая зона, 2-й уровень', fill=(230, 230, 230), font=font(13, True))
+    at2 = lambda x, y: (ix + (x - 31) * cell2, oy2 + (y - 40) * cell2)
+    left2, top2 = at2(31, 40); right2, bottom2 = at2(56, 56)
+    draw.rectangle([left2 - 6, top2 - 6, right2 + 6, bottom2 + 6], fill=(52, 48, 44))
+    for zone, name, x, y, w, h, levels, kind in FLOOR2_ROOMS:
+        x0, y0 = at2(x, y); x1, y1 = at2(x + w, y + h)
+        fill = tuple(int(value * 0.45 + 70) for value in zone_color[zone]) if kind == 'corridor' else (120, 170, 110) if name == 'Оранжерея' else (120, 110, 150) if name == 'Кинозал' else zone_color[zone]
+        draw.rectangle([x0, y0, x1, y1], fill=fill, outline=(30, 30, 30), width=2)
+        if kind != 'corridor':
+            label = name.replace('Каюта ', 'К.')
+            draw.text(((x0 + x1) / 2, (y0 + y1) / 2), label, fill=(20, 20, 20), font=font(9 if w < 5 else 11), anchor='mm')
+    for stair in STAIRS:
+        x0, y0 = at2(stair['x'], stair['y']); x1, y1 = at2(stair['x'] + stair['count'], stair['y'] + 1)
+        draw.rectangle([x0, y0, x1, y1], fill=(200, 200, 200), outline=(30, 30, 30))
+        for step in range(1, stair['count'] * 3):
+            sx = x0 + (x1 - x0) * step / (stair['count'] * 3)
+            draw.line([sx, y0, sx, y1], fill=(90, 90, 90))
+        draw.text((x1 + 3, (y0 + y1) / 2), 'вверх', fill=(240, 240, 240), font=font(9, True), anchor='lm')
+    for x, y, side, size in FLOOR2_DOORS:
+        if side in 'NS':
+            yy = y if side == 'N' else y + 1
+            x0, y0 = at2(x, yy); x1, _ = at2(x + size, yy)
+            draw.line([x0 + 2, y0, x1 - 2, y0], fill=(230, 40, 30), width=3)
+        else:
+            xx = x if side == 'W' else x + 1
+            x0, y0 = at2(xx, y); _, y1 = at2(xx, y + size)
+            draw.line([x0, y0 + 2, x0, y1 - 2], fill=(230, 40, 30), width=3)
     image.save(path)
 
 # назначение помещений — для меню базы (вкладка «Модули»)
@@ -358,6 +420,9 @@ NOTES = {
     'Санблок 1 (душевые)': 'душевые кабины, умывальники, туалеты',
     'Санблок 2 (душевые)': 'душевые кабины, умывальники, туалеты',
     'Спортзал': 'дорожки, велотренажёры, силовые станции, штанги, маты',
+    'Кинозал': 'второй уровень: экран, ряды кресел, проектор',
+    'Фойе': 'второй уровень: вход в кинозал и оранжерею',
+    'Оранжерея': 'второй уровень: место отдыха с растениями, гидропоника, фонтан',
     'Раздевалка, душевые': 'шкафчики, скамьи, душевые кабины',
 }
 
@@ -368,11 +433,13 @@ def map_plan():
     for number, zone in enumerate(ZONES, 1):
         modules[str(number)] = zone[1]
         module_of[zone[0]] = number
-    rooms = [dict(module=module_of[r[0]], zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7],
+    rooms = [dict(module=module_of[r[0]], zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7], floor=floor,
                   note=NOTES.get(r[1], '2 места' if r[1].startswith('Каюта') else 'одноместная' if r[7] == 'single' else ''))
-             for r in ROOMS]
+             for floor, rooms_of_floor in ((0, ROOMS), (1, FLOOR2_ROOMS)) for r in rooms_of_floor]
     room_at = {}
     for index, room in enumerate(rooms):
+        if room['floor']:
+            continue
         for row in range(room['y'], room['y'] + room['height']):
             for col in range(room['x'], room['x'] + room['width']):
                 room_at[(col, row)] = index
@@ -383,8 +450,9 @@ def map_plan():
             if index is not None and rooms[index]['kind'] == 'airlock':
                 return index
         return -1
-    doors = [dict(x=g[0], y=g[1], side=g[2], size=g[3], kind='gate', airlock=airlock_of(*g[:3])) for g in GATES]
-    doors += [dict(x=d[0], y=d[1], side=d[2], size=d[3], kind='door' if d[3] == 1 else 'double', airlock=-1) for d in DOORS]
+    doors = [dict(x=g[0], y=g[1], side=g[2], size=g[3], kind='gate', airlock=airlock_of(*g[:3]), floor=0) for g in GATES]
+    doors += [dict(x=d[0], y=d[1], side=d[2], size=d[3], kind='door' if d[3] == 1 else 'double', airlock=-1, floor=floor)
+              for floor, doors_of_floor in ((0, DOORS), (1, FLOOR2_DOORS)) for d in doors_of_floor]
     cells = {}
     for room in rooms:
         cells[str(room['module'])] = cells.get(str(room['module']), 0) + room['width'] * room['height']
@@ -395,7 +463,7 @@ def map_plan():
             'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4], levels=2 if c[0] in K7_CORRIDORS else 1,
                                note='коридор между зонами' + (', маршрут K7, высота 5 м' if c[0] in K7_CORRIDORS else '')) for c in CORRIDORS],
             'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
-            'doors': doors, 'cells': cells, 'total': sum(cells.values())}
+            'doors': doors, 'stairs': STAIRS, 'cells': cells, 'total': sum(cells.values())}
 
 def write_map_plan():
     plan = map_plan()
@@ -419,7 +487,9 @@ if __name__ == '__main__':
                'rooms': [dict(zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7]) for r in ROOMS],
                'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
                'gates': [dict(x=g[0], y=g[1], side=g[2], size=g[3]) for g in GATES],
-               'doors': [dict(x=d[0], y=d[1], side=d[2], size=d[3]) for d in DOORS]},
+               'doors': [dict(x=d[0], y=d[1], side=d[2], size=d[3]) for d in DOORS],
+               'floor2': {'rooms': [dict(zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], kind=r[7]) for r in FLOOR2_ROOMS],
+                          'doors': [dict(x=d[0], y=d[1], side=d[2], size=d[3]) for d in FLOOR2_DOORS], 'stairs': STAIRS}},
               open(os.path.join(out, 'base_plan_v2.json'), 'w'), ensure_ascii=False, indent=1)
     open(os.path.join(out, 'base_plan_v2.txt'), 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
     write_map_plan()
