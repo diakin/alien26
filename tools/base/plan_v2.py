@@ -5,11 +5,12 @@ import os, json, sys
 from PIL import Image, ImageDraw, ImageFont
 
 CELL_METERS = 1.25
+GRID_W, GRID_H = 66, 56          # основной квадрат 56×56 + спортивная зона у юго-восточного угла
 GRID = 56
 
 # зона: ключ, название, цвет, прямоугольник (x, y, ширина, высота в клетках), доступ
 ZONES = [
-    ('hangar', 'Ангар', (120, 140, 170), (0, 0, 24, 20), 'ворота 4 кл. в коридор H1, 3 кл. в V1'),
+    ('hangar', 'Ангар', (120, 140, 170), (0, 0, 27, 20), 'шлюз ангара в H1 (КПП)'),
     ('industry', 'Промышленная', (180, 170, 90), (27, 0, 16, 20), 'шлюз из H1'),
     ('support', 'Жизнеобеспечение', (140, 140, 140), (46, 0, 10, 20), 'проход из H1'),
     ('military', 'Военная', (190, 90, 80), (0, 23, 24, 14), 'шлюз из V1'),
@@ -17,19 +18,23 @@ ZONES = [
     ('isolator', 'Изолятор образцов', (90, 150, 120), (46, 23, 10, 14), 'шлюз санобработки из V2'),
     ('medical', 'Медицинская', (220, 130, 150), (0, 40, 13, 16), 'проход из V3'),
     ('domestic', 'Бытовая', (110, 160, 110), (16, 40, 12, 16), 'проходы из H2, V3, V4'),
-    ('living', 'Жилая', (150, 120, 180), (31, 40, 25, 16), 'проходы из V4'),
+    ('living', 'Жилая', (150, 120, 180), (31, 40, 25, 16), 'проходы из V4 и V5'),
+    ('sport', 'Спортивная', (200, 150, 90), (59, 40, 7, 16), 'проход из V5'),
 ]
 # коридоры между зонами, 3 клетки
 CORRIDORS = [
-    ('H1', 0, 20, 56, 3), ('H2', 0, 37, 56, 3),
-    ('V1', 24, 0, 3, 20), ('V1', 24, 23, 3, 14), ('V2', 43, 0, 3, 20), ('V2', 43, 23, 3, 14),
-    ('V3', 13, 40, 3, 16), ('V4', 28, 40, 3, 16),
+    ('H1', 0, 20, 56, 3), ('H2', 0, 37, 59, 3),
+    ('V1', 24, 23, 3, 14), ('V2', 43, 0, 3, 20), ('V2', 43, 23, 3, 14),
+    ('V3', 13, 40, 3, 16), ('V4', 28, 40, 3, 16), ('V5', 56, 40, 3, 16),
 ]
 # помещения: зона, название, x, y, ширина, высота, уровней, вид (room | corridor | airlock)
 ROOMS = [
     # ангар
     ('hangar', 'Платформа подъёмника', 0, 0, 20, 20, 4, 'room'),
-    ('hangar', 'Техполоса', 20, 0, 4, 20, 4, 'room'),
+    ('hangar', 'Техполоса', 20, 0, 4, 17, 4, 'room'),
+    ('hangar', 'КПП', 20, 17, 4, 3, 1, 'room'),
+    ('hangar', 'Проезд к цеху', 24, 0, 3, 17, 1, 'corridor'),
+    ('hangar', 'Шлюз ангара', 24, 17, 3, 3, 1, 'airlock'),
     # промышленная
     ('industry', 'Цех (стенд K7)', 27, 5, 11, 10, 2, 'room'),
     ('industry', 'Склад материалов', 27, 0, 6, 5, 1, 'room'),
@@ -55,7 +60,7 @@ ROOMS = [
     ('military', 'Коридор', 0, 29, 20, 2, 1, 'corridor'),
     ('military', 'Узел связи', 20, 23, 4, 5, 1, 'room'),
     ('military', 'Шлюз', 20, 28, 4, 4, 1, 'airlock'),
-    ('military', 'Караульная', 20, 32, 4, 5, 1, 'room'),
+    ('military', 'Дежурная часть', 20, 32, 4, 5, 1, 'room'),
     ('military', 'Оружейная', 0, 31, 7, 6, 1, 'room'),
     ('military', 'Склад боеприпасов', 8, 31, 5, 5, 1, 'room'),
     ('military', 'Мастерская оружейника', 14, 31, 6, 6, 1, 'room'),
@@ -92,6 +97,9 @@ ROOMS = [
     ('domestic', 'Санблок 1 (душевые)', 16, 49, 6, 7, 1, 'room'),
     ('domestic', 'Санблок 2 (душевые)', 22, 49, 6, 4, 1, 'room'),
     ('domestic', 'Прачечная', 22, 53, 6, 3, 1, 'room'),
+    # спортивная
+    ('sport', 'Спортзал', 59, 40, 7, 11, 1, 'room'),
+    ('sport', 'Раздевалка, душевые', 59, 51, 7, 5, 1, 'room'),
     # жилая
     ('living', 'Коридор', 31, 44, 25, 2, 1, 'corridor'),
     ('living', 'Коридор', 31, 50, 25, 2, 1, 'corridor'),
@@ -111,20 +119,43 @@ ROOMS.append(('living', 'Каюта %d' % cabin, 52, 46, 4, 4, 1, 'room'))
 THICK = [(7, 31, 1, 6), (13, 31, 1, 6), (8, 36, 5, 1)]
 # ворота шлюзов и ангара: (x, y, сторона клетки, клеток) — широкие, для K7
 GATES = [
-    (8, 19, 'S', 4), (23, 8, 'E', 3),
+    (23, 8, 'E', 3), (24, 17, 'N', 3), (24, 19, 'S', 3), (27, 9, 'W', 3), (39, 9, 'S', 3),
     (33, 19, 'S', 3), (33, 17, 'N', 3),
     (23, 29, 'E', 3), (20, 29, 'W', 2),
     (33, 23, 'N', 3), (33, 25, 'S', 3),
     (46, 24, 'W', 3), (46, 26, 'S', 2),
     (28, 14, 'S', 3), (39, 14, 'S', 3), (39, 4, 'S', 3),
 ]
+# обычные двери и проёмы: (x, y, сторона клетки, клеток)
+DOORS = [
+    (28, 4, 'S', 1), (35, 4, 'S', 1), (29, 17, 'N', 1), (39, 17, 'N', 1),                       # промышленная
+    (48, 1, 'W', 1), (52, 1, 'W', 1), (48, 6, 'W', 1), (48, 11, 'W', 1), (48, 16, 'W', 1),      # жизнеобеспечение
+    (46, 19, 'S', 2), (46, 17, 'W', 1),
+    (23, 18, 'E', 1),                                                                           # КПП -> шлюз ангара
+    (4, 28, 'S', 1), (11, 28, 'S', 1), (16, 28, 'S', 1), (20, 25, 'W', 1),                      # военная
+    (3, 31, 'N', 1), (10, 31, 'N', 1), (16, 31, 'N', 1), (21, 32, 'N', 1),
+    (29, 25, 'S', 1), (39, 25, 'S', 1), (29, 28, 'N', 1), (34, 28, 'N', 1), (40, 28, 'N', 1),   # лаборатории
+    (50, 24, 'W', 1), (48, 28, 'W', 1), (48, 31, 'W', 1), (48, 34, 'W', 1),                     # изолятор
+    (2, 40, 'N', 1), (2, 43, 'S', 1), (6, 43, 'S', 1), (10, 43, 'S', 1), (12, 44, 'E', 2),      # медицинская
+    (5, 48, 'E', 1), (5, 53, 'E', 1), (8, 48, 'W', 1), (8, 53, 'W', 1),
+    (19, 40, 'N', 2), (19, 46, 'S', 1), (24, 42, 'W', 1), (25, 45, 'N', 1),                     # бытовая
+    (18, 49, 'N', 1), (24, 49, 'N', 1), (24, 53, 'N', 1), (16, 47, 'W', 2), (27, 47, 'E', 2),
+    (31, 44, 'W', 2), (31, 50, 'W', 2), (55, 44, 'E', 2), (55, 50, 'E', 2),                     # жилая: выходы
+    (59, 44, 'W', 2), (59, 52, 'W', 1), (61, 51, 'N', 1),                                       # спортивная
+]
+for x, width in DOUBLE_ROW:
+    DOORS.append((x + 1, 43, 'S', 1))
+    DOORS.append((x + 1, 52, 'N', 1))
+for index in range(len(SINGLES)):
+    DOORS.append((31 + index * 3 + 1, 46, 'N', 1))
+DOORS.append((53, 46, 'N', 1))
 
 problems = []
 occupied = {}
 def claim(x, y, width, height, label):
     for row in range(y, y + height):
         for col in range(x, x + width):
-            if not (0 <= col < GRID and 0 <= row < GRID):
+            if not (0 <= col < GRID_W and 0 <= row < GRID_H):
                 problems.append('%s выходит за план (%d, %d)' % (label, col, row))
             elif (col, row) in occupied:
                 problems.append('%s пересекается с %s в (%d, %d)' % (label, occupied[(col, row)], col, row))
@@ -152,7 +183,7 @@ for key, title, color, (zx, zy, zw, zh), access in ZONES:
         lines.append('    %-26s %2d×%-2d %5.1f м²' % (room[1], room[4], room[5], area(room[4] * room[5])))
 corridor_cells = sum(item[3] * item[4] for item in CORRIDORS)
 lines.append('Коридоры между зонами: %d кл., %.0f м²' % (corridor_cells, area(corridor_cells)))
-lines.append('Всего: %d×%d кл. = %.0f×%.0f м' % (GRID, GRID, GRID * CELL_METERS, GRID * CELL_METERS))
+lines.append('Всего: основной квадрат %d×%d кл. = %.0f×%.0f м, со спортивной зоной %d×%d кл.' % (GRID, GRID, GRID * CELL_METERS, GRID * CELL_METERS, GRID_W, GRID_H))
 
 # ---------------- схема ----------------
 SCALE = 16
@@ -165,15 +196,17 @@ def font(size, bold=False):
     return ImageFont.load_default()
 
 def render(path):
-    width = MARGIN * 2 + GRID * SCALE + INSET_W
-    height = MARGIN * 2 + GRID * SCALE + 30
+    width = MARGIN * 2 + GRID_W * SCALE + INSET_W
+    height = MARGIN * 2 + GRID_H * SCALE + 30
     image = Image.new('RGB', (width, height), (24, 22, 20))
     draw = ImageDraw.Draw(image)
     at = lambda x, y: (MARGIN + x * SCALE, MARGIN + 30 + y * SCALE)
-    draw.text((MARGIN, 12), 'База «Ямантау» — план модернизации (56×56 клеток, клетка 1,25 м)', fill=(230, 230, 230), font=font(16, True))
+    draw.text((MARGIN, 12), 'База «Ямантау» — план модернизации (56×56 клеток + спортивная зона, клетка 1,25 м)', fill=(230, 230, 230), font=font(16, True))
     # скала
     left, top = at(0, 0); right, bottom = at(GRID, GRID)
     draw.rectangle([left - 10, top - 10, right + 10, bottom + 10], fill=(52, 48, 44))
+    annex_left, annex_top = at(GRID, 37); annex_right, annex_bottom = at(GRID_W, GRID_H)
+    draw.rectangle([annex_left - 10, annex_top - 10, annex_right + 10, annex_bottom + 10], fill=(52, 48, 44))
     zone_color = {zone[0]: zone[2] for zone in ZONES}
     for name, x, y, w, h in CORRIDORS:
         x0, y0 = at(x, y); x1, y1 = at(x + w, y + h)
@@ -215,6 +248,14 @@ def render(path):
         for offset in range(-patch.height, patch.width, 6):
             patch_draw.line([offset, patch.height, offset + patch.height, 0], fill=(100, 96, 90))
         image.paste(patch, (int(x0), int(y0)))
+    # зоны: рамки и подписи
+    for key, title, color, (zx, zy, zw, zh), access in ZONES:
+        x0, y0 = at(zx, zy); x1, y1 = at(zx + zw, zy + zh)
+        draw.rectangle([x0, y0, x1, y1], outline=(250, 250, 250), width=2)
+        tag = title.upper()
+        tag_width = draw.textlength(tag, font=font(11, True))
+        draw.rectangle([x0 + 2, y0 + 2, x0 + tag_width + 10, y0 + 17], fill=(20, 20, 20))
+        draw.text((x0 + 6, y0 + 3), tag, fill=(250, 250, 250), font=font(11, True))
     for x, y, side, size in GATES:
         if side in 'NS':
             yy = y if side == 'N' else y + 1
@@ -224,16 +265,17 @@ def render(path):
             xx = x if side == 'W' else x + 1
             x0, y0 = at(xx, y); _, y1 = at(xx, y + size)
             draw.line([x0, y0 + 2, x0, y1 - 2], fill=(255, 120, 30), width=5)
-    # зоны: рамки и подписи
-    for key, title, color, (zx, zy, zw, zh), access in ZONES:
-        x0, y0 = at(zx, zy); x1, y1 = at(zx + zw, zy + zh)
-        draw.rectangle([x0, y0, x1, y1], outline=(250, 250, 250), width=2)
-        tag = title.upper()
-        tag_width = draw.textlength(tag, font=font(11, True))
-        draw.rectangle([x0 + 2, y0 + 2, x0 + tag_width + 10, y0 + 17], fill=(20, 20, 20))
-        draw.text((x0 + 6, y0 + 3), tag, fill=(250, 250, 250), font=font(11, True))
+    for x, y, side, size in DOORS:
+        if side in 'NS':
+            yy = y if side == 'N' else y + 1
+            x0, y0 = at(x, yy); x1, _ = at(x + size, yy)
+            draw.line([x0 + 3, y0, x1 - 3, y0], fill=(230, 40, 30), width=4)
+        else:
+            xx = x if side == 'W' else x + 1
+            x0, y0 = at(xx, y); _, y1 = at(xx, y + size)
+            draw.line([x0, y0 + 3, x0, y1 - 3], fill=(230, 40, 30), width=4)
     # врезка: реакторный ярус −5
-    ix = MARGIN + GRID * SCALE + 40
+    ix = MARGIN + GRID_W * SCALE + 40
     iy = MARGIN + 30
     draw.text((ix, iy), 'Ярус −5: реактор (16×16 кл.)', fill=(230, 230, 230), font=font(13, True))
     cell = 18
@@ -242,8 +284,8 @@ def render(path):
     draw.rectangle(rect(-0.5, -0.5, 17, 17), fill=(52, 48, 44))
     reactor_rooms = [
         ('Реакторный зал', 4, 0, 12, 10, (200, 90, 60)),
-        ('Бассейн выдержки', 4, 10, 6, 6, (80, 130, 190)),
-        ('Насосная, теплообменники', 10, 10, 6, 6, (150, 150, 150)),
+        ('Насосная, теплообменники', 4, 10, 6, 6, (150, 150, 150)),
+        ('Бассейн выдержки', 10, 10, 6, 6, (80, 130, 190)),
         ('Коридор', 0, 4, 4, 2, (110, 110, 110)),
         ('Лифт', 0, 0, 4, 4, (226, 190, 60)),
         ('Пульт', 0, 6, 4, 4, (140, 180, 140)),
@@ -267,7 +309,7 @@ def render(path):
     draw.ellipse([cx - 1.1 * cell, cy - 1.1 * cell, cx + 1.1 * cell, cy + 1.1 * cell], outline=(40, 30, 30), width=2, fill=(110, 50, 40))
     # легенда
     ly = origin[1] + 17 * cell + 30
-    legend = [((84, 88, 92), 'коридор между зонами, 3 кл.'), ((226, 190, 60), 'шлюз / лифт'), ((255, 120, 30), 'широкие ворота (K7)'),
+    legend = [((84, 88, 92), 'коридор между зонами, 3 кл.'), ((226, 190, 60), 'шлюз / лифт'), ((255, 120, 30), 'широкие ворота (K7)'), ((230, 40, 30), 'дверь'),
               ((130, 126, 120), 'толстая стена (бетон 1,25 м)'), ((52, 48, 44), 'скала')]
     for index, (color, text) in enumerate(legend):
         y = ly + index * 22
@@ -281,12 +323,13 @@ if __name__ == '__main__':
     if problems:
         print('\n'.join(problems[:30]))
     render(os.path.join(out, 'base_plan_v2.png'))
-    json.dump({'cellMeters': CELL_METERS, 'grid': [GRID, GRID],
+    json.dump({'cellMeters': CELL_METERS, 'grid': [GRID_W, GRID_H], 'square': [GRID, GRID],
                'zones': [dict(key=z[0], name=z[1], x=z[3][0], y=z[3][1], width=z[3][2], height=z[3][3], access=z[4]) for z in ZONES],
                'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4]) for c in CORRIDORS],
                'rooms': [dict(zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7]) for r in ROOMS],
                'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
-               'gates': [dict(x=g[0], y=g[1], side=g[2], size=g[3]) for g in GATES]},
+               'gates': [dict(x=g[0], y=g[1], side=g[2], size=g[3]) for g in GATES],
+               'doors': [dict(x=d[0], y=d[1], side=d[2], size=d[3]) for d in DOORS]},
               open(os.path.join(out, 'base_plan_v2.json'), 'w'), ensure_ascii=False, indent=1)
     open(os.path.join(out, 'base_plan_v2.txt'), 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
     print('\n'.join(lines))
