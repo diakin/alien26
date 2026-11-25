@@ -1,0 +1,605 @@
+// Люди на основе MakeHuman (данные — tools/render/mh, готовит mh/mhbuild.py): анатомическое тело с морфами пола,
+// возраста, веса и черт лица, скелет game_engine с весами, текстура кожи, глаза; одежда — из вспомогательной сетки
+// «колготки» (облегает тело) и «юбка» MakeHuman: области по весам костей, приподнятые над телом на толщину слоя;
+// волосы — оболочка над кожей головы с линией роста. Поза задаётся теми же величинами, что у прежней модели
+// гражданских (civilian.js): таз, наклон и поворот корпуса, поворот головы, кисти и стопы с полюсами локтей и колен.
+// Рамка модели: y — вверх, z — вперёд (лицо), x — влево от человека (его левая рука при +x).
+import * as THREE from 'three';
+import { solveTwoBone, mulberry32, tileNoise, normalFromHeight, canvasTexture } from './lib.js';
+import { fabric, pvc } from './person.js';
+
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const DATA = new URL('./mh/', import.meta.url);
+const decode = (text, Type) => { const bytes = Uint8Array.from(atob(text), (char) => char.charCodeAt(0)); return new Type(bytes.buffer); };
+
+// ---------------- загрузка ----------------
+const topology = await (await fetch(new URL('topology.json', DATA))).json();
+const COUNT = topology.count;
+const PARTS = {};
+for (const [name, part] of Object.entries(topology.parts)) {
+  PARTS[name] = { source: decode(part.source, Int32Array), uv: decode(part.uv, Float32Array), index: decode(part.index, Uint32Array), proxy: !!part.proxy };
+}
+const SKIN_INDEX = decode(topology.skinIndex, Uint8Array);
+const SKIN_WEIGHT = decode(topology.skinWeight, Float32Array);
+const BONES = topology.bones;
+const BONE = Object.fromEntries(BONES.map((bone, index) => [bone.name, index]));
+const MASKS = Object.fromEntries(Object.entries(topology.masks).map(([name, text]) => [name, decode(text, Float32Array)]));
+
+const kindData = new Map();
+const skinTextures = new Map();
+// данные вида и текстура кожи: загружаются заранее (prepareHuman), держатся последние несколько видов
+export async function prepareHuman(kind) {
+  if (!kindData.has(kind)) {
+    const record = await (await fetch(new URL(`kind_${kind}.json`, DATA))).json();
+    record.rest = decode(record.positions, Float32Array);
+    record.eyeRest = decode(record.eyes, Float32Array);
+    kindData.set(kind, record);
+  }
+  if (!skinTextures.has(kind)) {
+    const texture = await new THREE.TextureLoader().loadAsync(new URL(`skin_${kind}.png`, DATA).href);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = true;
+    texture.anisotropy = 8;
+    skinTextures.set(kind, texture);
+    // держим текстуры не больше чем для трёх видов (2048² каждая)
+    while (skinTextures.size > 3) {
+      const [oldest] = skinTextures.keys();
+      skinTextures.get(oldest).dispose();
+      skinTextures.delete(oldest);
+    }
+  }
+}
+let eyeTexture = null;
+async function prepareEyes() {
+  eyeTexture = await new THREE.TextureLoader().loadAsync(new URL('eye_brown.png', DATA).href);
+  eyeTexture.colorSpace = THREE.SRGBColorSpace;
+}
+await prepareEyes();
+export const hasHuman = (kind) => kindData.has(kind) && skinTextures.has(kind);
+
+// ---------------- общие материалы ----------------
+const cache = new Map();
+const once = (key, make) => { if (!cache.has(key)) cache.set(key, make()); return cache.get(key); };
+function skinMaterial(kind) {
+  return once('skin' + kind, () => new THREE.MeshPhysicalMaterial({
+    map: skinTextures.get(kind), roughness: 0.6, sheen: 0.12, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffb8a0),
+  }));
+}
+// глаз: у сетки два слоя — яблоко с радужкой и роговица (прозрачная часть текстуры отбрасывается)
+const eyeMaterial = () => once('eye', () => new THREE.MeshPhysicalMaterial({ map: eyeTexture, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, alphaTest: 0.4 }));
+const lashMaterial = () => once('lash', () => new THREE.MeshStandardMaterial({ color: 0x120c0a, roughness: 0.8, side: THREE.DoubleSide }));
+
+// волосы: пряди вдоль направления «сверху вниз»
+function hairMaterial(color) {
+  return once('hair' + color.join(','), () => {
+    const width = 512, height = 512, rng = mulberry32(Math.round(color[0] * 1000 + color[1] * 100));
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext('2d');
+    const [red, green, blue] = color.map((value) => value * 255);
+    context.fillStyle = `rgb(${red},${green},${blue})`;
+    context.fillRect(0, 0, width, height);
+    for (let strand = 0; strand < 5000; strand++) {
+      const x = rng() * width, y = rng() * height, length = 30 + rng() * 120, light = rng() < 0.45 ? 1.45 : 0.55;
+      context.strokeStyle = `rgba(${Math.min(255, red * light + 6)},${Math.min(255, green * light + 4)},${Math.min(255, blue * light + 2)},${0.2 + rng() * 0.35})`;
+      context.lineWidth = 0.6 + rng() * 1.2;
+      context.beginPath(); context.moveTo(x, y); context.quadraticCurveTo(x + (rng() - 0.5) * 8, y + length / 2, x + (rng() - 0.5) * 14, y + length); context.stroke();
+    }
+    const size = 256, heights = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) heights[y * size + x] = tileNoise(x / size, y / size * 0.04, 48, 2, 7) * 0.8 + tileNoise(x / size, y / size, 3, 2, 9) * 0.6;
+    const normal = normalFromHeight(heights, size, 3);
+    return new THREE.MeshPhysicalMaterial({ map: canvasTexture(canvas, { repeat: 1 }), normalMap: normal, normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.5, sheen: 0.6, sheenRoughness: 0.35, sheenColor: new THREE.Color().setRGB(...color.map((value) => Math.min(1, value * 1.8 + 0.1))) });
+  });
+}
+
+// ---------------- геометрия ----------------
+function boneWeight(vertex, names) {
+  let total = 0;
+  for (let slot = 0; slot < 4; slot++) if (names.has(BONES[SKIN_INDEX[vertex * 4 + slot]].name)) total += SKIN_WEIGHT[vertex * 4 + slot];
+  return total;
+}
+const setOf = (...names) => new Set(names.flatMap((name) => (name.endsWith('_') ? [name + 'l', name + 'r'] : [name])));
+const TORSO = setOf('spine_01', 'spine_02', 'spine_03', 'clavicle_');
+const UPPER_ARM = setOf('upperarm_'), LOWER_ARM = setOf('lowerarm_'), HAND = setOf('hand_', 'thumb_01_', 'index_01_', 'middle_01_', 'ring_01_', 'pinky_01_',
+  'thumb_02_', 'index_02_', 'middle_02_', 'ring_02_', 'pinky_02_', 'thumb_03_', 'index_03_', 'middle_03_', 'ring_03_', 'pinky_03_');
+const NECK = setOf('neck_01'), HEAD = setOf('head'), PELVIS = setOf('pelvis'), THIGH = setOf('thigh_'), CALF = setOf('calf_'), FOOT = setOf('foot_', 'ball_');
+
+// геометрия части с перемещёнными вершинами; keep(вершина-источник, положение) решает, остаётся ли треугольник
+function partGeometry(part, positionOf, { keep = null, keepAny = false, uvMode = 'part', skin = true } = {}) {
+  const vertices = part.source.length;
+  const position = new Float32Array(vertices * 3);
+  for (let index = 0; index < vertices; index++) {
+    const point = positionOf(index);
+    position.set([point.x, point.y, point.z], index * 3);
+  }
+  let indices = part.index;
+  if (keep) {
+    const kept = [];
+    for (let triangle = 0; triangle < indices.length; triangle += 3) {
+      const inside = keepAny ? keep(indices[triangle]) || keep(indices[triangle + 1]) || keep(indices[triangle + 2])
+        : keep(indices[triangle]) && keep(indices[triangle + 1]) && keep(indices[triangle + 2]);
+      if (inside) kept.push(indices[triangle], indices[triangle + 1], indices[triangle + 2]);
+    }
+    indices = new Uint32Array(kept);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  if (uvMode === 'part') geometry.setAttribute('uv', new THREE.BufferAttribute(part.uv, 2));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  if (skin && !part.proxy) {
+    const skinIndex = new Uint16Array(vertices * 4), skinWeight = new Float32Array(vertices * 4);
+    for (let index = 0; index < vertices; index++) {
+      const source = part.source[index];
+      for (let slot = 0; slot < 4; slot++) { skinIndex[index * 4 + slot] = SKIN_INDEX[source * 4 + slot]; skinWeight[index * 4 + slot] = SKIN_WEIGHT[source * 4 + slot]; }
+    }
+    geometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+    geometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+// мягкая маска по сетке: значения 0..1 сглаживаются по соседям (вершины склеены по положению),
+// край потом режется alphaTest по изолинии 0.5 — ровная кривая вместо лесенки из треугольников
+function softMask(part, positionOf, valueOf, iterations = 3) {
+  const vertices = part.source.length;
+  const weld = new Map(), welded = new Int32Array(vertices);
+  for (let index = 0; index < vertices; index++) {
+    const point = positionOf(index);
+    const key = `${Math.round(point.x * 1e4)},${Math.round(point.y * 1e4)},${Math.round(point.z * 1e4)}`;
+    if (!weld.has(key)) weld.set(key, weld.size);
+    welded[index] = weld.get(key);
+  }
+  const neighbours = Array.from({ length: weld.size }, () => new Set());
+  for (let triangle = 0; triangle < part.index.length; triangle += 3) {
+    for (let corner = 0; corner < 3; corner++) {
+      const a = welded[part.index[triangle + corner]], b = welded[part.index[triangle + (corner + 1) % 3]];
+      neighbours[a].add(b); neighbours[b].add(a);
+    }
+  }
+  let values = new Float32Array(weld.size), counts = new Float32Array(weld.size);
+  for (let index = 0; index < vertices; index++) { values[welded[index]] += valueOf(index); counts[welded[index]]++; }
+  for (let vertex = 0; vertex < weld.size; vertex++) values[vertex] /= counts[vertex] || 1;
+  for (let step = 0; step < iterations; step++) {
+    const next = new Float32Array(weld.size);
+    for (let vertex = 0; vertex < weld.size; vertex++) {
+      let sum = values[vertex];
+      for (const other of neighbours[vertex]) sum += values[other];
+      next[vertex] = sum / (neighbours[vertex].size + 1);
+    }
+    values = next;
+  }
+  const result = new Float32Array(vertices);
+  for (let index = 0; index < vertices; index++) result[index] = values[welded[index]];
+  return result;
+}
+// вершинная прозрачность по маске и материал с отсечкой по ней
+function applyMask(geometry, mask) {
+  const colors = new Float32Array(mask.length * 4);
+  for (let index = 0; index < mask.length; index++) colors.set([1, 1, 1, mask[index]], index * 4);
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+}
+const maskedMaterials = new Map();
+function maskedMaterial(material) {
+  if (!maskedMaterials.has(material)) {
+    const copy = material.clone();
+    copy.vertexColors = true;
+    copy.alphaTest = 0.5;
+    copy.alphaToCoverage = false;
+    maskedMaterials.set(material, copy);
+  }
+  return maskedMaterials.get(material);
+}
+
+// у вершин с одинаковым положением (швы UV) — общая нормаль, чтобы слой одежды не рвался по швам при подъёме
+function smoothNormals(geometry) {
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  const groups = new Map();
+  for (let index = 0; index < position.count; index++) {
+    const key = `${Math.round(position.getX(index) * 1e4)},${Math.round(position.getY(index) * 1e4)},${Math.round(position.getZ(index) * 1e4)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(index);
+  }
+  const sum = new THREE.Vector3();
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    sum.set(0, 0, 0);
+    for (const index of members) sum.add(V(normal.getX(index), normal.getY(index), normal.getZ(index)));
+    sum.normalize();
+    for (const index of members) normal.setXYZ(index, sum.x, sum.y, sum.z);
+  }
+}
+// UV ткани: проекция по преобладающей оси нормали (ткань — повторяющаяся текстура, швы не заметны)
+function boxUV(geometry, density = 2.4) {
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  const uv = new Float32Array(position.count * 2);
+  for (let index = 0; index < position.count; index++) {
+    const nx = Math.abs(normal.getX(index)), nz = Math.abs(normal.getZ(index)), ny = Math.abs(normal.getY(index));
+    const x = position.getX(index), y = position.getY(index), z = position.getZ(index);
+    let u, v;
+    if (ny > nx && ny > nz) { u = x; v = z; } else if (nx > nz) { u = z; v = y; } else { u = x; v = y; }
+    uv[index * 2] = u * density; uv[index * 2 + 1] = v * density;
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+// сгладить слой одежды (Таубин: без усадки) — у ткани нет рельефа мышц; кромка остаётся на месте
+function relax(geometry, iterations = 6) {
+  const position = geometry.attributes.position, index = geometry.index.array;
+  const keyOf = (vertex) => `${Math.round(position.getX(vertex) * 1e4)},${Math.round(position.getY(vertex) * 1e4)},${Math.round(position.getZ(vertex) * 1e4)}`;
+  const weld = new Map(), welded = new Int32Array(position.count);
+  for (let vertex = 0; vertex < position.count; vertex++) { const key = keyOf(vertex); if (!weld.has(key)) weld.set(key, weld.size); welded[vertex] = weld.get(key); }
+  const neighbours = Array.from({ length: weld.size }, () => new Set());
+  const edgeCount = new Map();
+  for (let triangle = 0; triangle < index.length; triangle += 3) {
+    for (let corner = 0; corner < 3; corner++) {
+      const a = welded[index[triangle + corner]], b = welded[index[triangle + (corner + 1) % 3]];
+      neighbours[a].add(b); neighbours[b].add(a);
+      const edge = a < b ? a + ',' + b : b + ',' + a;
+      edgeCount.set(edge, (edgeCount.get(edge) || 0) + 1);
+    }
+  }
+  const boundary = new Uint8Array(weld.size);
+  for (const [edge, uses] of edgeCount) if (uses === 1) for (const vertex of edge.split(',')) boundary[+vertex] = 1;
+  let points = new Float32Array(weld.size * 3);
+  for (let vertex = 0; vertex < position.count; vertex++) points.set([position.getX(vertex), position.getY(vertex), position.getZ(vertex)], welded[vertex] * 3);
+  for (let step = 0; step < iterations * 2; step++) {
+    const factor = step % 2 ? -0.53 : 0.5, next = new Float32Array(points);
+    for (let vertex = 0; vertex < weld.size; vertex++) {
+      if (boundary[vertex] || !neighbours[vertex].size) continue;
+      let x = 0, y = 0, z = 0;
+      for (const other of neighbours[vertex]) { x += points[other * 3]; y += points[other * 3 + 1]; z += points[other * 3 + 2]; }
+      const count = neighbours[vertex].size;
+      next[vertex * 3] += factor * (x / count - points[vertex * 3]);
+      next[vertex * 3 + 1] += factor * (y / count - points[vertex * 3 + 1]);
+      next[vertex * 3 + 2] += factor * (z / count - points[vertex * 3 + 2]);
+    }
+    points = next;
+  }
+  for (let vertex = 0; vertex < position.count; vertex++) position.setXYZ(vertex, points[welded[vertex] * 3], points[welded[vertex] * 3 + 1], points[welded[vertex] * 3 + 2]);
+  geometry.computeVertexNormals();
+}
+
+// приподнять вершины над телом по нормали на offset(вершина)
+function inflate(geometry, offsetOf) {
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  for (let index = 0; index < position.count; index++) {
+    const offset = offsetOf(index);
+    position.setXYZ(index, position.getX(index) + normal.getX(index) * offset, position.getY(index) + normal.getY(index) * offset, position.getZ(index) + normal.getZ(index) * offset);
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+// ---------------- одежда ----------------
+// garment: { region, offset, material } — region(вершина-источник, положение покоя) → true, если вершина покрыта
+// края одежды — по плоскостям (ровная кромка по рядам сетки): вырез у шеи, манжеты у запястий, низ брюк у щиколоток
+const neckCut = (frame, point) => point.y < frame.joints.neck_01[0].y - 0.012 + (point.z < frame.joints.neck_01[0].z - 0.01 ? 0.025 : 0) - Math.max(0, point.z - frame.joints.neck_01[0].z) * 0.6;
+// сторона по x: левая рука у модели в +x
+const armSide = (point) => point.x > 0 ? 'l' : 'r';
+const beforeWrist = (frame, point, margin = 0.015, source = null) => {
+  if (source && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.3) return true;
+  const side = armSide(point);
+  const wrist = frame.joints['hand_' + side][0], elbow = frame.joints['lowerarm_' + side][0];
+  return point.clone().sub(wrist).dot(wrist.clone().sub(elbow).normalize()) < -margin;
+};
+const aboveAnkle = (frame, point, height = 0.05) => point.y > frame.joints.foot_l[0].y + height;
+const shortSleeve = (frame, point) => [armSide(point)].every((side) => {
+  const shoulder = frame.joints['upperarm_' + side][0], elbow = frame.joints['lowerarm_' + side][0];
+  const along = elbow.clone().sub(shoulder);
+  return point.clone().sub(shoulder).dot(along.normalize()) < along.length() * 0.45 || Math.abs(point.x) < Math.abs(shoulder.x) - 0.02;
+});
+// тело под одеждой убирается, только если одежда есть и вокруг (кромка по сглаженной маске может отступить)
+const COVER_PROBES = [V(0, 0, 0), V(0, 0.035, 0), V(0, -0.035, 0), V(0.03, 0, 0), V(-0.03, 0, 0), V(0, 0, 0.03), V(0, 0, -0.03)];
+export const REGIONS = {
+  // рубашка, китель, куртка: корпус и рукава до запястья, низ — до верха бёдер
+  top: (frame) => (source, point) => boneWeight(source, HEAD) < 0.05 && boneWeight(source, FOOT) === 0 && neckCut(frame, point) && beforeWrist(frame, point, 0.015, source)
+    && point.y > frame.waist - 0.11,
+  // короткий рукав: до середины плеча
+  shortTop: (frame) => (source, point) => REGIONS.top(frame)(source, point) && shortSleeve(frame, point),
+  // брюки: от пояса до щиколоток
+  legs: (frame) => (source, point) => point.y < frame.waist + 0.05 && aboveAnkle(frame, point) && boneWeight(source, TORSO) < 0.7 && boneWeight(source, HAND) + boneWeight(source, LOWER_ARM) === 0,
+  // комбинезон: всё, кроме головы, шеи, кистей и стоп
+  coverall: (frame) => (source, point) => boneWeight(source, HEAD) < 0.05 && neckCut(frame, point) && beforeWrist(frame, point, 0.015, source) && aboveAnkle(frame, point, 0.04),
+  // жилет: корпус без рукавов
+  vest: (frame) => (source, point) => boneWeight(source, TORSO) + boneWeight(source, PELVIS) * 0.5 > 0.55 && boneWeight(source, UPPER_ARM) < 0.25 && point.y > frame.waist - 0.08
+    && neckCut(frame, point) && point.y < frame.joints.neck_01[0].y - 0.05,
+  // световозвращающие полосы жилета: две горизонтальные ленты
+  vestStripes: (frame) => (source, point) => REGIONS.vest(frame)(source, point)
+    && (Math.abs(point.y - (frame.shoulderY - 0.17)) < 0.02 || Math.abs(point.y - (frame.waist + 0.04)) < 0.02),
+  // перчатки: кисть и низ предплечья (длинные у костюма биозащиты)
+  glove: (frame) => (source, point) => boneWeight(source, HAND) > 0.15 || !beforeWrist(frame, point, 0.1, source),
+  // обувь по стопе: туфли до щиколотки, ботинки и сапоги — выше по голени
+  shoes: (frame) => (source, point) => boneWeight(source, FOOT) > 0.3 || point.y < frame.joints.foot_l[0].y + 0.03,
+  boot: (frame) => (source, point) => boneWeight(source, FOOT) > 0.2 || point.y < frame.joints.foot_l[0].y + 0.24,
+  workBoot: (frame) => (source, point) => boneWeight(source, FOOT) > 0.2 || point.y < frame.joints.foot_l[0].y + 0.11,
+  // ремень: лента по поясу брюк
+  belt: (frame) => (source, point) => REGIONS.legs(frame)(source, point) && point.y > frame.waist - 0.005 && point.y < frame.waist + 0.035,
+  // фартук: спереди от груди до колен
+  apron: (frame) => (source, point) => point.z > frame.pelvis.z + 0.02 && point.y < frame.shoulderY - 0.08 && point.y > frame.joints.calf_l[0].y + 0.08
+    && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.1 && Math.abs(point.x) < 0.2,
+};
+
+// ---------------- построение ----------------
+const restCache = new Map();
+// данные вида в покое: масштаб под длину ног 0,84 м (как у прежней модели), суставы, рамка (талия, плечи, лицо)
+function restOf(kind) {
+  if (restCache.has(kind)) return restCache.get(kind);
+  const data = kindData.get(kind);
+  const joint = (name, end = 0) => V(...data.joints[name][end]);
+  const leg = (side) => joint('thigh_' + side).distanceTo(joint('calf_' + side)) + joint('calf_' + side).distanceTo(joint('foot_' + side));
+  const scale = 0.84 / ((leg('l') + leg('r')) / 2);
+  const point = (index) => V(data.rest[index * 3], data.rest[index * 3 + 1], data.rest[index * 3 + 2]).multiplyScalar(scale);
+  const joints = Object.fromEntries(BONES.map((bone) => [bone.name, [joint(bone.name, 0).multiplyScalar(scale), joint(bone.name, 1).multiplyScalar(scale)]]));
+  // центр головы: середина рамки вершин, привязанных к голове
+  const headBox = new THREE.Box3();
+  for (const vertex of PARTS.body.source) if (boneWeight(vertex, HEAD) > 0.95) headBox.expandByPoint(point(vertex));
+  // глаза: середина двух половин сетки глаз
+  const eyeCenter = new THREE.Vector3(), eyeCount = data.eyeRest.length / 3;
+  for (let index = 0; index < eyeCount; index++) eyeCenter.add(V(data.eyeRest[index * 3], data.eyeRest[index * 3 + 1], data.eyeRest[index * 3 + 2]));
+  eyeCenter.multiplyScalar(scale / eyeCount);
+  // расстояние между центрами глаз: средние точки левой и правой половин
+  const sides = [V(0, 0, 0), V(0, 0, 0)], counts = [0, 0];
+  for (let index = 0; index < eyeCount; index++) {
+    const point = V(data.eyeRest[index * 3], data.eyeRest[index * 3 + 1], data.eyeRest[index * 3 + 2]).multiplyScalar(scale);
+    const side = point.x > eyeCenter.x ? 1 : 0;
+    sides[side].add(point); counts[side]++;
+  }
+  const eyeDistance = sides[0].divideScalar(counts[0]).distanceTo(sides[1].divideScalar(counts[1]));
+  const frame = {
+    waist: joints.spine_01[0].y + 0.02, shoulderY: joints.upperarm_l[0].y, pelvis: joints.pelvis[0].clone(),
+    headCenter: headBox.getCenter(V(0, 0, 0)), headSize: headBox.getSize(V(0, 0, 0)), crown: headBox.max.y - headBox.getCenter(V(0, 0, 0)).y, eyeCenter, eyeDistance, joints,
+  };
+  const result = { data, scale, point, joints, frame };
+  restCache.set(kind, result);
+  return result;
+}
+
+// поверхность одежды/тела спереди в покое: наибольшее z у вершин «колготок» около (x, y)
+export function frontOf(kind, x, y, spread = 0.025) {
+  const rest = restOf(kind), part = PARTS.tights;
+  let best = -Infinity;
+  for (let index = 0; index < part.source.length; index++) {
+    const point = rest.point(part.source[index]);
+    if (Math.abs(point.x - x) < spread && Math.abs(point.y - y) < spread) best = Math.max(best, point.z);
+  }
+  return best;
+}
+
+// покрытие волос: линия роста — высота над центром глаз (в долях расстояния между глазами) по углу вокруг головы:
+// 0 — лоб, π/2 — над ухом, π — затылок (центр головы по глубине — на 1 доле позади глаз). Брови — 0,4, макушка — около 2,
+// верх уха — 0,86. Возвращает 0..1 (мягкий край).
+const HAIRLINE = {
+  short: [[0, 1.25], [0.5, 1.25], [0.85, 1.1], [1.05, 0.8], [1.15, -0.15], [1.29, -0.15], [1.36, 0.92], [2.0, 0.92], [2.25, -0.3], [2.55, -1.35], [Math.PI, -1.35]],
+  long: [[0, 1.25], [0.5, 1.25], [0.95, 1.0], [1.3, 0.2], [1.9, -1.0], [2.4, -2.2], [Math.PI, -2.5]],
+};
+function hairCoverage(relative, style) {
+  if (style === 'bald') return 0;
+  const table = HAIRLINE[style] || HAIRLINE.short;
+  const angle = Math.atan2(Math.abs(relative.x), relative.z + 1.0);
+  let line = table[table.length - 1][1];
+  for (let index = 1; index < table.length; index++) {
+    if (angle <= table[index][0]) {
+      const [a0, h0] = table[index - 1], [a1, h1] = table[index];
+      line = h0 + (h1 - h0) * (angle - a0) / (a1 - a0);
+      break;
+    }
+  }
+  return smooth(line - 0.08, line + 0.06, relative.y);
+}
+function smooth(edge0, edge1, value) { const amount = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0))); return amount * amount * (3 - 2 * amount); }
+
+// options: kind, look (civilian.js), female, garments: [{ region: 'top'|..., offset, material }], hideHair, hairStyle
+// pose: { pelvis, pelvisQuat, torsoQuat, headQuat, hands: [правая, левая] (центр кисти), elbowPoles, feet (лодыжки), kneePole,
+//         footQuats, handsOnHead (кисти на затылке — считаются от головы) }
+export function buildHumanBody(options, pose) {
+  const { kind, look } = options;
+  const rest = restOf(kind);
+  const group = new THREE.Group();
+  // скелет: кости с единичным поворотом в покое, начало — голова кости
+  const bones = BONES.map((bone) => { const object = new THREE.Bone(); object.name = bone.name; return object; });
+  BONES.forEach((bone, index) => {
+    const head = rest.joints[bone.name][0];
+    if (bone.parent) { bones[BONE[bone.parent]].add(bones[index]); bones[index].position.copy(head).sub(rest.joints[bone.parent][0]); }
+    else bones[index].position.copy(head);
+  });
+  // обратные матрицы покоя: кость в покое — без поворота, в точке своей головы
+  const skeleton = new THREE.Skeleton(bones, BONES.map((bone) => new THREE.Matrix4().makeTranslation(rest.joints[bone.name][0].clone().negate())));
+  const root = bones[BONE.Root];
+
+  // ---- поза ----
+  const worldQuat = (name) => bones[BONE[name]].getWorldQuaternion(new THREE.Quaternion());
+  const worldPos = (name) => bones[BONE[name]].getWorldPosition(new THREE.Vector3());
+  const setWorld = (name, quaternion) => {
+    const bone = bones[BONE[name]];
+    bone.parent.updateWorldMatrix(true, false);
+    const parentQuat = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+    bone.quaternion.copy(parentQuat.invert().multiply(quaternion));
+    bone.updateMatrixWorld(true);
+  };
+  const restDir = (name) => rest.joints[name][1].clone().sub(rest.joints[name][0]).normalize();
+  // кость направить к точке; поворот вокруг оси — от basis (поворот родителя по цепи)
+  const aim = (name, target, basis) => {
+    const from = restDir(name).applyQuaternion(basis);
+    const to = target.clone().sub(worldPos(name)).normalize();
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(from, to).multiply(basis);
+    setWorld(name, quaternion);
+    return quaternion;
+  };
+  root.position.copy(pose.pelvis).sub(rest.joints.pelvis[0]).add(rest.joints.Root[0]);
+  root.updateMatrixWorld(true);
+  setWorld('pelvis', pose.pelvisQuat);
+  setWorld('spine_01', pose.pelvisQuat.clone().slerp(pose.torsoQuat, 0.4));
+  setWorld('spine_02', pose.pelvisQuat.clone().slerp(pose.torsoQuat, 0.75));
+  setWorld('spine_03', pose.torsoQuat);
+  for (const side of ['l', 'r']) setWorld('clavicle_' + side, pose.torsoQuat);
+  setWorld('neck_01', pose.torsoQuat.clone().slerp(pose.headQuat, 0.55));
+  setWorld('head', pose.headQuat);
+  // центр головы в позе
+  const headMatrix = bones[BONE.head].matrixWorld;
+  const headCenter = rest.frame.headCenter.clone().sub(rest.joints.head[0]).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(pose.headQuat)).add(worldPos('head'));
+  const headLocal = (x, y, z) => V(x, y, z).applyQuaternion(pose.headQuat).add(headCenter);
+
+  // руки: сторона 0 — правая (−x), 1 — левая (+x), как у прежней модели
+  const joints = { pelvis: pose.pelvis.clone(), head: headCenter.clone(), shoulders: [], elbows: [], hands: [], wrists: [], hips: [], knees: [], ankles: [] };
+  ['r', 'l'].forEach((side, number) => {
+    const upper = 'upperarm_' + side, lower = 'lowerarm_' + side, hand = 'hand_' + side;
+    const shoulder = worldPos(upper);
+    const upperLength = rest.joints[upper][0].distanceTo(rest.joints[lower][0]);
+    const lowerLength = rest.joints[lower][0].distanceTo(rest.joints[hand][0]);
+    const handTarget = pose.handsOnHead ? headLocal(number ? 0.07 : -0.07, 0.06, -0.09) : pose.hands[number].clone();
+    // запястье — немного выше центра кисти, к плечу
+    const toShoulder = shoulder.clone().sub(handTarget).normalize();
+    const wristTarget = handTarget.clone().addScaledVector(toShoulder, 0.075);
+    const elbow = solveTwoBone(shoulder, wristTarget, upperLength, lowerLength, pose.elbowPoles[number]);
+    const upperQuat = aim(upper, elbow, pose.torsoQuat);
+    const lowerQuat = aim(lower, wristTarget, upperQuat);
+    const wrist = worldPos(hand);
+    // кисть: продолжает предплечье; ладонь к бедру; при руках на затылке — к голове
+    const handQuat = aim(hand, wrist.clone().add(wrist.clone().sub(worldPos(lower)).normalize()), lowerQuat);
+    // пальцы чуть согнуты (расслабленная кисть)
+    const across = rest.joints['pinky_01_' + side][0].clone().sub(rest.joints['index_01_' + side][0]).normalize();
+    for (const finger of ['index', 'middle', 'ring', 'pinky']) {
+      for (const [segment, angle] of [['01', 0.25], ['02', 0.45], ['03', 0.35]]) {
+        const name = `${finger}_${segment}_${side}`;
+        const bone = bones[BONE[name]];
+        const axis = across.clone().multiplyScalar(side === 'l' ? 1 : -1);
+        bone.quaternion.setFromAxisAngle(axis, angle * (pose.handsOnHead ? 1.6 : 1));
+      }
+    }
+    for (const [segment, angle] of [['02', 0.2], ['03', 0.25]]) bones[BONE[`thumb_${segment}_${side}`]].quaternion.setFromAxisAngle(across, angle * (side === 'l' ? 1 : -1));
+    bones[BONE[hand]].updateMatrixWorld(true);
+    joints.shoulders[number] = shoulder; joints.elbows[number] = elbow.clone(); joints.wrists[number] = wrist.clone();
+    joints.hands[number] = wrist.clone().add(wrist.clone().sub(worldPos(lower)).normalize().multiplyScalar(0.07));
+    void handQuat;
+  });
+  // ноги
+  ['r', 'l'].forEach((side, number) => {
+    const thigh = 'thigh_' + side, calf = 'calf_' + side, foot = 'foot_' + side;
+    const hip = worldPos(thigh);
+    const thighLength = rest.joints[thigh][0].distanceTo(rest.joints[calf][0]);
+    const calfLength = rest.joints[calf][0].distanceTo(rest.joints[foot][0]);
+    const ankle = pose.feet[number].clone();
+    const knee = solveTwoBone(hip, ankle, thighLength, calfLength, pose.kneePole[number]);
+    const thighQuat = aim(thigh, knee, pose.pelvisQuat);
+    aim(calf, ankle, thighQuat);
+    setWorld(foot, pose.footQuats[number]);
+    setWorld('ball_' + side, pose.footQuats[number]);
+    joints.hips[number] = hip; joints.knees[number] = knee.clone(); joints.ankles[number] = worldPos(foot);
+  });
+  root.updateMatrixWorld(true);
+
+  // ---- сетки ----
+  const addSkinned = (geometry, material, name) => {
+    const mesh = new THREE.SkinnedMesh(geometry, material);
+    mesh.name = name;
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    group.add(mesh);
+    return mesh;
+  };
+  const restPoint = (part) => (index) => rest.point(part.source[index]);
+  const garments = options.garments || [];
+  // тело: без участков, закрытых плотной одеждой, и без стоп (обувь)
+  const covered = garments.filter((garment) => !garment.thin && garment.region).map((garment) => REGIONS[garment.region](rest.frame));
+  const bodyPart = PARTS.body;
+  const body = partGeometry(bodyPart, restPoint(bodyPart), {
+    keep: (index) => {
+      const source = bodyPart.source[index];
+      if (boneWeight(source, FOOT) > 0.45 && !options.bareFeet) return false;
+      const point = rest.point(source);
+      // тело под одеждой скрыто, но у краёв (шея, запястья, низ брюк) остаётся с запасом — без щелей у кромки
+      if (boneWeight(source, NECK) > 0.15 || boneWeight(source, HEAD) > 0 || boneWeight(source, HAND) > 0.05) return true;
+      return !covered.some((region) => COVER_PROBES.every((probe) => region(source, point.clone().add(probe))));
+    },
+  });
+  const bodyMesh = addSkinned(body, skinMaterial(kind), 'body');
+  // глаза и ресницы
+  const eyes = PARTS.eyes;
+  const eyeGeometry = partGeometry(eyes, (index) => V(rest.data.eyeRest[index * 3], rest.data.eyeRest[index * 3 + 1], rest.data.eyeRest[index * 3 + 2]).multiplyScalar(rest.scale), { skin: false });
+  const eyeCount = eyes.source.length;
+  const eyeSkinIndex = new Uint16Array(eyeCount * 4).fill(0), eyeSkinWeight = new Float32Array(eyeCount * 4).fill(0);
+  for (let index = 0; index < eyeCount; index++) { eyeSkinIndex[index * 4] = BONE.head; eyeSkinWeight[index * 4] = 1; }
+  eyeGeometry.setAttribute('skinIndex', new THREE.BufferAttribute(eyeSkinIndex, 4));
+  eyeGeometry.setAttribute('skinWeight', new THREE.BufferAttribute(eyeSkinWeight, 4));
+  addSkinned(eyeGeometry, eyeMaterial(), 'eyes');
+  addSkinned(partGeometry(PARTS.lashes, restPoint(PARTS.lashes)), lashMaterial(), 'lashes');
+
+  // одежда: слои по порядку, каждый над предыдущим
+  const frame0 = rest.frame;
+  for (const garment of garments) {
+    const part = garment.part === 'skirt' ? PARTS.skirt : PARTS.tights;
+    const region = garment.part === 'skirt' ? () => true : REGIONS[garment.region](rest.frame);
+    const inside = (index) => {
+      const source = part.source[index];
+      if (garment.part === 'skirt' && garment.open) {
+        // распашные полы (халат): разрез спереди
+        const point = rest.point(source);
+        if (Math.abs(point.x) < 0.035 && point.z > 0) return 0;
+      }
+      // полы до колена (халат): ниже колена отрезаны
+      if (garment.part === 'skirt' && garment.toKnee && rest.point(source).y < frame0.joints.calf_l[0].y + 0.02) return 0;
+      return region(source, rest.point(source)) ? 1 : 0;
+    };
+    // кромка по изолинии сглаженной маски
+    const mask = softMask(part, restPoint(part), inside, garment.part === 'skirt' ? 1 : 2);
+    const geometry = partGeometry(part, restPoint(part), { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
+    applyMask(geometry, mask);
+    if (garment.relax !== 0) relax(geometry, garment.relax || 5);
+    smoothNormals(geometry);
+    // свободная ткань: у брюк и рукавов внизу чуть шире
+    const looseness = garment.loose ?? 0.006;
+    // вырез у шеи прилегает к коже: иначе в зазор между тканью и телом видно тёмную щель
+    const tuck = garment.offset <= 0.012;
+    inflate(geometry, (index) => {
+      const point = rest.point(part.source[index]);
+      let offset = garment.offset + looseness * smooth(frame0.waist - 0.1, frame0.joints.foot_l[0].y + 0.1, point.y);
+      if (tuck && point.y > frame0.shoulderY - 0.06) offset *= 0.2 + 0.8 * smooth(0.5, 0.97, mask[index]);
+      return offset;
+    });
+    boxUV(geometry, garment.density || 2.4);
+    addSkinned(geometry, maskedMaterial(garment.material), 'garment');
+  }
+
+  // волосы: кожа головы, приподнятая там, где растут волосы; под капюшоном и шапочкой — нет
+  const style = options.hairStyle || 'short';
+  if (!options.hideHair && style !== 'bald') {
+    const frame = rest.frame;
+    const relative = (point) => point.clone().sub(frame.eyeCenter).divideScalar(frame.eyeDistance);
+    const long = style === 'long';
+    const thickness = long ? 0.013 : 0.007;
+    // длинные волосы спадают на шею и верх спины: полотно над одеждой (ниже затылка — выше слоя одежды)
+    const coverage = (index) => hairCoverage(relative(rest.point(bodyPart.source[index])), style);
+    // линия роста — изолиния сглаженной маски (alphaTest), без зубцов по треугольникам
+    const onHead = (index) => boneWeight(bodyPart.source[index], HEAD) + boneWeight(bodyPart.source[index], NECK) > 0.5;
+    const hairMask = softMask(bodyPart, restPoint(bodyPart), (index) => onHead(index) ? Math.min(1, coverage(index) * 2.5) : 0, 2);
+    const geometry = partGeometry(bodyPart, restPoint(bodyPart), { uvMode: 'none', keepAny: true, keep: (index) => onHead(index) && hairMask[index] > 0.5 });
+    applyMask(geometry, hairMask);
+    smoothNormals(geometry);
+    inflate(geometry, (index) => {
+      const point = relative(rest.point(bodyPart.source[index]));
+      const lift = -0.0015 + (thickness + 0.0015) * coverage(index) + (long ? 0 : 0.004 * coverage(index) * smooth(1.4, 2.2, point.y));
+      return lift;
+    });
+    // UV волос: вокруг головы и сверху вниз (пряди вдоль v)
+    const position = geometry.attributes.position, uv = new Float32Array(position.count * 2);
+    for (let index = 0; index < position.count; index++) {
+      const x = position.getX(index) - frame.headCenter.x, y = position.getY(index) - frame.headCenter.y, z = position.getZ(index) - frame.headCenter.z;
+      uv[index * 2] = (Math.atan2(x, z) / (Math.PI * 2) + 0.5) * 3;
+      uv[index * 2 + 1] = y * 4 + Math.sqrt(x * x + z * z) * 2;
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    addSkinned(geometry, maskedMaterial(hairMaterial(look.hairColor || rest.data.hair)), 'hair');
+  }
+  // привязать все сетки к скелету (покой — единичная матрица группы)
+  group.add(root);
+  group.updateMatrixWorld(true);
+  for (const mesh of group.children) if (mesh.isSkinnedMesh) mesh.bind(skeleton, new THREE.Matrix4());
+  // поза выставлена до привязки: перевычислить кости
+  skeleton.update();
+
+  // точка в рамке корпуса (как local() у прежней модели) по высоте над тазом покоя, с учётом поверхности спереди
+  const spineMatrix = bones[BONE.spine_03].matrixWorld, pelvisMatrix = bones[BONE.pelvis].matrixWorld;
+  const restSpine = rest.joints.spine_03[0], restPelvis = rest.joints.pelvis[0];
+  const torsoPoint = (x, y, z) => V(x, y, z).sub(restSpine).applyMatrix4(spineMatrix);
+  const hipPoint = (x, y, z) => V(x, y, z).sub(restPelvis).applyMatrix4(pelvisMatrix);
+  return { group, skeleton, bones, joints, headCenter, headLocal, torsoPoint, hipPoint, rest, bodyMesh, front: (x, y, spread) => frontOf(kind, x, y, spread), headMatrix };
+}

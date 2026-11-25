@@ -1,0 +1,3677 @@
+[
+{
+"name": "civman_idle",
+"options": {
+"civilian": "man",
+"pose": "idle"
+}
+},
+{
+"name": "civman_cower",
+"options": {
+"civilian": "man",
+"pose": "cower"
+}
+},
+{
+"name": "civman_walk_f0",
+"options": {
+"civilian": "man",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civman_walk_f1",
+"options": {
+"civilian": "man",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civman_walk_f2",
+"options": {
+"civilian": "man",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civman_walk_f3",
+"options": {
+"civilian": "man",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civman_walk_f4",
+"options": {
+"civilian": "man",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civman_walk_f5",
+"options": {
+"civilian": "man",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civman_walk_f6",
+"options": {
+"civilian": "man",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civman_walk_f7",
+"options": {
+"civilian": "man",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civman_walk_f8",
+"options": {
+"civilian": "man",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civman_walk_f9",
+"options": {
+"civilian": "man",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civman_walk_f10",
+"options": {
+"civilian": "man",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civman_walk_f11",
+"options": {
+"civilian": "man",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civman_walk_f12",
+"options": {
+"civilian": "man",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civman_walk_f13",
+"options": {
+"civilian": "man",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civman_walk_f14",
+"options": {
+"civilian": "man",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civman_walk_f15",
+"options": {
+"civilian": "man",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civman_fall_f0",
+"options": {
+"civilian": "man",
+"fall": 0.1429
+}
+},
+{
+"name": "civman_fall_f1",
+"options": {
+"civilian": "man",
+"fall": 0.2857
+}
+},
+{
+"name": "civman_fall_f2",
+"options": {
+"civilian": "man",
+"fall": 0.4286
+}
+},
+{
+"name": "civman_fall_f3",
+"options": {
+"civilian": "man",
+"fall": 0.5714
+}
+},
+{
+"name": "civman_fall_f4",
+"options": {
+"civilian": "man",
+"fall": 0.7143
+}
+},
+{
+"name": "civman_fall_f5",
+"options": {
+"civilian": "man",
+"fall": 0.8571
+}
+},
+{
+"name": "civman_dead",
+"options": {
+"civilian": "man",
+"dead": true
+}
+},
+{
+"name": "civwoman_idle",
+"options": {
+"civilian": "woman",
+"pose": "idle"
+}
+},
+{
+"name": "civwoman_cower",
+"options": {
+"civilian": "woman",
+"pose": "cower"
+}
+},
+{
+"name": "civwoman_walk_f0",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civwoman_walk_f1",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civwoman_walk_f2",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civwoman_walk_f3",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civwoman_walk_f4",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civwoman_walk_f5",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civwoman_walk_f6",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civwoman_walk_f7",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civwoman_walk_f8",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civwoman_walk_f9",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civwoman_walk_f10",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civwoman_walk_f11",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civwoman_walk_f12",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civwoman_walk_f13",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civwoman_walk_f14",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civwoman_walk_f15",
+"options": {
+"civilian": "woman",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civwoman_fall_f0",
+"options": {
+"civilian": "woman",
+"fall": 0.1429
+}
+},
+{
+"name": "civwoman_fall_f1",
+"options": {
+"civilian": "woman",
+"fall": 0.2857
+}
+},
+{
+"name": "civwoman_fall_f2",
+"options": {
+"civilian": "woman",
+"fall": 0.4286
+}
+},
+{
+"name": "civwoman_fall_f3",
+"options": {
+"civilian": "woman",
+"fall": 0.5714
+}
+},
+{
+"name": "civwoman_fall_f4",
+"options": {
+"civilian": "woman",
+"fall": 0.7143
+}
+},
+{
+"name": "civwoman_fall_f5",
+"options": {
+"civilian": "woman",
+"fall": 0.8571
+}
+},
+{
+"name": "civwoman_dead",
+"options": {
+"civilian": "woman",
+"dead": true
+}
+},
+{
+"name": "civscientist_idle",
+"options": {
+"civilian": "scientist",
+"pose": "idle"
+}
+},
+{
+"name": "civscientist_cower",
+"options": {
+"civilian": "scientist",
+"pose": "cower"
+}
+},
+{
+"name": "civscientist_walk_f0",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civscientist_walk_f1",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civscientist_walk_f2",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civscientist_walk_f3",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civscientist_walk_f4",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civscientist_walk_f5",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civscientist_walk_f6",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civscientist_walk_f7",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civscientist_walk_f8",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civscientist_walk_f9",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civscientist_walk_f10",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civscientist_walk_f11",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civscientist_walk_f12",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civscientist_walk_f13",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civscientist_walk_f14",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civscientist_walk_f15",
+"options": {
+"civilian": "scientist",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civscientist_fall_f0",
+"options": {
+"civilian": "scientist",
+"fall": 0.1429
+}
+},
+{
+"name": "civscientist_fall_f1",
+"options": {
+"civilian": "scientist",
+"fall": 0.2857
+}
+},
+{
+"name": "civscientist_fall_f2",
+"options": {
+"civilian": "scientist",
+"fall": 0.4286
+}
+},
+{
+"name": "civscientist_fall_f3",
+"options": {
+"civilian": "scientist",
+"fall": 0.5714
+}
+},
+{
+"name": "civscientist_fall_f4",
+"options": {
+"civilian": "scientist",
+"fall": 0.7143
+}
+},
+{
+"name": "civscientist_fall_f5",
+"options": {
+"civilian": "scientist",
+"fall": 0.8571
+}
+},
+{
+"name": "civscientist_dead",
+"options": {
+"civilian": "scientist",
+"dead": true
+}
+},
+{
+"name": "civengineer_idle",
+"options": {
+"civilian": "engineer",
+"pose": "idle"
+}
+},
+{
+"name": "civengineer_cower",
+"options": {
+"civilian": "engineer",
+"pose": "cower"
+}
+},
+{
+"name": "civengineer_walk_f0",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civengineer_walk_f1",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civengineer_walk_f2",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civengineer_walk_f3",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civengineer_walk_f4",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civengineer_walk_f5",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civengineer_walk_f6",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civengineer_walk_f7",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civengineer_walk_f8",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civengineer_walk_f9",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civengineer_walk_f10",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civengineer_walk_f11",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civengineer_walk_f12",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civengineer_walk_f13",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civengineer_walk_f14",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civengineer_walk_f15",
+"options": {
+"civilian": "engineer",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civengineer_fall_f0",
+"options": {
+"civilian": "engineer",
+"fall": 0.1429
+}
+},
+{
+"name": "civengineer_fall_f1",
+"options": {
+"civilian": "engineer",
+"fall": 0.2857
+}
+},
+{
+"name": "civengineer_fall_f2",
+"options": {
+"civilian": "engineer",
+"fall": 0.4286
+}
+},
+{
+"name": "civengineer_fall_f3",
+"options": {
+"civilian": "engineer",
+"fall": 0.5714
+}
+},
+{
+"name": "civengineer_fall_f4",
+"options": {
+"civilian": "engineer",
+"fall": 0.7143
+}
+},
+{
+"name": "civengineer_fall_f5",
+"options": {
+"civilian": "engineer",
+"fall": 0.8571
+}
+},
+{
+"name": "civengineer_dead",
+"options": {
+"civilian": "engineer",
+"dead": true
+}
+},
+{
+"name": "civworker_idle",
+"options": {
+"civilian": "worker",
+"pose": "idle"
+}
+},
+{
+"name": "civworker_cower",
+"options": {
+"civilian": "worker",
+"pose": "cower"
+}
+},
+{
+"name": "civworker_walk_f0",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civworker_walk_f1",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civworker_walk_f2",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civworker_walk_f3",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civworker_walk_f4",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civworker_walk_f5",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civworker_walk_f6",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civworker_walk_f7",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civworker_walk_f8",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civworker_walk_f9",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civworker_walk_f10",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civworker_walk_f11",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civworker_walk_f12",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civworker_walk_f13",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civworker_walk_f14",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civworker_walk_f15",
+"options": {
+"civilian": "worker",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civworker_fall_f0",
+"options": {
+"civilian": "worker",
+"fall": 0.1429
+}
+},
+{
+"name": "civworker_fall_f1",
+"options": {
+"civilian": "worker",
+"fall": 0.2857
+}
+},
+{
+"name": "civworker_fall_f2",
+"options": {
+"civilian": "worker",
+"fall": 0.4286
+}
+},
+{
+"name": "civworker_fall_f3",
+"options": {
+"civilian": "worker",
+"fall": 0.5714
+}
+},
+{
+"name": "civworker_fall_f4",
+"options": {
+"civilian": "worker",
+"fall": 0.7143
+}
+},
+{
+"name": "civworker_fall_f5",
+"options": {
+"civilian": "worker",
+"fall": 0.8571
+}
+},
+{
+"name": "civworker_dead",
+"options": {
+"civilian": "worker",
+"dead": true
+}
+},
+{
+"name": "civboy_idle",
+"options": {
+"civilian": "boy",
+"pose": "idle"
+}
+},
+{
+"name": "civboy_cower",
+"options": {
+"civilian": "boy",
+"pose": "cower"
+}
+},
+{
+"name": "civboy_walk_f0",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civboy_walk_f1",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civboy_walk_f2",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civboy_walk_f3",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civboy_walk_f4",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civboy_walk_f5",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civboy_walk_f6",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civboy_walk_f7",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civboy_walk_f8",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civboy_walk_f9",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civboy_walk_f10",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civboy_walk_f11",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civboy_walk_f12",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civboy_walk_f13",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civboy_walk_f14",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civboy_walk_f15",
+"options": {
+"civilian": "boy",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civboy_fall_f0",
+"options": {
+"civilian": "boy",
+"fall": 0.1429
+}
+},
+{
+"name": "civboy_fall_f1",
+"options": {
+"civilian": "boy",
+"fall": 0.2857
+}
+},
+{
+"name": "civboy_fall_f2",
+"options": {
+"civilian": "boy",
+"fall": 0.4286
+}
+},
+{
+"name": "civboy_fall_f3",
+"options": {
+"civilian": "boy",
+"fall": 0.5714
+}
+},
+{
+"name": "civboy_fall_f4",
+"options": {
+"civilian": "boy",
+"fall": 0.7143
+}
+},
+{
+"name": "civboy_fall_f5",
+"options": {
+"civilian": "boy",
+"fall": 0.8571
+}
+},
+{
+"name": "civboy_dead",
+"options": {
+"civilian": "boy",
+"dead": true
+}
+},
+{
+"name": "civgirl_idle",
+"options": {
+"civilian": "girl",
+"pose": "idle"
+}
+},
+{
+"name": "civgirl_cower",
+"options": {
+"civilian": "girl",
+"pose": "cower"
+}
+},
+{
+"name": "civgirl_walk_f0",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civgirl_walk_f1",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civgirl_walk_f2",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civgirl_walk_f3",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civgirl_walk_f4",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civgirl_walk_f5",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civgirl_walk_f6",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civgirl_walk_f7",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civgirl_walk_f8",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civgirl_walk_f9",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civgirl_walk_f10",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civgirl_walk_f11",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civgirl_walk_f12",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civgirl_walk_f13",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civgirl_walk_f14",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civgirl_walk_f15",
+"options": {
+"civilian": "girl",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civgirl_fall_f0",
+"options": {
+"civilian": "girl",
+"fall": 0.1429
+}
+},
+{
+"name": "civgirl_fall_f1",
+"options": {
+"civilian": "girl",
+"fall": 0.2857
+}
+},
+{
+"name": "civgirl_fall_f2",
+"options": {
+"civilian": "girl",
+"fall": 0.4286
+}
+},
+{
+"name": "civgirl_fall_f3",
+"options": {
+"civilian": "girl",
+"fall": 0.5714
+}
+},
+{
+"name": "civgirl_fall_f4",
+"options": {
+"civilian": "girl",
+"fall": 0.7143
+}
+},
+{
+"name": "civgirl_fall_f5",
+"options": {
+"civilian": "girl",
+"fall": 0.8571
+}
+},
+{
+"name": "civgirl_dead",
+"options": {
+"civilian": "girl",
+"dead": true
+}
+},
+{
+"name": "civcommander_idle",
+"options": {
+"civilian": "commander",
+"pose": "idle"
+}
+},
+{
+"name": "civcommander_cower",
+"options": {
+"civilian": "commander",
+"pose": "cower"
+}
+},
+{
+"name": "civcommander_walk_f0",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civcommander_walk_f1",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civcommander_walk_f2",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civcommander_walk_f3",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civcommander_walk_f4",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civcommander_walk_f5",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civcommander_walk_f6",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civcommander_walk_f7",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civcommander_walk_f8",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civcommander_walk_f9",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civcommander_walk_f10",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civcommander_walk_f11",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civcommander_walk_f12",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civcommander_walk_f13",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civcommander_walk_f14",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civcommander_walk_f15",
+"options": {
+"civilian": "commander",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civcommander_fall_f0",
+"options": {
+"civilian": "commander",
+"fall": 0.1429
+}
+},
+{
+"name": "civcommander_fall_f1",
+"options": {
+"civilian": "commander",
+"fall": 0.2857
+}
+},
+{
+"name": "civcommander_fall_f2",
+"options": {
+"civilian": "commander",
+"fall": 0.4286
+}
+},
+{
+"name": "civcommander_fall_f3",
+"options": {
+"civilian": "commander",
+"fall": 0.5714
+}
+},
+{
+"name": "civcommander_fall_f4",
+"options": {
+"civilian": "commander",
+"fall": 0.7143
+}
+},
+{
+"name": "civcommander_fall_f5",
+"options": {
+"civilian": "commander",
+"fall": 0.8571
+}
+},
+{
+"name": "civcommander_dead",
+"options": {
+"civilian": "commander",
+"dead": true
+}
+},
+{
+"name": "civofficer_idle",
+"options": {
+"civilian": "officer",
+"pose": "idle"
+}
+},
+{
+"name": "civofficer_cower",
+"options": {
+"civilian": "officer",
+"pose": "cower"
+}
+},
+{
+"name": "civofficer_walk_f0",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civofficer_walk_f1",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civofficer_walk_f2",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civofficer_walk_f3",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civofficer_walk_f4",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civofficer_walk_f5",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civofficer_walk_f6",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civofficer_walk_f7",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civofficer_walk_f8",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civofficer_walk_f9",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civofficer_walk_f10",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civofficer_walk_f11",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civofficer_walk_f12",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civofficer_walk_f13",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civofficer_walk_f14",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civofficer_walk_f15",
+"options": {
+"civilian": "officer",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civofficer_fall_f0",
+"options": {
+"civilian": "officer",
+"fall": 0.1429
+}
+},
+{
+"name": "civofficer_fall_f1",
+"options": {
+"civilian": "officer",
+"fall": 0.2857
+}
+},
+{
+"name": "civofficer_fall_f2",
+"options": {
+"civilian": "officer",
+"fall": 0.4286
+}
+},
+{
+"name": "civofficer_fall_f3",
+"options": {
+"civilian": "officer",
+"fall": 0.5714
+}
+},
+{
+"name": "civofficer_fall_f4",
+"options": {
+"civilian": "officer",
+"fall": 0.7143
+}
+},
+{
+"name": "civofficer_fall_f5",
+"options": {
+"civilian": "officer",
+"fall": 0.8571
+}
+},
+{
+"name": "civofficer_dead",
+"options": {
+"civilian": "officer",
+"dead": true
+}
+},
+{
+"name": "civdoctor_idle",
+"options": {
+"civilian": "doctor",
+"pose": "idle"
+}
+},
+{
+"name": "civdoctor_cower",
+"options": {
+"civilian": "doctor",
+"pose": "cower"
+}
+},
+{
+"name": "civdoctor_walk_f0",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civdoctor_walk_f1",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civdoctor_walk_f2",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civdoctor_walk_f3",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civdoctor_walk_f4",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civdoctor_walk_f5",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civdoctor_walk_f6",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civdoctor_walk_f7",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civdoctor_walk_f8",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civdoctor_walk_f9",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civdoctor_walk_f10",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civdoctor_walk_f11",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civdoctor_walk_f12",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civdoctor_walk_f13",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civdoctor_walk_f14",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civdoctor_walk_f15",
+"options": {
+"civilian": "doctor",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civdoctor_fall_f0",
+"options": {
+"civilian": "doctor",
+"fall": 0.1429
+}
+},
+{
+"name": "civdoctor_fall_f1",
+"options": {
+"civilian": "doctor",
+"fall": 0.2857
+}
+},
+{
+"name": "civdoctor_fall_f2",
+"options": {
+"civilian": "doctor",
+"fall": 0.4286
+}
+},
+{
+"name": "civdoctor_fall_f3",
+"options": {
+"civilian": "doctor",
+"fall": 0.5714
+}
+},
+{
+"name": "civdoctor_fall_f4",
+"options": {
+"civilian": "doctor",
+"fall": 0.7143
+}
+},
+{
+"name": "civdoctor_fall_f5",
+"options": {
+"civilian": "doctor",
+"fall": 0.8571
+}
+},
+{
+"name": "civdoctor_dead",
+"options": {
+"civilian": "doctor",
+"dead": true
+}
+},
+{
+"name": "civsurgeon_idle",
+"options": {
+"civilian": "surgeon",
+"pose": "idle"
+}
+},
+{
+"name": "civsurgeon_cower",
+"options": {
+"civilian": "surgeon",
+"pose": "cower"
+}
+},
+{
+"name": "civsurgeon_walk_f0",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civsurgeon_walk_f1",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civsurgeon_walk_f2",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civsurgeon_walk_f3",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civsurgeon_walk_f4",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civsurgeon_walk_f5",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civsurgeon_walk_f6",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civsurgeon_walk_f7",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civsurgeon_walk_f8",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civsurgeon_walk_f9",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civsurgeon_walk_f10",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civsurgeon_walk_f11",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civsurgeon_walk_f12",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civsurgeon_walk_f13",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civsurgeon_walk_f14",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civsurgeon_walk_f15",
+"options": {
+"civilian": "surgeon",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civsurgeon_fall_f0",
+"options": {
+"civilian": "surgeon",
+"fall": 0.1429
+}
+},
+{
+"name": "civsurgeon_fall_f1",
+"options": {
+"civilian": "surgeon",
+"fall": 0.2857
+}
+},
+{
+"name": "civsurgeon_fall_f2",
+"options": {
+"civilian": "surgeon",
+"fall": 0.4286
+}
+},
+{
+"name": "civsurgeon_fall_f3",
+"options": {
+"civilian": "surgeon",
+"fall": 0.5714
+}
+},
+{
+"name": "civsurgeon_fall_f4",
+"options": {
+"civilian": "surgeon",
+"fall": 0.7143
+}
+},
+{
+"name": "civsurgeon_fall_f5",
+"options": {
+"civilian": "surgeon",
+"fall": 0.8571
+}
+},
+{
+"name": "civsurgeon_dead",
+"options": {
+"civilian": "surgeon",
+"dead": true
+}
+},
+{
+"name": "civnurse_idle",
+"options": {
+"civilian": "nurse",
+"pose": "idle"
+}
+},
+{
+"name": "civnurse_cower",
+"options": {
+"civilian": "nurse",
+"pose": "cower"
+}
+},
+{
+"name": "civnurse_walk_f0",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civnurse_walk_f1",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civnurse_walk_f2",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civnurse_walk_f3",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civnurse_walk_f4",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civnurse_walk_f5",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civnurse_walk_f6",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civnurse_walk_f7",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civnurse_walk_f8",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civnurse_walk_f9",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civnurse_walk_f10",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civnurse_walk_f11",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civnurse_walk_f12",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civnurse_walk_f13",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civnurse_walk_f14",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civnurse_walk_f15",
+"options": {
+"civilian": "nurse",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civnurse_fall_f0",
+"options": {
+"civilian": "nurse",
+"fall": 0.1429
+}
+},
+{
+"name": "civnurse_fall_f1",
+"options": {
+"civilian": "nurse",
+"fall": 0.2857
+}
+},
+{
+"name": "civnurse_fall_f2",
+"options": {
+"civilian": "nurse",
+"fall": 0.4286
+}
+},
+{
+"name": "civnurse_fall_f3",
+"options": {
+"civilian": "nurse",
+"fall": 0.5714
+}
+},
+{
+"name": "civnurse_fall_f4",
+"options": {
+"civilian": "nurse",
+"fall": 0.7143
+}
+},
+{
+"name": "civnurse_fall_f5",
+"options": {
+"civilian": "nurse",
+"fall": 0.8571
+}
+},
+{
+"name": "civnurse_dead",
+"options": {
+"civilian": "nurse",
+"dead": true
+}
+},
+{
+"name": "civlabwoman_idle",
+"options": {
+"civilian": "labwoman",
+"pose": "idle"
+}
+},
+{
+"name": "civlabwoman_cower",
+"options": {
+"civilian": "labwoman",
+"pose": "cower"
+}
+},
+{
+"name": "civlabwoman_walk_f0",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civlabwoman_walk_f1",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civlabwoman_walk_f2",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civlabwoman_walk_f3",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civlabwoman_walk_f4",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civlabwoman_walk_f5",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civlabwoman_walk_f6",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civlabwoman_walk_f7",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civlabwoman_walk_f8",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civlabwoman_walk_f9",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civlabwoman_walk_f10",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civlabwoman_walk_f11",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civlabwoman_walk_f12",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civlabwoman_walk_f13",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civlabwoman_walk_f14",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civlabwoman_walk_f15",
+"options": {
+"civilian": "labwoman",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civlabwoman_fall_f0",
+"options": {
+"civilian": "labwoman",
+"fall": 0.1429
+}
+},
+{
+"name": "civlabwoman_fall_f1",
+"options": {
+"civilian": "labwoman",
+"fall": 0.2857
+}
+},
+{
+"name": "civlabwoman_fall_f2",
+"options": {
+"civilian": "labwoman",
+"fall": 0.4286
+}
+},
+{
+"name": "civlabwoman_fall_f3",
+"options": {
+"civilian": "labwoman",
+"fall": 0.5714
+}
+},
+{
+"name": "civlabwoman_fall_f4",
+"options": {
+"civilian": "labwoman",
+"fall": 0.7143
+}
+},
+{
+"name": "civlabwoman_fall_f5",
+"options": {
+"civilian": "labwoman",
+"fall": 0.8571
+}
+},
+{
+"name": "civlabwoman_dead",
+"options": {
+"civilian": "labwoman",
+"dead": true
+}
+},
+{
+"name": "civhazmat_idle",
+"options": {
+"civilian": "hazmat",
+"pose": "idle"
+}
+},
+{
+"name": "civhazmat_cower",
+"options": {
+"civilian": "hazmat",
+"pose": "cower"
+}
+},
+{
+"name": "civhazmat_walk_f0",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civhazmat_walk_f1",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civhazmat_walk_f2",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civhazmat_walk_f3",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civhazmat_walk_f4",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civhazmat_walk_f5",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civhazmat_walk_f6",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civhazmat_walk_f7",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civhazmat_walk_f8",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civhazmat_walk_f9",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civhazmat_walk_f10",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civhazmat_walk_f11",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civhazmat_walk_f12",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civhazmat_walk_f13",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civhazmat_walk_f14",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civhazmat_walk_f15",
+"options": {
+"civilian": "hazmat",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civhazmat_fall_f0",
+"options": {
+"civilian": "hazmat",
+"fall": 0.1429
+}
+},
+{
+"name": "civhazmat_fall_f1",
+"options": {
+"civilian": "hazmat",
+"fall": 0.2857
+}
+},
+{
+"name": "civhazmat_fall_f2",
+"options": {
+"civilian": "hazmat",
+"fall": 0.4286
+}
+},
+{
+"name": "civhazmat_fall_f3",
+"options": {
+"civilian": "hazmat",
+"fall": 0.5714
+}
+},
+{
+"name": "civhazmat_fall_f4",
+"options": {
+"civilian": "hazmat",
+"fall": 0.7143
+}
+},
+{
+"name": "civhazmat_fall_f5",
+"options": {
+"civilian": "hazmat",
+"fall": 0.8571
+}
+},
+{
+"name": "civhazmat_dead",
+"options": {
+"civilian": "hazmat",
+"dead": true
+}
+},
+{
+"name": "civengineerw_idle",
+"options": {
+"civilian": "engineerw",
+"pose": "idle"
+}
+},
+{
+"name": "civengineerw_cower",
+"options": {
+"civilian": "engineerw",
+"pose": "cower"
+}
+},
+{
+"name": "civengineerw_walk_f0",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civengineerw_walk_f1",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civengineerw_walk_f2",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civengineerw_walk_f3",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civengineerw_walk_f4",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civengineerw_walk_f5",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civengineerw_walk_f6",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civengineerw_walk_f7",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civengineerw_walk_f8",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civengineerw_walk_f9",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civengineerw_walk_f10",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civengineerw_walk_f11",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civengineerw_walk_f12",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civengineerw_walk_f13",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civengineerw_walk_f14",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civengineerw_walk_f15",
+"options": {
+"civilian": "engineerw",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civengineerw_fall_f0",
+"options": {
+"civilian": "engineerw",
+"fall": 0.1429
+}
+},
+{
+"name": "civengineerw_fall_f1",
+"options": {
+"civilian": "engineerw",
+"fall": 0.2857
+}
+},
+{
+"name": "civengineerw_fall_f2",
+"options": {
+"civilian": "engineerw",
+"fall": 0.4286
+}
+},
+{
+"name": "civengineerw_fall_f3",
+"options": {
+"civilian": "engineerw",
+"fall": 0.5714
+}
+},
+{
+"name": "civengineerw_fall_f4",
+"options": {
+"civilian": "engineerw",
+"fall": 0.7143
+}
+},
+{
+"name": "civengineerw_fall_f5",
+"options": {
+"civilian": "engineerw",
+"fall": 0.8571
+}
+},
+{
+"name": "civengineerw_dead",
+"options": {
+"civilian": "engineerw",
+"dead": true
+}
+},
+{
+"name": "civelectrician_idle",
+"options": {
+"civilian": "electrician",
+"pose": "idle"
+}
+},
+{
+"name": "civelectrician_cower",
+"options": {
+"civilian": "electrician",
+"pose": "cower"
+}
+},
+{
+"name": "civelectrician_walk_f0",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civelectrician_walk_f1",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civelectrician_walk_f2",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civelectrician_walk_f3",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civelectrician_walk_f4",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civelectrician_walk_f5",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civelectrician_walk_f6",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civelectrician_walk_f7",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civelectrician_walk_f8",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civelectrician_walk_f9",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civelectrician_walk_f10",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civelectrician_walk_f11",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civelectrician_walk_f12",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civelectrician_walk_f13",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civelectrician_walk_f14",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civelectrician_walk_f15",
+"options": {
+"civilian": "electrician",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civelectrician_fall_f0",
+"options": {
+"civilian": "electrician",
+"fall": 0.1429
+}
+},
+{
+"name": "civelectrician_fall_f1",
+"options": {
+"civilian": "electrician",
+"fall": 0.2857
+}
+},
+{
+"name": "civelectrician_fall_f2",
+"options": {
+"civilian": "electrician",
+"fall": 0.4286
+}
+},
+{
+"name": "civelectrician_fall_f3",
+"options": {
+"civilian": "electrician",
+"fall": 0.5714
+}
+},
+{
+"name": "civelectrician_fall_f4",
+"options": {
+"civilian": "electrician",
+"fall": 0.7143
+}
+},
+{
+"name": "civelectrician_fall_f5",
+"options": {
+"civilian": "electrician",
+"fall": 0.8571
+}
+},
+{
+"name": "civelectrician_dead",
+"options": {
+"civilian": "electrician",
+"dead": true
+}
+},
+{
+"name": "civplumber_idle",
+"options": {
+"civilian": "plumber",
+"pose": "idle"
+}
+},
+{
+"name": "civplumber_cower",
+"options": {
+"civilian": "plumber",
+"pose": "cower"
+}
+},
+{
+"name": "civplumber_walk_f0",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civplumber_walk_f1",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civplumber_walk_f2",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civplumber_walk_f3",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civplumber_walk_f4",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civplumber_walk_f5",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civplumber_walk_f6",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civplumber_walk_f7",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civplumber_walk_f8",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civplumber_walk_f9",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civplumber_walk_f10",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civplumber_walk_f11",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civplumber_walk_f12",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civplumber_walk_f13",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civplumber_walk_f14",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civplumber_walk_f15",
+"options": {
+"civilian": "plumber",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civplumber_fall_f0",
+"options": {
+"civilian": "plumber",
+"fall": 0.1429
+}
+},
+{
+"name": "civplumber_fall_f1",
+"options": {
+"civilian": "plumber",
+"fall": 0.2857
+}
+},
+{
+"name": "civplumber_fall_f2",
+"options": {
+"civilian": "plumber",
+"fall": 0.4286
+}
+},
+{
+"name": "civplumber_fall_f3",
+"options": {
+"civilian": "plumber",
+"fall": 0.5714
+}
+},
+{
+"name": "civplumber_fall_f4",
+"options": {
+"civilian": "plumber",
+"fall": 0.7143
+}
+},
+{
+"name": "civplumber_fall_f5",
+"options": {
+"civilian": "plumber",
+"fall": 0.8571
+}
+},
+{
+"name": "civplumber_dead",
+"options": {
+"civilian": "plumber",
+"dead": true
+}
+},
+{
+"name": "civcook_idle",
+"options": {
+"civilian": "cook",
+"pose": "idle"
+}
+},
+{
+"name": "civcook_cower",
+"options": {
+"civilian": "cook",
+"pose": "cower"
+}
+},
+{
+"name": "civcook_walk_f0",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civcook_walk_f1",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civcook_walk_f2",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civcook_walk_f3",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civcook_walk_f4",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civcook_walk_f5",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civcook_walk_f6",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civcook_walk_f7",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civcook_walk_f8",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civcook_walk_f9",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civcook_walk_f10",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civcook_walk_f11",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civcook_walk_f12",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civcook_walk_f13",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civcook_walk_f14",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civcook_walk_f15",
+"options": {
+"civilian": "cook",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civcook_fall_f0",
+"options": {
+"civilian": "cook",
+"fall": 0.1429
+}
+},
+{
+"name": "civcook_fall_f1",
+"options": {
+"civilian": "cook",
+"fall": 0.2857
+}
+},
+{
+"name": "civcook_fall_f2",
+"options": {
+"civilian": "cook",
+"fall": 0.4286
+}
+},
+{
+"name": "civcook_fall_f3",
+"options": {
+"civilian": "cook",
+"fall": 0.5714
+}
+},
+{
+"name": "civcook_fall_f4",
+"options": {
+"civilian": "cook",
+"fall": 0.7143
+}
+},
+{
+"name": "civcook_fall_f5",
+"options": {
+"civilian": "cook",
+"fall": 0.8571
+}
+},
+{
+"name": "civcook_dead",
+"options": {
+"civilian": "cook",
+"dead": true
+}
+},
+{
+"name": "civcookw_idle",
+"options": {
+"civilian": "cookw",
+"pose": "idle"
+}
+},
+{
+"name": "civcookw_cower",
+"options": {
+"civilian": "cookw",
+"pose": "cower"
+}
+},
+{
+"name": "civcookw_walk_f0",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civcookw_walk_f1",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civcookw_walk_f2",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civcookw_walk_f3",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civcookw_walk_f4",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civcookw_walk_f5",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civcookw_walk_f6",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civcookw_walk_f7",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civcookw_walk_f8",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civcookw_walk_f9",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civcookw_walk_f10",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civcookw_walk_f11",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civcookw_walk_f12",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civcookw_walk_f13",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civcookw_walk_f14",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civcookw_walk_f15",
+"options": {
+"civilian": "cookw",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civcookw_fall_f0",
+"options": {
+"civilian": "cookw",
+"fall": 0.1429
+}
+},
+{
+"name": "civcookw_fall_f1",
+"options": {
+"civilian": "cookw",
+"fall": 0.2857
+}
+},
+{
+"name": "civcookw_fall_f2",
+"options": {
+"civilian": "cookw",
+"fall": 0.4286
+}
+},
+{
+"name": "civcookw_fall_f3",
+"options": {
+"civilian": "cookw",
+"fall": 0.5714
+}
+},
+{
+"name": "civcookw_fall_f4",
+"options": {
+"civilian": "cookw",
+"fall": 0.7143
+}
+},
+{
+"name": "civcookw_fall_f5",
+"options": {
+"civilian": "cookw",
+"fall": 0.8571
+}
+},
+{
+"name": "civcookw_dead",
+"options": {
+"civilian": "cookw",
+"dead": true
+}
+},
+{
+"name": "civcleaner_idle",
+"options": {
+"civilian": "cleaner",
+"pose": "idle"
+}
+},
+{
+"name": "civcleaner_cower",
+"options": {
+"civilian": "cleaner",
+"pose": "cower"
+}
+},
+{
+"name": "civcleaner_walk_f0",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civcleaner_walk_f1",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civcleaner_walk_f2",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civcleaner_walk_f3",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civcleaner_walk_f4",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civcleaner_walk_f5",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civcleaner_walk_f6",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civcleaner_walk_f7",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civcleaner_walk_f8",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civcleaner_walk_f9",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civcleaner_walk_f10",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civcleaner_walk_f11",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civcleaner_walk_f12",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civcleaner_walk_f13",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civcleaner_walk_f14",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civcleaner_walk_f15",
+"options": {
+"civilian": "cleaner",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civcleaner_fall_f0",
+"options": {
+"civilian": "cleaner",
+"fall": 0.1429
+}
+},
+{
+"name": "civcleaner_fall_f1",
+"options": {
+"civilian": "cleaner",
+"fall": 0.2857
+}
+},
+{
+"name": "civcleaner_fall_f2",
+"options": {
+"civilian": "cleaner",
+"fall": 0.4286
+}
+},
+{
+"name": "civcleaner_fall_f3",
+"options": {
+"civilian": "cleaner",
+"fall": 0.5714
+}
+},
+{
+"name": "civcleaner_fall_f4",
+"options": {
+"civilian": "cleaner",
+"fall": 0.7143
+}
+},
+{
+"name": "civcleaner_fall_f5",
+"options": {
+"civilian": "cleaner",
+"fall": 0.8571
+}
+},
+{
+"name": "civcleaner_dead",
+"options": {
+"civilian": "cleaner",
+"dead": true
+}
+},
+{
+"name": "civcleanerm_idle",
+"options": {
+"civilian": "cleanerm",
+"pose": "idle"
+}
+},
+{
+"name": "civcleanerm_cower",
+"options": {
+"civilian": "cleanerm",
+"pose": "cower"
+}
+},
+{
+"name": "civcleanerm_walk_f0",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.0
+}
+},
+{
+"name": "civcleanerm_walk_f1",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.0625
+}
+},
+{
+"name": "civcleanerm_walk_f2",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.125
+}
+},
+{
+"name": "civcleanerm_walk_f3",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.1875
+}
+},
+{
+"name": "civcleanerm_walk_f4",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.25
+}
+},
+{
+"name": "civcleanerm_walk_f5",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.3125
+}
+},
+{
+"name": "civcleanerm_walk_f6",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.375
+}
+},
+{
+"name": "civcleanerm_walk_f7",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.4375
+}
+},
+{
+"name": "civcleanerm_walk_f8",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.5
+}
+},
+{
+"name": "civcleanerm_walk_f9",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.5625
+}
+},
+{
+"name": "civcleanerm_walk_f10",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.625
+}
+},
+{
+"name": "civcleanerm_walk_f11",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.6875
+}
+},
+{
+"name": "civcleanerm_walk_f12",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.75
+}
+},
+{
+"name": "civcleanerm_walk_f13",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.8125
+}
+},
+{
+"name": "civcleanerm_walk_f14",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.875
+}
+},
+{
+"name": "civcleanerm_walk_f15",
+"options": {
+"civilian": "cleanerm",
+"walkPhase": 0.9375
+}
+},
+{
+"name": "civcleanerm_fall_f0",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.1429
+}
+},
+{
+"name": "civcleanerm_fall_f1",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.2857
+}
+},
+{
+"name": "civcleanerm_fall_f2",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.4286
+}
+},
+{
+"name": "civcleanerm_fall_f3",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.5714
+}
+},
+{
+"name": "civcleanerm_fall_f4",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.7143
+}
+},
+{
+"name": "civcleanerm_fall_f5",
+"options": {
+"civilian": "cleanerm",
+"fall": 0.8571
+}
+},
+{
+"name": "civcleanerm_dead",
+"options": {
+"civilian": "cleanerm",
+"dead": true
+}
+}
+]

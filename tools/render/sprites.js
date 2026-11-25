@@ -12,7 +12,7 @@ import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } fr
 import { buildMechPosed, buildMechFall } from './mechpose.js';
 import { buildDead, buildFall } from './dead.js';
 import { rockGeometry } from './lib.js';
-import { buildCivilian, civilianWalk, civilianFall } from './civilian.js';
+import { buildCivilian, civilianWalk, civilianFall, prepareHuman } from './civilian.js';
 import { setEnvIntensity } from './lib.js';
 
 // масштаб как у сцены: 18.5 м на 1280 px, рендер в 2 раза крупнее
@@ -152,7 +152,7 @@ function buildRockObject(seed, radius) {
   return group;
 }
 
-window.renderSprite = (options, direction) => {
+const renderSpriteNow = (options, direction) => {
   let soldier;
   setFrame(options.frame || DEFAULT_FRAME, options.alien ? 2 : 1);
   if (options.rock) soldier = buildRockObject(options.rock.seed, options.rock.radius);
@@ -238,5 +238,10 @@ window.debugShadow = () => {
   results.sunLayers = sun.layers.mask; results.groundLayers = ground.layers.mask;
   scene.remove(soldier);
   return results;
+};
+// люди MakeHuman (human.js): данные вида и текстура кожи загружаются до рендера
+window.renderSprite = async (options, direction) => {
+  if (options.civilian) await prepareHuman(options.civilian);
+  return renderSpriteNow(options, direction);
 };
 window.ready = true;

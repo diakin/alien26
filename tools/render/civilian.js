@@ -5,8 +5,11 @@
 // руки на голове (испуган, ждёт эвакуации); dead / fall — лежит на спине, падение (civilianFall).
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { segment, ball, solveTwoBone, fabricNormalTexture, setShadows } from './lib.js';
+import { segment, ball, solveTwoBone, setShadows } from './lib.js';
 import { clothLimb, FOLDS, buildBoot } from './cloth.js';
+import { fabric, pvc, rubber } from './person.js';
+import { buildHumanBody, prepareHuman } from './human.js';
+export { prepareHuman };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -28,8 +31,8 @@ export const CIVILIANS = {
   worker: { top: 0xb8581c, legs: 0xb8581c, shoes: 0x2a2620, hair: 0x2a2018, skin: 0xb88a6a, build: 1.04, hairStyle: 'short', helmet: 0xe0b020, boots: true, gloves: 0x3a3a34, belt: true },
   // ---- персонал базы ----
   // cap — фуражка (crown, band), epaulets — погоны, tie — галстук, armband — повязка на левом плече (дежурный)
-  commander: { top: 0x3e4a30, legs: 0x3e4a30, shoes: 0x121212, hair: 0x6a6a66, skin: 0xc8987a, build: 1.04, hairStyle: 'short', cap: { crown: 0x3e4a30, band: 0x9a1c1c }, epaulets: 0xc8a040, tie: 0x2a2c20 },
-  officer: { top: 0x46523a, legs: 0x46523a, shoes: 0x121212, hair: 0x2a2018, skin: 0xc4967a, build: 1.02, hairStyle: 'short', epaulets: 0xc8a040, tie: 0x2a2c20, armband: 0xb01e1e },
+  commander: { uniform: true, eyes: 0x5a6a78, top: 0x3e4a30, legs: 0x3e4a30, shoes: 0x121212, hair: 0x6a6a66, skin: 0xc8987a, build: 1.04, hairStyle: 'short', cap: { crown: 0x3e4a30, band: 0x9a1c1c }, epaulets: 0xc8a040, tie: 0x2a2c20 },
+  officer: { uniform: true, eyes: 0x4a3a28, top: 0x46523a, legs: 0x46523a, shoes: 0x121212, hair: 0x2a2018, skin: 0xc4967a, build: 1.02, hairStyle: 'short', epaulets: 0xc8a040, tie: 0x2a2c20, armband: 0xb01e1e },
   // врач: голубой хирургический костюм, белый халат, фонендоскоп
   doctor: { top: 0x84b4cc, legs: 0x84b4cc, shoes: 0xdcdcd8, hair: 0x3a2c20, skin: 0xc89c80, build: 1, hairStyle: 'short', coat: 0xeeeeea, stethoscope: true, glasses: true },
   // хирург: зелёный костюм, шапочка, маска, перчатки
@@ -37,7 +40,7 @@ export const CIVILIANS = {
   nurse: { top: 0xf2f2f0, legs: 0xf2f2f0, shoes: 0xe8e8e4, hair: 0x7a4a2a, skin: 0xdcb094, build: 0.86, hairStyle: 'long', female: true, nurseCap: 0xf8f8f8, stethoscope: true },
   labwoman: { top: 0x6a4a6a, legs: 0x2a2a32, shoes: 0x26221e, hair: 0x4a2c1c, skin: 0xd8ae92, build: 0.87, hairStyle: 'long', female: true, coat: 0xe6e6e0 },
   // костюм биозащиты: комбинезон с капюшоном, панорамное стекло, фильтр, перчатки и сапоги
-  hazmat: { top: 0xe0c030, legs: 0xe0c030, shoes: 0x1e1e1e, hair: 0x2a2018, skin: 0xc89a7c, build: 1.06, hairStyle: 'short', hazmat: true, gloves: 0x262626, boots: true, coverall: true },
+  hazmat: { top: 0xe8c418, legs: 0xe8c418, shoes: 0x141414, hair: 0x5a3a24, skin: 0xd6aa8c, build: 1.08, hairStyle: 'short', female: true, eyes: 0x6a4a2a, hazmat: true, gloves: 0x141414, boots: true, coverall: true },
   engineerw: { top: 0x2c4a74, legs: 0x2c4a74, shoes: 0x2a2620, hair: 0x5a3a22, skin: 0xd6aa8e, build: 0.88, hairStyle: 'long', female: true, vest: 0xc4d02a, helmet: 0xe8e8e2, boots: true, tablet: true, coverall: true },
   electrician: { top: 0x2c3c66, legs: 0x2c3c66, shoes: 0x2a2620, hair: 0x3a2c20, skin: 0xc0926e, build: 1.02, hairStyle: 'short', coverall: true, belt: true, gloves: 0xd8b020, boots: true },
   plumber: { top: 0x4a5a48, legs: 0x4a5a48, shoes: 0x2a2620, hair: 0x2a2018, skin: 0xbc8e6c, build: 1.05, hairStyle: 'short', coverall: true, belt: true, gloves: 0x3a3a34, boots: true, baseballCap: 0x2a4a8a },
@@ -52,15 +55,18 @@ export const CIVILIANS = {
   girl: { top: 0xd0708e, legs: 0x5a4a8a, shoes: 0xe0dcd4, hair: 0x9a6a3a, skin: 0xe0b89c, build: 0.9, hairStyle: 'long', female: true, child: 0.64, headScale: 1.28 },
 };
 
-let fabricNormal = null;
 const prepared = {};
 function materialsFor(kind) {
   if (prepared[kind]) return prepared[kind];
   const look = CIVILIANS[kind];
-  if (!fabricNormal) { fabricNormal = fabricNormalTexture(33); fabricNormal.repeat.set(3, 3); }
-  const cloth = (color, roughness = 0.95) => new THREE.MeshStandardMaterial({ color, roughness, normalMap: fabricNormal, normalScale: new THREE.Vector2(0.8, 0.8) });
+  // ткани (person.js): форма и комбинезоны — саржа, рубашки, халаты и хирургические костюмы — полотно, брюки — саржа,
+  // у мужчины в городе — джинсы, у женщины — трикотажный верх; костюм биозащиты — глянцевый ПВХ
+  const coverall = kind === 'engineer' || kind === 'worker' || !!look.coverall;
+  const topWeave = look.topWeave || (coverall || look.uniform ? 'twill' : kind === 'woman' || kind === 'girl' ? 'knit' : 'plain');
+  const legsWeave = look.legsWeave || (kind === 'man' || kind === 'boy' ? 'denim' : look.legs === look.top ? topWeave : 'twill');
+  const cloth = (color, roughness = 0.92, weave = 'plain') => fabric(color, weave, { roughness });
   const materials = {
-    top: cloth(look.top), legs: cloth(look.legs),
+    top: look.hazmat ? pvc(look.top) : cloth(look.top, 0.92, topWeave), legs: look.hazmat ? pvc(look.legs) : cloth(look.legs, 0.92, legsWeave),
     skin: new THREE.MeshStandardMaterial({ color: look.skin, roughness: 0.7 }),
     hair: new THREE.MeshStandardMaterial({ color: look.hair, roughness: 0.85 }),
     shoe: new THREE.MeshStandardMaterial({ color: look.shoes, roughness: 0.55 }),
@@ -70,16 +76,16 @@ function materialsFor(kind) {
     boot: new THREE.MeshStandardMaterial({ color: 0x3a3026, roughness: 0.85 }),
     lace: new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.9 }),
   };
-  if (look.coat) materials.coat = cloth(look.coat, 0.9);
+  if (look.coat) materials.coat = cloth(look.coat, 0.9, 'plain');
   if (look.vest) {
     materials.vest = new THREE.MeshStandardMaterial({ color: look.vest, roughness: 0.6, emissive: look.vest, emissiveIntensity: 0.08 });
     materials.stripe = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, roughness: 0.25, metalness: 0.4 });
   }
   if (look.helmet) materials.helmet = new THREE.MeshStandardMaterial({ color: look.helmet, roughness: 0.4, metalness: 0.05 });
-  if (look.gloves) materials.glove = new THREE.MeshStandardMaterial({ color: look.gloves, roughness: 0.85 });
+  if (look.gloves) materials.glove = look.hazmat || kind.startsWith('cleaner') || kind === 'surgeon' ? rubber(look.gloves) : cloth(look.gloves, 0.85, 'knit');
   if (look.glasses) materials.lens = new THREE.MeshPhysicalMaterial({ color: 0x1a2428, roughness: 0.05, metalness: 0.5, clearcoat: 1 });
   const plain = (color, roughness = 0.6, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
-  if (look.cap) { materials.capCrown = cloth(look.cap.crown, 0.8); materials.capBand = plain(look.cap.band, 0.7); materials.visor = plain(0x101010, 0.3, 0.2); }
+  if (look.cap) { materials.capCrown = cloth(look.cap.crown, 0.8, 'twill'); materials.capBand = plain(look.cap.band, 0.7); materials.visor = plain(0x101010, 0.3, 0.2); }
   if (look.epaulets) materials.gold = plain(look.epaulets, 0.35, 0.7);
   if (look.tie) materials.tie = plain(look.tie, 0.7);
   if (look.armband) materials.armband = plain(look.armband, 0.8);
@@ -91,11 +97,19 @@ function materialsFor(kind) {
   if (look.apron) materials.apron = cloth(look.apron, 0.9);
   if (look.baseballCap) materials.baseballCap = cloth(look.baseballCap, 0.85);
   if (look.hazmat) {
-    materials.hood = new THREE.MeshStandardMaterial({ color: look.top, roughness: 0.55, normalMap: fabricNormal, normalScale: new THREE.Vector2(0.4, 0.4) });
-    materials.visorGlass = new THREE.MeshPhysicalMaterial({ color: 0x23343a, roughness: 0.05, metalness: 0.3, clearcoat: 1 });
-    materials.filter = plain(0x2a2a2a, 0.5);
-    materials.tape = plain(0x1e1e1e, 0.6);
+    materials.hood = pvc(look.top);
+    // панорамное стекло: прозрачное, с бликами
+    materials.visorGlass = new THREE.MeshPhysicalMaterial({ color: 0xdfeaf0, roughness: 0.04, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+    materials.visorRim = new THREE.MeshPhysicalMaterial({ color: 0xc8d0d4, roughness: 0.2, clearcoat: 1, transparent: true, opacity: 0.75 });
+    materials.respirator = rubber(0x161616);
+    materials.filter = rubber(0x262626);
+    materials.label = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.6 });
+    materials.labelText = new THREE.MeshStandardMaterial({ color: 0xbcbcbc, roughness: 0.6 });
+    materials.boot = rubber(0x121212);
+    materials.lace = rubber(0x121212);
   }
+  materials.button = new THREE.MeshStandardMaterial({ color: look.uniform ? 0xb89a48 : 0xe8e6e0, roughness: 0.35, metalness: look.uniform ? 0.7 : 0 });
+  materials.seam = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0.25 });
   prepared[kind] = materials;
   return materials;
 }
@@ -146,203 +160,242 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   const look = CIVILIANS[kind];
   const spec = typeof pose === 'string' ? CIVILIAN_POSES[pose] : pose;
   const materials = materialsFor(kind);
-  const build = look.build;
   const person = new THREE.Group();
   const add = (object) => { person.add(object); return object; };
   const placed = (mesh, position, quaternion) => { mesh.position.copy(position); mesh.quaternion.copy(quaternion); return add(mesh); };
+  const female = kind === 'woman' || kind === 'girl' || !!look.female;
+  const coverall = kind === 'engineer' || kind === 'worker' || !!look.coverall;
 
   const pelvis = spec.pelvis.clone();
   const torsoQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.lean, spec.twist, 0, 'YXZ'));
   const pelvisQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.lean * 0.3, spec.twist * 0.5, 0, 'YXZ'));
-  const local = (x, y, z, origin = pelvis, quat = torsoQuat) => V(x, y, z).applyQuaternion(quat).add(origin);
-  const hipLocal = (x, y, z) => local(x, y, z, pelvis, pelvisQuat);
-  const female = kind === 'woman' || !!look.female;
-  const coverall = kind === 'engineer' || kind === 'worker' || !!look.coverall;
-  const upper = materials.top;
-
-  // таз и корпус
-  placed(box(0.34 * (female ? 1.06 : 1), 0.22, 0.22, materials.legs, 0.08), pelvis, pelvisQuat);
-  if (!coverall) placed(box(0.35 * (female ? 1.05 : 1), 0.04, 0.23, materials.dark, 0.015), hipLocal(0, 0.09, 0), pelvisQuat);   // ремень
-  const abdomen = add(clothLimb(local(0, 0.04, 0), local(0, 0.26, 0), 0.15 * build, 0.165 * build, upper, FOLDS.torso(5)));
-  abdomen.scale.set(1, 1, 0.74);
-  const chest = local(0, 0.33, 0);
-  placed(box(0.39 * build, 0.38, 0.22, upper, 0.1), chest, torsoQuat);
-  if (female) for (const side of [-1, 1]) add(ball(local(side * 0.065, 0.31, 0.085), 0.06, upper, [1, 0.85, 0.6]));
-  // воротник
-  placed(box(0.2, 0.05, 0.16, kind === 'scientist' ? upper : coverall ? upper : materials.top, 0.02), local(0, 0.54, 0.01), torsoQuat);
-
-  // халат учёного: полы до колен поверх брюк и плечи поверх рубашки
-  if (look.coat) {
-    placed(box(0.42 * build, 0.36, 0.25, materials.coat, 0.1), local(0, 0.34, 0), torsoQuat);
-    // короткая юбка халата на тазу, ниже — полы на бёдрах (см. ноги): так халат следует позе, а не торчит трубой
-    const skirt = add(segment(hipLocal(0, 0.06, 0), hipLocal(0, -0.2, 0), 0.2, 0.22, materials.coat, 16));
-    skirt.scale.set(1, 1, 0.72);
-    placed(box(0.03, 0.62, 0.02, materials.top, 0.008), local(0, 0.18, 0.13), torsoQuat);    // рубашка в вырезе халата
-    placed(box(0.08, 0.1, 0.02, materials.coat, 0.01), local(-0.13, 0.36, 0.14), torsoQuat);   // нагрудный карман
-    placed(box(0.012, 0.09, 0.012, materials.dark, 0.004), local(-0.13, 0.42, 0.155), torsoQuat);   // ручка
-  }
-  // сигнальный жилет инженера со световозвращающими полосами
-  if (look.vest) {
-    placed(box(0.41 * build, 0.34, 0.235, materials.vest, 0.08), local(0, 0.32, 0), torsoQuat);
-    for (const height of [0.22, 0.38]) placed(box(0.415 * build, 0.035, 0.24, materials.stripe, 0.01), local(0, height, 0), torsoQuat);
-  }
-  // галстук и погоны (форма офицера)
-  if (look.tie) placed(box(0.035, 0.2, 0.012, materials.tie, 0.005), local(0, 0.41, 0.114), torsoQuat);
-  if (look.epaulets) for (const side of [-1, 1]) placed(box(0.06, 0.014, 0.11, materials.gold, 0.005), local(side * 0.155 * build, 0.535, 0), torsoQuat);
-  // фартук повара: от пояса до колен спереди
-  if (look.apron) placed(box(0.34 * build, 0.52, 0.02, materials.apron, 0.01), hipLocal(0, -0.15, 0.125), pelvisQuat);
-  // пояс с инструментом у рабочего
-  if (look.belt) {
-    placed(box(0.37, 0.05, 0.24, materials.dark, 0.015), hipLocal(0, 0.09, 0), pelvisQuat);
-    placed(box(0.08, 0.12, 0.07, materials.dark, 0.015), hipLocal(0.17, 0.0, 0.07), pelvisQuat);
-    placed(box(0.025, 0.2, 0.025, materials.dark, 0.006), hipLocal(-0.18, -0.02, 0.04), pelvisQuat);   // ручка молотка
-  }
-
-  // голова
-  const headStart = person.children.length;
-  const neckBase = local(0, 0.56, 0);
   const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.head[0], 0, spec.head[2])).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, spec.head[1], 0)));
-  const headCenter = neckBase.clone().add(V(0, 0.15, 0.02).applyQuaternion(headQuat));
-  const headLocal = (x, y, z) => V(x, y, z).applyQuaternion(headQuat).add(headCenter);
-  add(segment(neckBase, headCenter, 0.055, 0.05, materials.skin, 12));
-  add(ball(headCenter, 0.1, materials.skin, [0.93, 1.1, 1.0], 18));
-  if (!look.hazmat) add(ball(headLocal(0, -0.005, 0.098), 0.02, materials.skin, [0.8, 1, 1]));   // нос
-  for (const side of [-1, 1]) add(ball(headLocal(side * 0.095, 0, -0.005), 0.025, materials.skin, [0.5, 1, 0.8]));   // уши
-  // волосы: шапочка сверху и сзади; у женщины — объём до плеч сзади
-  const hairCap = add(new THREE.Mesh(new THREE.SphereGeometry(0.106, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.scrubCap || materials.hair));
-  hairCap.position.copy(headLocal(0, 0.012, -0.012)); hairCap.quaternion.copy(headQuat); hairCap.scale.set(0.97, 1.05, 1.06);
-  if (look.scrubCap) hairCap.scale.set(1.02, 1.1, 1.08);
-  hairCap.castShadow = true;
-  add(ball(headLocal(0, -0.01, -0.05), 0.09, materials.scrubCap || materials.hair, [1, 0.9, 0.75]));
-  if (look.hairStyle === 'long' && !look.hazmat && !look.chefHat) {
-    const back = add(segment(headLocal(0, 0.02, -0.06), headLocal(0, -0.22, -0.07), 0.1, 0.085, materials.hair, 14));
-    back.scale.set(1, 1, 0.6);
-    for (const side of [-1, 1]) add(segment(headLocal(side * 0.085, 0.03, 0.0), headLocal(side * 0.09, -0.16, -0.02), 0.035, 0.03, materials.hair, 8));
+  const footQuats = [0, 1].map((side) => new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.footPitch[side], spec.footYaw ? spec.footYaw[side] : 0, 0, 'YXZ')));
+
+  // ---- одежда слоями (human.js): брюки, верх, халат или комбинезон, жилет, фартук, перчатки ----
+  const garments = [];
+  const layer = (region, material, offset, extra = {}) => garments.push({ region, material, offset, ...extra });
+  if (look.hazmat) {
+    layer('coverall', materials.top, 0.02, { density: 1.6 });
+    layer('glove', materials.glove, 0.026, { relax: 0, loose: 0 });
+    layer('boot', materials.boot, 0.03, { relax: 2, loose: 0 });
+  } else if (coverall) {
+    layer('coverall', materials.top, 0.009);
+  } else {
+    layer('legs', materials.legs, 0.005);
+    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009);
+  }
+  if (look.coat) {
+    layer('top', materials.coat, 0.017);
+    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, material: materials.coat, offset: 0.02 });
+  }
+  if (look.vest) {
+    layer('vest', materials.vest, 0.022);
+    layer('vestStripes', materials.stripe, 0.025, { thin: true });
+  }
+  if (look.apron) layer('apron', materials.apron, look.coat ? 0.026 : 0.02, { thin: true });
+  if (look.gloves && !look.hazmat) layer('glove', materials.glove, 0.004, { thin: true, relax: 0, loose: 0 });
+  // обувь — по форме стопы; ремень — лента по поясу брюк
+  if (!look.hazmat) layer(look.boots ? 'workBoot' : 'shoes', look.boots ? materials.boot : materials.shoe, look.boots ? 0.014 : 0.009, { relax: 2, loose: 0, thin: true });
+  const belted = look.belt || (!coverall && !look.coat && !look.apron && !look.hazmat && kind !== 'girl' && kind !== 'woman');
+  if (belted) layer('belt', materials.dark, 0.016, { thin: true, relax: 0, loose: 0 });
+
+  const human = buildHumanBody({ kind, look, garments, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
+    pelvis, pelvisQuat, torsoQuat, headQuat, hands: spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead,
+    elbowPoles: spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
+  });
+  add(human.group);
+  const { joints, headCenter, rest } = human;
+  const frame = rest.frame;
+  // точка на поверхности спереди (в покое) над слоем одежды: для пуговиц, галстука, нашивок
+  const front = (x, y, lift = 0.012) => human.torsoPoint(x, y, human.front(x, y) + lift);
+  const chestY = frame.shoulderY - 0.13, waistY = frame.waist;
+
+  // ---- голова: принадлежности в рамке головы (центр — середина головы, z — вперёд) ----
+  // headScaled — головные уборы и капюшон: размеры прежней модели (голова 0,186 × 0,22 × 0,2) подогнаны под голову человека
+  const headScaled = new THREE.Group(), headExact = new THREE.Group();
+  for (const holder of [headScaled, headExact]) { holder.position.copy(headCenter); holder.quaternion.copy(headQuat); add(holder); }
+  // головные уборы прежней модели рассчитаны на макушку на высоте 0,11 над центром головы
+  headScaled.scale.set(frame.headSize.x / 0.186 * 1.02, frame.crown / 0.11, frame.headSize.z / 0.2 * 1.02);
+  const inHead = (mesh, x, y, z, holder = headScaled) => { mesh.position.set(x, y, z); holder.add(mesh); mesh.castShadow = true; return mesh; };
+  const eye = frame.eyeCenter.clone().sub(frame.headCenter);          // центр между глазами в рамке головы
+  const faceFront = eye.z + 0.012;
+  if (look.scrubCap) {
+    const capShell = new THREE.Mesh(new THREE.SphereGeometry(0.108, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.52), materials.scrubCap);
+    inHead(capShell, 0, 0.02, -0.008).scale.set(1.0, 1.12, 1.08);
   }
   if (look.glasses) {
-    for (const side of [-1, 1]) placed(box(0.045, 0.03, 0.008, materials.lens, 0.006), headLocal(side * 0.036, 0.015, 0.1), headQuat);
-    placed(box(0.15, 0.008, 0.008, materials.dark, 0.003), headLocal(0, 0.028, 0.101), headQuat);
+    for (const side of [-1, 1]) {
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.003, 20), materials.lens);
+      lens.rotation.x = Math.PI / 2; lens.scale.set(1, 1, 0.75);
+      inHead(lens, eye.x + side * frame.eyeDistance * 0.5, eye.y, faceFront + 0.004, headExact);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.0172, 0.0016, 4, 22), materials.dark);
+      rim.scale.set(1, 0.75, 1);
+      inHead(rim, eye.x + side * frame.eyeDistance * 0.5, eye.y, faceFront + 0.004, headExact);
+      const temple = segment(V(eye.x + side * (frame.eyeDistance * 0.5 + 0.017), eye.y + 0.004, faceFront + 0.002), V(side * frame.headSize.x * 0.5, eye.y + 0.002, eye.z - 0.075), 0.0014, 0.0014, materials.dark, 4);
+      headExact.add(temple);
+    }
+    inHead(box(0.014, 0.003, 0.003, materials.dark, 0.001), eye.x, eye.y + 0.004, faceFront + 0.006, headExact);
   }
-  // фуражка: тулья, околыш, козырёк, кокарда
   if (look.cap) {
-    const crown = placed(new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.105, 0.065, 24), materials.capCrown), headLocal(0, 0.1, 0.005), headQuat);
-    crown.scale.set(1, 1, 1.08); crown.castShadow = true;
-    placed(new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.106, 0.04, 24), materials.capBand), headLocal(0, 0.055, 0.005), headQuat).scale.set(1, 1, 1.08);
-    const visor = placed(box(0.17, 0.012, 0.075, materials.visor, 0.005), headLocal(0, 0.04, 0.11), headQuat);
-    visor.rotateX(0.25);
-    placed(box(0.03, 0.03, 0.01, materials.gold || materials.visor, 0.004), headLocal(0, 0.07, 0.115), headQuat);
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.105, 0.065, 28), materials.capCrown);
+    inHead(crown, 0, 0.1, 0.005).scale.set(1, 1, 1.08);
+    inHead(new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.106, 0.04, 28), materials.capBand), 0, 0.055, 0.005).scale.set(1, 1, 1.08);
+    inHead(box(0.17, 0.012, 0.075, materials.visor, 0.005), 0, 0.04, 0.11).rotateX(0.25);
+    inHead(box(0.03, 0.03, 0.01, materials.gold || materials.visor, 0.004), 0, 0.07, 0.117);
   }
   if (look.baseballCap) {
-    const shell = add(new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.baseballCap));
-    shell.position.copy(headLocal(0, 0.025, 0)); shell.quaternion.copy(headQuat); shell.scale.set(1, 0.9, 1.08); shell.castShadow = true;
-    placed(box(0.15, 0.012, 0.09, materials.baseballCap, 0.005), headLocal(0, 0.03, 0.13), headQuat).rotateX(0.12);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.11, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.baseballCap);
+    inHead(shell, 0, 0.03, 0).scale.set(1, 0.9, 1.08);
+    inHead(box(0.15, 0.012, 0.09, materials.baseballCap, 0.005), 0, 0.035, 0.13).rotateX(0.12);
   }
+
+  // размеры черепа в рамке головы: ширина без ушей, глубина, высота лба и макушки
+  const skullX = frame.headSize.x * 0.5 - 0.012, skullZ = frame.headSize.z * 0.5 - 0.008, browY = eye.y + 0.03, crownY = frame.crown;
   if (look.chefHat) {
-    placed(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.16, 20), materials.chefHat), headLocal(0, 0.13, -0.005), headQuat).castShadow = true;
-    add(ball(headLocal(0, 0.22, -0.005), 0.12, materials.chefHat, [1, 0.6, 1]));
+    // поварской колпак: околыш по лбу и надутый верх
+    const bandBottom = browY - 0.004, bandHeight = crownY - bandBottom + 0.05;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1, 1, 28, 1, true), materials.chefHat);
+    inHead(band, 0, bandBottom + bandHeight / 2, -0.012, headExact).scale.set(skullX + 0.026, bandHeight, skullZ + 0.026);
+    const puff = ball(V(0, 0, 0), 1, materials.chefHat, [1, 1, 1], 20);
+    inHead(puff, 0, bandBottom + bandHeight + 0.01, -0.012, headExact).scale.set(skullX + 0.04, 0.05, skullZ + 0.045);
   }
-  if (look.nurseCap) placed(box(0.15, 0.05, 0.09, materials.nurseCap, 0.012), headLocal(0, 0.105, 0.01), headQuat);
-  if (look.mask) placed(box(0.12, 0.075, 0.035, materials.mask, 0.012), headLocal(0, -0.045, 0.092), headQuat);
-  // капюшон костюма биозащиты закрывает голову целиком: панорамное стекло, фильтр, шов у шеи
-  if (look.hazmat) {
-    const hood = add(ball(headLocal(0, 0.01, -0.005), 0.148, materials.hood, [1, 1.08, 1.02], 20));
-    hood.castShadow = true;
-    const visor = placed(box(0.17, 0.12, 0.04, materials.visorGlass, 0.02), headLocal(0, 0.025, 0.128), headQuat);
-    visor.rotateX(-0.08);
-    placed(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.06, 14), materials.filter), headLocal(0, -0.085, 0.13), headQuat).rotateX(Math.PI / 2);
-    add(segment(local(0, 0.52, 0), local(0, 0.6, 0), 0.12, 0.12, materials.tape, 16)).scale.set(1, 1, 0.85);
-    placed(box(0.22, 0.32, 0.12, materials.tape, 0.03), local(0, 0.33, -0.17), torsoQuat);      // блок фильтровентиляции на спине
+  if (look.nurseCap) {
+    // сестринская шапочка: передняя стенка, откинутая назад, и плоский верх на темени
+    inHead(box(skullX * 1.55, 0.05, 0.007, materials.nurseCap, 0.003), 0, crownY - 0.012, skullZ * 0.45, headExact).rotateX(-0.55);
+    inHead(box(skullX * 1.45, 0.008, 0.07, materials.nurseCap, 0.003), 0, crownY + 0.008, skullZ * 0.05, headExact);
+  }
+  if (look.mask) {
+    // хирургическая маска: на нос и рот, завязки к затылку
+    const maskShell = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 12, Math.PI * 0.2, Math.PI * 0.6, Math.PI * 0.52, Math.PI * 0.3), materials.mask);
+    maskShell.scale.set(frame.headSize.x / 0.2, 1.0, frame.headSize.z / 0.2 * 1.04);
+    inHead(maskShell, 0, eye.y - 0.012, 0.0, headExact);
   }
   if (look.helmet) {
-    const shell = add(new THREE.Mesh(new THREE.SphereGeometry(0.128, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.helmet));
-    shell.position.copy(headLocal(0, 0.035, 0)); shell.quaternion.copy(headQuat); shell.scale.set(1, 0.95, 1.1);
-    shell.castShadow = true;
-    const brim = placed(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.012, 22), materials.helmet), headLocal(0, 0.035, 0.02), headQuat);
-    brim.scale.set(0.95, 1, 1.1); brim.castShadow = true;
-    placed(box(0.02, 0.02, 0.2, materials.helmet, 0.008), headLocal(0, 0.155, 0), headQuat);   // гребень
+    // строительная каска: купол над черепом с зазором под оголовье, козырёк спереди, узкий поля по бокам и сзади, ребро по темени
+    const base = browY + 0.012, height = crownY - base + 0.04;
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.helmet);
+    inHead(shell, 0, base, -0.012, headExact).scale.set(skullX + 0.026, height, skullZ + 0.03);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.006, 32), materials.helmet);
+    inHead(brim, 0, base + 0.002, 0.008, headExact).scale.set(skullX + 0.034, 1, skullZ + 0.05);
+    // ребро жёсткости — та же оболочка, узкая по x и чуть выше купола
+    const ridge = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.helmet);
+    inHead(ridge, 0, base, -0.012, headExact).scale.set(0.016, height + 0.007, skullZ + 0.036);
+  }
+  // костюм биозащиты: капюшон из ПВХ облегает голову, спереди — окно с прозрачным выпуклым стеклом в светлой рамке,
+  // под стеклом лицо и чёрная полумаска с двумя фильтрами; капюшон спадает на плечи
+  if (look.hazmat) {
+    const radii = [0.122, 0.142, 0.128];
+    const windowPhi = 0.95, windowTop = 0.3 * Math.PI, windowBottom = 0.76 * Math.PI;
+    const hoodPart = (phiStart, phiLength, thetaStart, thetaLength, material) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 44, 30, phiStart, phiLength, thetaStart, thetaLength), material);
+      mesh.scale.set(...radii);
+      return inHead(mesh, 0, 0.012, -0.006);
+    };
+    hoodPart(Math.PI / 2 + windowPhi, Math.PI * 2 - windowPhi * 2, 0, Math.PI, materials.hood);
+    hoodPart(Math.PI / 2 - windowPhi, windowPhi * 2, 0, windowTop, materials.hood);
+    hoodPart(Math.PI / 2 - windowPhi, windowPhi * 2, windowBottom, Math.PI - windowBottom, materials.hood);
+    const glass = hoodPart(Math.PI / 2 - windowPhi, windowPhi * 2, windowTop, windowBottom - windowTop, materials.visorGlass);
+    glass.scale.set(radii[0] * 1.03, radii[1], radii[2] * 1.12);
+    glass.castShadow = false; glass.renderOrder = 2;
+    const rimPoints = [];
+    for (let step = 0; step <= 64; step++) {
+      const along = step / 64;
+      let phi, theta;
+      if (along < 0.25) { phi = Math.PI / 2 - windowPhi + along * 4 * windowPhi * 2; theta = windowTop; }
+      else if (along < 0.5) { phi = Math.PI / 2 + windowPhi; theta = windowTop + (along - 0.25) * 4 * (windowBottom - windowTop); }
+      else if (along < 0.75) { phi = Math.PI / 2 + windowPhi - (along - 0.5) * 4 * windowPhi * 2; theta = windowBottom; }
+      else { phi = Math.PI / 2 - windowPhi; theta = windowBottom - (along - 0.75) * 4 * (windowBottom - windowTop); }
+      rimPoints.push(V(-Math.cos(phi) * Math.sin(theta) * radii[0] * 1.035, Math.cos(theta) * radii[1] * 1.005 + 0.012, Math.sin(phi) * Math.sin(theta) * radii[2] * 1.12 - 0.006));
+    }
+    inHead(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPoints, true), 80, 0.006, 6, true), materials.visorRim), 0, 0, 0);
+    // полумаска с клапаном и двумя фильтрами
+    const mouthY = eye.y - frame.eyeDistance * 1.05, mouthZ = eye.z + 0.012;
+    const maskBody = new THREE.Mesh(new THREE.SphereGeometry(0.034, 22, 16), materials.respirator);
+    maskBody.scale.set(1.1, 1.05, 0.85);
+    inHead(maskBody, 0, mouthY + 0.008, mouthZ, headExact);
+    inHead(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.016, 14), materials.filter), 0, mouthY - 0.006, mouthZ + 0.028, headExact).rotateX(Math.PI / 2 + 0.3);
+    for (const side of [-1, 1]) {
+      const cartridge = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.024, 20), materials.filter);
+      inHead(cartridge, side * 0.034, mouthY - 0.005, mouthZ + 0.006, headExact);
+      cartridge.rotateZ(side * 1.15); cartridge.rotateX(0.45);
+      headExact.add(segment(V(side * 0.034, mouthY + 0.02, mouthZ - 0.01), V(side * frame.headSize.x * 0.5, eye.y + 0.01, eye.z - 0.06), 0.003, 0.003, materials.respirator, 4));
+    }
+    // капюшон спадает на плечи
+    const neckTop = human.torsoPoint(0, frame.shoulderY + 0.12, rest.joints.neck_01[0].z);
+    const shoulders = human.torsoPoint(0, frame.shoulderY + 0.01, rest.joints.spine_03[0].z);
+    const cape = add(segment(neckTop, shoulders, 0.085, 0.2 * (female ? 0.92 : 1), materials.hood, 28));
+    cape.scale.set(1, 1, 0.82);
+    // молния, чёрная нашивка на груди, клапан кармана на плече
+    add(segment(front(0, chestY + 0.12, 0.024), front(0, waistY - 0.05, 0.024), 0.005, 0.005, materials.respirator, 6));
+    placed(box(0.1, 0.034, 0.006, materials.label, 0.003), front(0.075, chestY + 0.03, 0.026), torsoQuat);
+    for (let line = 0; line < 2; line++) placed(box(0.068 - line * 0.02, 0.004, 0.003, materials.labelText, 0.001), front(0.075, chestY + 0.037 - line * 0.011, 0.03), torsoQuat);
   }
 
-  // у детей голова крупнее: части головы (кроме шеи) увеличены вокруг её центра
-  if (look.headScale) {
-    person.children.slice(headStart + 1).forEach((part) => {
-      part.position.sub(headCenter).multiplyScalar(look.headScale).add(headCenter);
-      part.scale.multiplyScalar(look.headScale);
-      part.updateMatrix();
-    });
+  // ---- корпус: детали одежды ----
+  if (look.uniform) {
+    // китель: пуговицы, нагрудные карманы с клапанами, воротник, ремень
+    for (let button = 0; button < 5; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.005, 12), materials.button), front(0.0, chestY + 0.11 - button * 0.075, 0.015), torsoQuat).rotateX(Math.PI / 2);
+    for (const side of [-1, 1]) {
+      placed(box(0.085, 0.03, 0.01, materials.top, 0.004), front(side * 0.075, chestY + 0.035, 0.016), torsoQuat);
+      placed(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.004, 10), materials.button), front(side * 0.075, chestY + 0.03, 0.023), torsoQuat).rotateX(Math.PI / 2);
+    }
   }
-
-  // руки
-  const shoulders = [local(-0.2 * build, 0.47, 0), local(0.2 * build, 0.47, 0)];
-  const hands = spec.handsOnHead ? [headLocal(-0.07, 0.07, -0.08), headLocal(0.07, 0.07, -0.08)] : [spec.hands[0].clone(), spec.hands[1].clone()];
-  const joints = { pelvis: pelvis.clone(), head: headCenter.clone(), shoulders: [], elbows: [], hands: [], hips: [], knees: [], ankles: [] };
-  const sleeve = look.coat ? materials.coat : upper;
-  [0, 1].forEach((side) => {
-    const shoulder = shoulders[side];
-    const elbow = solveTwoBone(shoulder, hands[side], 0.28, 0.27, spec.elbowPoles[side]);
-    joints.shoulders[side] = shoulder.clone(); joints.elbows[side] = elbow.clone(); joints.hands[side] = hands[side].clone();
-    add(ball(shoulder, 0.07, sleeve, [1, 1, 1], 14));
-    add(clothLimb(shoulder, elbow, 0.066, 0.055, sleeve, FOLDS.upperArm(side * 3 + 4)));
-    add(ball(elbow, 0.055, sleeve, [1, 1, 1], 12));
-    const wrist = hands[side].clone().lerp(elbow, 0.14);
-    add(clothLimb(elbow, wrist, 0.055, 0.044, sleeve, FOLDS.forearm(side * 3 + 5)));
-    const handMaterial = materials.glove || materials.skin;
-    add(ball(wrist, 0.035, handMaterial, [1, 1, 1], 10));
-    const forearm = new THREE.Vector3().subVectors(hands[side], elbow).normalize();
-    const hand = add(box(0.07, 0.1, 0.035, handMaterial, 0.015));
-    hand.position.copy(hands[side]);
-    hand.quaternion.setFromUnitVectors(V(0, -1, 0), forearm);
-  });
-  // повязка дежурного на левом плече
-  if (look.armband) {
-    const elbow = joints.elbows[0], shoulder = joints.shoulders[0];
-    add(segment(shoulder.clone().lerp(elbow, 0.3), shoulder.clone().lerp(elbow, 0.55), 0.072, 0.068, materials.armband, 14));
+  if (look.tie) {
+    add(segment(front(0, frame.shoulderY + 0.04, 0.016), front(0, chestY - 0.06, 0.016), 0.012, 0.02, materials.tie, 4)).scale.set(1, 1, 0.3);
   }
-  // фонендоскоп на шее: дуга за шеей, трубки на грудь, головка
+  if (look.epaulets) for (const [number, side] of [[0, -1], [1, 1]]) {
+    const top = joints.shoulders[number].clone().add(V(0, 0.045, 0).applyQuaternion(torsoQuat)).add(V(-side * 0.035, 0, 0).applyQuaternion(torsoQuat));
+    placed(box(0.065, 0.012, 0.1, materials.gold, 0.005), top, torsoQuat);
+  }
+  if (look.coat) {
+    // халат: лацканы, три пуговицы, нагрудный карман с ручкой, боковые карманы
+    for (const side of [-1, 1]) {
+      const lapel = add(segment(front(side * 0.05, frame.shoulderY + 0.02, 0.022), front(side * 0.015, chestY - 0.06, 0.022), 0.02, 0.01, materials.coat, 4));
+      lapel.scale.set(1, 1, 0.25);
+    }
+    for (let button = 0; button < 3; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.005, 12), materials.button), front(0.012, chestY - 0.08 - button * 0.08, 0.024), torsoQuat).rotateX(Math.PI / 2);
+    placed(box(0.08, 0.095, 0.006, materials.coat, 0.004), front(0.085, chestY - 0.01, 0.024), torsoQuat);
+    placed(box(0.009, 0.08, 0.009, materials.dark, 0.003), front(0.1, chestY + 0.02, 0.03), torsoQuat);
+  }
+  if (look.belt || (!coverall && !look.coat && !look.apron && !look.hazmat && kind !== 'girl' && kind !== 'woman')) {
+    // ремень по талии: эллипс по сечению брюк
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.018, 6, 32), materials.dark);
+    const half = Math.abs(human.front(0, waistY - 0.04) - rest.joints.pelvis[0].z) + 0.012;
+    ring.scale.set(half * 1.32, half * 1.0, 1);
+    ring.rotation.x = Math.PI / 2;
+    const holder = new THREE.Group();
+    holder.add(ring);
+    holder.position.copy(human.hipPoint(0, waistY - 0.035, rest.joints.pelvis[0].z - 0.005));
+    holder.quaternion.copy(pelvisQuat);
+    add(holder);
+    placed(box(0.05, 0.035, 0.01, materials.chrome || materials.button, 0.004), human.hipPoint(0, waistY - 0.035, human.front(0, waistY - 0.04) + 0.016), pelvisQuat);
+    if (look.belt) {
+      placed(box(0.08, 0.12, 0.06, materials.dark, 0.015), human.hipPoint(0.16, waistY - 0.1, rest.joints.pelvis[0].z + 0.03), pelvisQuat);
+      placed(box(0.025, 0.2, 0.025, materials.dark, 0.006), human.hipPoint(-0.17, waistY - 0.12, rest.joints.pelvis[0].z + 0.02), pelvisQuat);
+    }
+  }
+  if (look.armband) add(segment(joints.shoulders[0].clone().lerp(joints.elbows[0], 0.3), joints.shoulders[0].clone().lerp(joints.elbows[0], 0.55), 0.06, 0.056, materials.armband, 16));
   if (look.stethoscope) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.008, 6, 18, Math.PI * 1.15), materials.steth);
-    ring.position.copy(local(0, 0.53, 0.0));
-    ring.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 - 0.2, 0, Math.PI - 0.07 * Math.PI)));
-    add(ring);
-    for (const side of [-1, 1]) add(segment(local(side * 0.08, 0.52, 0.06), local(side * 0.05, 0.32, 0.135), 0.008, 0.008, materials.steth, 6));
-    placed(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.012, 14), materials.chrome), local(0.05, 0.3, 0.14), torsoQuat).rotateX(Math.PI / 2);
+    const neck = rest.joints.neck_01[0];
+    const points = [];
+    for (let step = 0; step <= 16; step++) {
+      const angle = Math.PI * 0.12 + step / 16 * Math.PI * 0.76;
+      points.push(human.torsoPoint(Math.cos(angle) * 0.075, neck.y - 0.01, neck.z - Math.sin(angle) * 0.065 + 0.01));
+    }
+    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 24, 0.006, 6), materials.steth));
+    for (const side of [-1, 1]) add(segment(human.torsoPoint(side * 0.074, neck.y - 0.01, neck.z + 0.02), front(side * 0.05, chestY - 0.03, 0.03), 0.006, 0.006, materials.steth, 6));
+    placed(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.011, 16), materials.chrome), front(0.05, chestY - 0.05, 0.032), torsoQuat).rotateX(Math.PI / 2);
   }
   // планшет у инженера в левой руке
   if (look.tablet && !spec.handsOnHead && spec !== CIVILIAN_POSES.dead && !spec.limp) {
     const tablet = add(box(0.2, 0.26, 0.015, materials.dark, 0.01));
-    tablet.position.copy(hands[0].clone().add(V(0.02, 0.06, 0.05)));
+    tablet.position.copy(joints.hands[0].clone().add(V(0.02, 0.06, 0.06)));
     tablet.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, 0.6, 0)));
   }
 
-  // ноги
-  const hipJoints = [hipLocal(-0.1 * build, -0.05, 0), hipLocal(0.1 * build, -0.05, 0)];
-  [0, 1].forEach((side) => {
-    const hip = hipJoints[side];
-    const ankle = spec.feet[side].clone().add(V(0, 0.03, 0));
-    const knee = solveTwoBone(hip, ankle, 0.42, 0.42, spec.kneePole[side]);
-    joints.hips[side] = hip.clone(); joints.knees[side] = knee.clone(); joints.ankles[side] = ankle.clone();
-    add(ball(hip, 0.1, materials.legs, [1, 1, 1], 14));
-    add(clothLimb(hip, knee, 0.1, 0.075, materials.legs, FOLDS.thigh(side * 5 + 3)));
-    if (look.coat) add(segment(hip, hip.clone().lerp(knee, 0.85), 0.125, 0.105, materials.coat, 14));   // полы халата
-    add(ball(knee, 0.074, materials.legs, [1, 1, 1], 12));
-    add(clothLimb(knee, ankle.clone().add(V(0, 0.04, 0)), 0.073, 0.06, materials.legs, FOLDS.shin(side * 5 + 6)));
-    const shoeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.footPitch[side], spec.footYaw ? spec.footYaw[side] : 0, 0, 'YXZ'));
-    if (look.boots) {
-      const boot = buildBoot(materials);
-      boot.quaternion.copy(shoeQuat);
-      boot.position.copy(ankle.clone().add(V(0, -0.11, 0).applyQuaternion(shoeQuat)));
-      add(boot);
-    } else {
-      // туфли: стопа и подошва; у женщины чуть уже
-      const shoe = add(box(female ? 0.08 : 0.095, 0.075, 0.25, materials.shoe, 0.03));
-      shoe.quaternion.copy(shoeQuat);
-      shoe.position.copy(ankle.clone().add(V(0, -0.075, 0.05).applyQuaternion(shoeQuat)));
-      const sole = add(box(female ? 0.085 : 0.1, 0.02, 0.26, materials.sole, 0.008));
-      sole.quaternion.copy(shoeQuat);
-      sole.position.copy(ankle.clone().add(V(0, -0.11, 0.05).applyQuaternion(shoeQuat)));
-    }
-  });
-
   setShadows(person);
+  person.traverse((node) => { if (node.isSkinnedMesh) node.frustumCulled = false; });
   person.userData = { head: headCenter.clone(), joints };
   if (look.child) {
     // ребёнок: вся фигура меньше; суставы и голова — в тех же координатах после уменьшения
