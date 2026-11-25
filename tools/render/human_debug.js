@@ -1,7 +1,7 @@
 // Отладка людей (human.js, civilian.js): виды головы и фигуры с нескольких сторон. window.renderViews(kind, pose, mode)
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildCivilian, prepareHuman, civilianWalk, civilianFall } from './civilian.js';
+import { buildCivilian, prepareHuman, civilianWalk, civilianFall, armedWalk } from './civilian.js';
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -15,7 +15,9 @@ window.renderViews = async (kind, pose = 'idle', mode = 'head') => {
   scene.add(new THREE.HemisphereLight(0xb8c4cc, 0x202020, 0.8));
   const key = new THREE.DirectionalLight(0xfff0dc, 2.4); key.position.set(-1.5, 2.5, 2.5); scene.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, 0.8); fill.position.set(2, 1, 2); scene.add(fill);
-  const model = pose.startsWith('fall') ? civilianFall(kind, +pose.slice(4)) : buildCivilian({ kind, pose: pose === 'walk' ? civilianWalk(0.25) : pose });
+  const armed = pose.startsWith('a-'); const name = armed ? pose.slice(2) : pose;
+  const model = name.startsWith('fall') ? civilianFall(kind, +name.slice(4), armed)
+    : buildCivilian({ kind, armed, pose: name === 'walk' ? (armed ? armedWalk(0.25) : civilianWalk(0.25)) : name });
   if (!model.userData.head) model.userData.head = new THREE.Vector3(0, 0.3, 0);
   scene.add(model);
   model.updateMatrixWorld(true);
@@ -25,7 +27,7 @@ window.renderViews = async (kind, pose = 'idle', mode = 'head') => {
   renderer.setScissorTest(true);
   views.forEach((angle, index) => {
     const camera = new THREE.PerspectiveCamera(mode === 'head' ? 18 : 30, mode === 'head' ? 1 : 0.5, 0.05, 30);
-    const target = mode === 'head' ? head : new THREE.Vector3(0, pose.startsWith('fall') ? 0.25 : 0.9, 0);
+    const target = mode === 'head' ? head : new THREE.Vector3(0, pose.includes('fall') ? 0.25 : 0.9, 0);
     const distance = mode === 'head' ? 1.0 : 4.2;
     const lift = index === 3 && mode === 'head' ? 0.6 : 0.05;
     camera.position.set(target.x + Math.sin(angle) * distance, target.y + lift, target.z + Math.cos(angle) * distance);

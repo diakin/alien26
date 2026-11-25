@@ -392,6 +392,11 @@ function restOf(kind) {
 }
 
 // поверхность одежды/тела спереди в покое: наибольшее z у вершин «колготок» около (x, y)
+// суставы в покое (масштаб модели): для расчёта поз до построения тела (оружие у плеча)
+export function restJoints(kind) {
+  const joints = restOf(kind).joints;
+  return Object.fromEntries(Object.entries(joints).map(([name, value]) => [name, value[0].clone()]));
+}
 export function frontOf(kind, x, y, spread = 0.025) {
   const rest = restOf(kind), part = PARTS.tights;
   let best = -Infinity;
@@ -484,7 +489,25 @@ function bagFrame(kind) {
     const point = rest.point(source);
     if (Math.abs(point.x) < 0.03 && Math.abs(point.y - joints.thigh_l[0].y) < 0.02) crotchFront = Math.max(crotchFront, point.z);
   }
-  const result = { crotchFront, legs, arms, thighRadius: median(thighValues), armRadius: median(armValues), chestY, chestZ, profileAt,
+  // профиль бёдер (наибольший радиус по направлениям между тазобедренными суставами и поясом, без рук) — от него висят полы
+  const hipTop = frame.waist - 0.05, hipSlice = [];
+  for (const source of part.source) {
+    const point = rest.point(source);
+    if (point.y > joints.thigh_l[0].y - 0.07 && point.y < hipTop && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.1) hipSlice.push(point);
+  }
+  const hipZValues = hipSlice.map((point) => point.z);
+  const hipZ = (Math.min(...hipZValues) + Math.max(...hipZValues)) / 2, hipProfile = new Float32Array(BINS);
+  for (const point of hipSlice) {
+    const bin = Math.floor((Math.atan2(point.x, point.z - hipZ) / (Math.PI * 2) + 0.5) * BINS) % BINS;
+    hipProfile[bin] = Math.max(hipProfile[bin], Math.hypot(point.x, point.z - hipZ));
+  }
+  const hipSmoothed = hipProfile.map((value, bin) => (hipProfile[(bin + BINS - 1) % BINS] + value * 2 + hipProfile[(bin + 1) % BINS]) / 4);
+  const hipProfileAt = (angle) => {
+    const position = (angle / (Math.PI * 2) + 0.5) * BINS - 0.5;
+    const low = Math.floor(position), mix = position - low;
+    return hipSmoothed[(low + BINS) % BINS] * (1 - mix) + hipSmoothed[(low + 1) % BINS] * mix;
+  };
+  const result = { hipZ, hipTop, hipProfileAt, crotchFront, legs, arms, thighRadius: median(thighValues), armRadius: median(armValues), chestY, chestZ, profileAt,
     hipY: joints.thigh_l[0].y, kneeY: joints.calf_l[0].y, footY: joints.foot_l[0].y };
   bagCache.set(kind, result);
   return result;
@@ -784,7 +807,7 @@ export function buildHumanBody(options, pose) {
         const name = `${finger}_${segment}_${side}`;
         const bone = bones[BONE[name]];
         const axis = across.clone().multiplyScalar(side === 'l' ? 1 : -1);
-        bone.quaternion.setFromAxisAngle(axis, angle * (pose.handsOnHead ? 1.6 : 1));
+        bone.quaternion.setFromAxisAngle(axis, angle * (pose.grip ? 2.1 : pose.handsOnHead ? 1.6 : 1));
       }
     }
     for (const [segment, angle] of [['02', 0.2], ['03', 0.25]]) bones[BONE[`thumb_${segment}_${side}`]].quaternion.setFromAxisAngle(across, angle * (side === 'l' ? 1 : -1));
@@ -911,6 +934,23 @@ export function buildHumanBody(options, pose) {
         const source = part.source[index];
         const shift = bagDisplace(kind, rest.point(source), source, skirtBag);
         position.setXYZ(index, position.getX(index) + shift.x, position.getY(index) + shift.y, position.getZ(index) + shift.z);
+      }
+      geometry.computeVertexNormals();
+    }
+    // полы висят от бёдер: не уже профиля бёдер, книзу чуть расходятся (не облегают ноги)
+    if (garment.hang) {
+      const shape = bagFrame(kind), position = geometry.attributes.position;
+      for (let index = 0; index < position.count; index++) {
+        const x = position.getX(index), y = position.getY(index), z = position.getZ(index);
+        const dz = z - shape.hipZ, radius = Math.hypot(x, dz);
+        if (radius < 1e-4) continue;
+        const angle = Math.atan2(x, dz);
+        const target = shape.hipProfileAt(angle) + garment.offset + 0.012 + garment.hang * Math.max(0, shape.hipTop - y);
+        const blend = smooth(frame0.waist, shape.hipTop - 0.04, y);
+        if (radius < target) {
+          const scale = (radius + (target - radius) * blend) / radius;
+          position.setX(index, x * scale); position.setZ(index, shape.hipZ + dz * scale);
+        }
       }
       geometry.computeVertexNormals();
     }

@@ -1,0 +1,3442 @@
+[
+{
+"name": "staffcommander_ease",
+"options": {
+"civilian": "commander",
+"pose": "idle"
+}
+},
+{
+"name": "staffcommander_idle",
+"options": {
+"civilian": "commander",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffcommander_standAim",
+"options": {
+"civilian": "commander",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffcommander_kneelAim",
+"options": {
+"civilian": "commander",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffcommander_walk_f0",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffcommander_walk_f1",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffcommander_walk_f2",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffcommander_walk_f3",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffcommander_walk_f4",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffcommander_walk_f5",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffcommander_walk_f6",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffcommander_walk_f7",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffcommander_walk_f8",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffcommander_walk_f9",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffcommander_walk_f10",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffcommander_walk_f11",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffcommander_walk_f12",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffcommander_walk_f13",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffcommander_walk_f14",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffcommander_walk_f15",
+"options": {
+"civilian": "commander",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffcommander_fall_f0",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffcommander_fall_f1",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffcommander_fall_f2",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffcommander_fall_f3",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffcommander_fall_f4",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffcommander_fall_f5",
+"options": {
+"civilian": "commander",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffcommander_dead",
+"options": {
+"civilian": "commander",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffofficer_ease",
+"options": {
+"civilian": "officer",
+"pose": "idle"
+}
+},
+{
+"name": "staffofficer_idle",
+"options": {
+"civilian": "officer",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffofficer_standAim",
+"options": {
+"civilian": "officer",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffofficer_kneelAim",
+"options": {
+"civilian": "officer",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffofficer_walk_f0",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffofficer_walk_f1",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffofficer_walk_f2",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffofficer_walk_f3",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffofficer_walk_f4",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffofficer_walk_f5",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffofficer_walk_f6",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffofficer_walk_f7",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffofficer_walk_f8",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffofficer_walk_f9",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffofficer_walk_f10",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffofficer_walk_f11",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffofficer_walk_f12",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffofficer_walk_f13",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffofficer_walk_f14",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffofficer_walk_f15",
+"options": {
+"civilian": "officer",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffofficer_fall_f0",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffofficer_fall_f1",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffofficer_fall_f2",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffofficer_fall_f3",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffofficer_fall_f4",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffofficer_fall_f5",
+"options": {
+"civilian": "officer",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffofficer_dead",
+"options": {
+"civilian": "officer",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffdoctor_ease",
+"options": {
+"civilian": "doctor",
+"pose": "idle"
+}
+},
+{
+"name": "staffdoctor_idle",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffdoctor_standAim",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffdoctor_kneelAim",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffdoctor_walk_f0",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffdoctor_walk_f1",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffdoctor_walk_f2",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffdoctor_walk_f3",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffdoctor_walk_f4",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffdoctor_walk_f5",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffdoctor_walk_f6",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffdoctor_walk_f7",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffdoctor_walk_f8",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffdoctor_walk_f9",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffdoctor_walk_f10",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffdoctor_walk_f11",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffdoctor_walk_f12",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffdoctor_walk_f13",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffdoctor_walk_f14",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffdoctor_walk_f15",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffdoctor_fall_f0",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffdoctor_fall_f1",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffdoctor_fall_f2",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffdoctor_fall_f3",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffdoctor_fall_f4",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffdoctor_fall_f5",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffdoctor_dead",
+"options": {
+"civilian": "doctor",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffsurgeon_ease",
+"options": {
+"civilian": "surgeon",
+"pose": "idle"
+}
+},
+{
+"name": "staffsurgeon_idle",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffsurgeon_standAim",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffsurgeon_kneelAim",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffsurgeon_walk_f0",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffsurgeon_walk_f1",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffsurgeon_walk_f2",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffsurgeon_walk_f3",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffsurgeon_walk_f4",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffsurgeon_walk_f5",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffsurgeon_walk_f6",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffsurgeon_walk_f7",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffsurgeon_walk_f8",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffsurgeon_walk_f9",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffsurgeon_walk_f10",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffsurgeon_walk_f11",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffsurgeon_walk_f12",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffsurgeon_walk_f13",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffsurgeon_walk_f14",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffsurgeon_walk_f15",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffsurgeon_fall_f0",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffsurgeon_fall_f1",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffsurgeon_fall_f2",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffsurgeon_fall_f3",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffsurgeon_fall_f4",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffsurgeon_fall_f5",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffsurgeon_dead",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffnurse_ease",
+"options": {
+"civilian": "nurse",
+"pose": "idle"
+}
+},
+{
+"name": "staffnurse_idle",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffnurse_standAim",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffnurse_kneelAim",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffnurse_walk_f0",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffnurse_walk_f1",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffnurse_walk_f2",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffnurse_walk_f3",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffnurse_walk_f4",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffnurse_walk_f5",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffnurse_walk_f6",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffnurse_walk_f7",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffnurse_walk_f8",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffnurse_walk_f9",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffnurse_walk_f10",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffnurse_walk_f11",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffnurse_walk_f12",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffnurse_walk_f13",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffnurse_walk_f14",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffnurse_walk_f15",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffnurse_fall_f0",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffnurse_fall_f1",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffnurse_fall_f2",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffnurse_fall_f3",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffnurse_fall_f4",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffnurse_fall_f5",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffnurse_dead",
+"options": {
+"civilian": "nurse",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "stafflabwoman_ease",
+"options": {
+"civilian": "labwoman",
+"pose": "idle"
+}
+},
+{
+"name": "stafflabwoman_idle",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "stafflabwoman_standAim",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "stafflabwoman_kneelAim",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "stafflabwoman_walk_f0",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "stafflabwoman_walk_f1",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "stafflabwoman_walk_f2",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "stafflabwoman_walk_f3",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "stafflabwoman_walk_f4",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "stafflabwoman_walk_f5",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "stafflabwoman_walk_f6",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "stafflabwoman_walk_f7",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "stafflabwoman_walk_f8",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "stafflabwoman_walk_f9",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "stafflabwoman_walk_f10",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "stafflabwoman_walk_f11",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "stafflabwoman_walk_f12",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "stafflabwoman_walk_f13",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "stafflabwoman_walk_f14",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "stafflabwoman_walk_f15",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "stafflabwoman_fall_f0",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "stafflabwoman_fall_f1",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "stafflabwoman_fall_f2",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "stafflabwoman_fall_f3",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "stafflabwoman_fall_f4",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "stafflabwoman_fall_f5",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "stafflabwoman_dead",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffhazmat_ease",
+"options": {
+"civilian": "hazmat",
+"pose": "idle"
+}
+},
+{
+"name": "staffhazmat_idle",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffhazmat_standAim",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffhazmat_kneelAim",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffhazmat_walk_f0",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffhazmat_walk_f1",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffhazmat_walk_f2",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffhazmat_walk_f3",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffhazmat_walk_f4",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffhazmat_walk_f5",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffhazmat_walk_f6",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffhazmat_walk_f7",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffhazmat_walk_f8",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffhazmat_walk_f9",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffhazmat_walk_f10",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffhazmat_walk_f11",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffhazmat_walk_f12",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffhazmat_walk_f13",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffhazmat_walk_f14",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffhazmat_walk_f15",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffhazmat_fall_f0",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffhazmat_fall_f1",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffhazmat_fall_f2",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffhazmat_fall_f3",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffhazmat_fall_f4",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffhazmat_fall_f5",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffhazmat_dead",
+"options": {
+"civilian": "hazmat",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffengineerw_ease",
+"options": {
+"civilian": "engineerw",
+"pose": "idle"
+}
+},
+{
+"name": "staffengineerw_idle",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffengineerw_standAim",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffengineerw_kneelAim",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffengineerw_walk_f0",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffengineerw_walk_f1",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffengineerw_walk_f2",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffengineerw_walk_f3",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffengineerw_walk_f4",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffengineerw_walk_f5",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffengineerw_walk_f6",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffengineerw_walk_f7",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffengineerw_walk_f8",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffengineerw_walk_f9",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffengineerw_walk_f10",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffengineerw_walk_f11",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffengineerw_walk_f12",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffengineerw_walk_f13",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffengineerw_walk_f14",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffengineerw_walk_f15",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffengineerw_fall_f0",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffengineerw_fall_f1",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffengineerw_fall_f2",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffengineerw_fall_f3",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffengineerw_fall_f4",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffengineerw_fall_f5",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffengineerw_dead",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffelectrician_ease",
+"options": {
+"civilian": "electrician",
+"pose": "idle"
+}
+},
+{
+"name": "staffelectrician_idle",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffelectrician_standAim",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffelectrician_kneelAim",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffelectrician_walk_f0",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffelectrician_walk_f1",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffelectrician_walk_f2",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffelectrician_walk_f3",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffelectrician_walk_f4",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffelectrician_walk_f5",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffelectrician_walk_f6",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffelectrician_walk_f7",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffelectrician_walk_f8",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffelectrician_walk_f9",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffelectrician_walk_f10",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffelectrician_walk_f11",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffelectrician_walk_f12",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffelectrician_walk_f13",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffelectrician_walk_f14",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffelectrician_walk_f15",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffelectrician_fall_f0",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffelectrician_fall_f1",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffelectrician_fall_f2",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffelectrician_fall_f3",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffelectrician_fall_f4",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffelectrician_fall_f5",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffelectrician_dead",
+"options": {
+"civilian": "electrician",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffplumber_ease",
+"options": {
+"civilian": "plumber",
+"pose": "idle"
+}
+},
+{
+"name": "staffplumber_idle",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffplumber_standAim",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffplumber_kneelAim",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffplumber_walk_f0",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffplumber_walk_f1",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffplumber_walk_f2",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffplumber_walk_f3",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffplumber_walk_f4",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffplumber_walk_f5",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffplumber_walk_f6",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffplumber_walk_f7",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffplumber_walk_f8",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffplumber_walk_f9",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffplumber_walk_f10",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffplumber_walk_f11",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffplumber_walk_f12",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffplumber_walk_f13",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffplumber_walk_f14",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffplumber_walk_f15",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffplumber_fall_f0",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffplumber_fall_f1",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffplumber_fall_f2",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffplumber_fall_f3",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffplumber_fall_f4",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffplumber_fall_f5",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffplumber_dead",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffcook_ease",
+"options": {
+"civilian": "cook",
+"pose": "idle"
+}
+},
+{
+"name": "staffcook_idle",
+"options": {
+"civilian": "cook",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffcook_standAim",
+"options": {
+"civilian": "cook",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffcook_kneelAim",
+"options": {
+"civilian": "cook",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffcook_walk_f0",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffcook_walk_f1",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffcook_walk_f2",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffcook_walk_f3",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffcook_walk_f4",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffcook_walk_f5",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffcook_walk_f6",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffcook_walk_f7",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffcook_walk_f8",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffcook_walk_f9",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffcook_walk_f10",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffcook_walk_f11",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffcook_walk_f12",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffcook_walk_f13",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffcook_walk_f14",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffcook_walk_f15",
+"options": {
+"civilian": "cook",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffcook_fall_f0",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffcook_fall_f1",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffcook_fall_f2",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffcook_fall_f3",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffcook_fall_f4",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffcook_fall_f5",
+"options": {
+"civilian": "cook",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffcook_dead",
+"options": {
+"civilian": "cook",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffcookw_ease",
+"options": {
+"civilian": "cookw",
+"pose": "idle"
+}
+},
+{
+"name": "staffcookw_idle",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffcookw_standAim",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffcookw_kneelAim",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffcookw_walk_f0",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffcookw_walk_f1",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffcookw_walk_f2",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffcookw_walk_f3",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffcookw_walk_f4",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffcookw_walk_f5",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffcookw_walk_f6",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffcookw_walk_f7",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffcookw_walk_f8",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffcookw_walk_f9",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffcookw_walk_f10",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffcookw_walk_f11",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffcookw_walk_f12",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffcookw_walk_f13",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffcookw_walk_f14",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffcookw_walk_f15",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffcookw_fall_f0",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffcookw_fall_f1",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffcookw_fall_f2",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffcookw_fall_f3",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffcookw_fall_f4",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffcookw_fall_f5",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffcookw_dead",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffcleaner_ease",
+"options": {
+"civilian": "cleaner",
+"pose": "idle"
+}
+},
+{
+"name": "staffcleaner_idle",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffcleaner_standAim",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffcleaner_kneelAim",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffcleaner_walk_f0",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffcleaner_walk_f1",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffcleaner_walk_f2",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffcleaner_walk_f3",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffcleaner_walk_f4",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffcleaner_walk_f5",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffcleaner_walk_f6",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffcleaner_walk_f7",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffcleaner_walk_f8",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffcleaner_walk_f9",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffcleaner_walk_f10",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffcleaner_walk_f11",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffcleaner_walk_f12",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffcleaner_walk_f13",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffcleaner_walk_f14",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffcleaner_walk_f15",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffcleaner_fall_f0",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffcleaner_fall_f1",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffcleaner_fall_f2",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffcleaner_fall_f3",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffcleaner_fall_f4",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffcleaner_fall_f5",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffcleaner_dead",
+"options": {
+"civilian": "cleaner",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffcleanerm_ease",
+"options": {
+"civilian": "cleanerm",
+"pose": "idle"
+}
+},
+{
+"name": "staffcleanerm_idle",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffcleanerm_standAim",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffcleanerm_kneelAim",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffcleanerm_walk_f0",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffcleanerm_walk_f1",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffcleanerm_walk_f2",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffcleanerm_walk_f3",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffcleanerm_walk_f4",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffcleanerm_walk_f5",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffcleanerm_walk_f6",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffcleanerm_walk_f7",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffcleanerm_walk_f8",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffcleanerm_walk_f9",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffcleanerm_walk_f10",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffcleanerm_walk_f11",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffcleanerm_walk_f12",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffcleanerm_walk_f13",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffcleanerm_walk_f14",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffcleanerm_walk_f15",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffcleanerm_fall_f0",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffcleanerm_fall_f1",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffcleanerm_fall_f2",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffcleanerm_fall_f3",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffcleanerm_fall_f4",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffcleanerm_fall_f5",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffcleanerm_dead",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffscientist_ease",
+"options": {
+"civilian": "scientist",
+"pose": "idle"
+}
+},
+{
+"name": "staffscientist_idle",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffscientist_standAim",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffscientist_kneelAim",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffscientist_walk_f0",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffscientist_walk_f1",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffscientist_walk_f2",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffscientist_walk_f3",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffscientist_walk_f4",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffscientist_walk_f5",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffscientist_walk_f6",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffscientist_walk_f7",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffscientist_walk_f8",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffscientist_walk_f9",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffscientist_walk_f10",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffscientist_walk_f11",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffscientist_walk_f12",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffscientist_walk_f13",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffscientist_walk_f14",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffscientist_walk_f15",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffscientist_fall_f0",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffscientist_fall_f1",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffscientist_fall_f2",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffscientist_fall_f3",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffscientist_fall_f4",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffscientist_fall_f5",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffscientist_dead",
+"options": {
+"civilian": "scientist",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffengineer_ease",
+"options": {
+"civilian": "engineer",
+"pose": "idle"
+}
+},
+{
+"name": "staffengineer_idle",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffengineer_standAim",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffengineer_kneelAim",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffengineer_walk_f0",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffengineer_walk_f1",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffengineer_walk_f2",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffengineer_walk_f3",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffengineer_walk_f4",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffengineer_walk_f5",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffengineer_walk_f6",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffengineer_walk_f7",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffengineer_walk_f8",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffengineer_walk_f9",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffengineer_walk_f10",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffengineer_walk_f11",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffengineer_walk_f12",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffengineer_walk_f13",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffengineer_walk_f14",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffengineer_walk_f15",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffengineer_fall_f0",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffengineer_fall_f1",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffengineer_fall_f2",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffengineer_fall_f3",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffengineer_fall_f4",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffengineer_fall_f5",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffengineer_dead",
+"options": {
+"civilian": "engineer",
+"armed": true,
+"dead": true
+}
+}
+]

@@ -8,7 +8,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { segment, ball, solveTwoBone, setShadows } from './lib.js';
 import { clothLimb, FOLDS, buildBoot } from './cloth.js';
 import { fabric, pvc, rubber } from './person.js';
-import { buildHumanBody, prepareHuman } from './human.js';
+import { buildHumanBody, prepareHuman, restJoints } from './human.js';
+import { buildRifle } from './weapons.js';
 export { prepareHuman };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -109,6 +110,10 @@ function materialsFor(kind) {
     materials.boot = rubber(0x121212);
     materials.lace = rubber(0x121212);
   }
+  // боевое снаряжение персонала: бронежилет и подсумки из кордуры, шлем матовый
+  materials.armor = cloth(0x4e4c36, 0.95, 'twill');
+  materials.armorDark = cloth(0x34352a, 0.95, 'twill');
+  materials.armorHelmet = new THREE.MeshStandardMaterial({ color: 0x484c38, roughness: 0.8 });
   materials.button = new THREE.MeshStandardMaterial({ color: look.uniform ? 0xb89a48 : 0xe8e6e0, roughness: 0.35, metalness: look.uniform ? 0.7 : 0 });
   materials.seam = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0.25 });
   prepared[kind] = materials;
@@ -156,10 +161,53 @@ export function civilianWalk(phase) {
   };
 }
 
+// ---------- с оружием: персонал базы при обороне ----------
+// Позы как у бойца (soldier2.js): ready 'low' — автомат у груди стволом вниз, 'aim' — приклад у плеча (+x, как у бойца).
+// Голова (мировой поворот) смотрит вперёд, щекой к прикладу.
+export const ARMED_POSES = {
+  idle: {
+    pelvis: V(0, 0.96, 0), lean: 0.05, twist: 0.12, feet: [V(-0.13, 0.08, 0.06), V(0.14, 0.08, -0.04)], footPitch: [0, 0], footYaw: [-0.1, 0.15],
+    kneePole: [V(-0.1, 0, 1), V(0.1, 0, 1)], head: [0.06, 0, 0], aimPitch: -0.55, ready: 'low',
+  },
+  standAim: {
+    pelvis: V(0, 0.95, 0), lean: 0.1, twist: 0.32, feet: [V(-0.15, 0.08, 0.24), V(0.17, 0.08, -0.18)], footPitch: [0, 0.1], footYaw: [0.1, 0.35],
+    kneePole: [V(0, 0, 1), V(0.2, 0, 1)], head: [0.1, 0, 0.12], aimPitch: 0.02, ready: 'aim',
+  },
+  kneelAim: {
+    pelvis: V(0.02, 0.57, -0.06), lean: 0.18, twist: 0.36, feet: [V(-0.15, 0.08, 0.34), V(0.17, 0.1, -0.46)], footPitch: [0, 1.0], footYaw: [0.1, 0.3],
+    kneePole: [V(0, 0.2, 1), V(0, -1, 0.5)], head: [0.12, 0, 0.12], aimPitch: 0.05, ready: 'aim',
+  },
+};
+// ходьба с оружием: ноги — как у гражданского, автомат у груди
+export function armedWalk(phase) {
+  const base = civilianWalk(phase);
+  return { ...base, hands: undefined, elbowPoles: undefined, twist: 0.12 + base.twist * 0.25, lean: 0.08, head: [0.05, 0, 0], aimPitch: -0.5, ready: 'low' };
+}
+// автомат по позе: положение у плеча в координатах модели, кисти — на пистолетной рукоятке и цевье
+function placeRifle(kind, spec, pelvis, torsoQuat) {
+  const joints = restJoints(kind);
+  const posed = (name) => joints[name].clone().sub(joints.pelvis).applyQuaternion(torsoQuat).add(pelvis);
+  const shoulder = posed('upperarm_l');
+  const rifle = buildRifle();
+  if (spec.ready === 'aim') {
+    rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, 0, -0.05, 'YXZ'));
+    rifle.position.copy(shoulder).add(V(-0.075, 0.05, 0.03).applyQuaternion(torsoQuat));
+  } else {
+    rifle.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, -0.45, 0, 'YXZ'));
+    rifle.position.copy(shoulder).add(V(-0.05, -0.1, 0.1).applyQuaternion(torsoQuat));
+  }
+  rifle.updateMatrixWorld(true);
+  const hands = [rifle.localToWorld(V(-0.01, -0.035, 0.5)), rifle.localToWorld(rifle.userData.grip.clone())];
+  const elbowPoles = [V(-0.9, -1, -0.1).applyQuaternion(torsoQuat), V(0.8, -1, -0.3).applyQuaternion(torsoQuat)];
+  return { rifle, hands, elbowPoles };
+}
+
 // ---------- модель ----------
-export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
-  const look = CIVILIANS[kind];
-  const spec = typeof pose === 'string' ? CIVILIAN_POSES[pose] : pose;
+// armed — боевой вид персонала: бронежилет и каска поверх рабочей одежды (головные уборы снимаются), автомат в позах с ready
+export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {}) {
+  const baseLook = CIVILIANS[kind];
+  const look = armed ? { ...baseLook, cap: null, chefHat: null, nurseCap: null, helmet: null, scrubCap: null, baseballCap: null, vest: null, tablet: null } : baseLook;
+  const spec = typeof pose === 'string' ? (armed && ARMED_POSES[pose] ? ARMED_POSES[pose] : CIVILIAN_POSES[pose]) : pose;
   const materials = materialsFor(kind);
   const person = new THREE.Group();
   const add = (object) => { person.add(object); return object; };
@@ -191,8 +239,8 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
     layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008, ...folds(foldAmount * (look.coat ? 0.5 : 1)) });
   }
   if (look.coat) {
-    layer('top', materials.coat, 0.017, { flare: 0.012, ...folds(0.8) });
-    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, material: materials.coat, offset: 0.02, ...folds(0.8) });
+    layer('top', materials.coat, 0.017, { flare: 0.024, ...folds(0.9) });
+    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, hang: 0.16, material: materials.coat, offset: 0.02, ...folds(0.9) });
   }
   if (look.vest) {
     layer('vest', materials.vest, 0.022);
@@ -208,11 +256,15 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   const baggy = look.uniform ? { torso: 0.85, legs: 1, arms: 0.65 }
     : look.hazmat ? { torso: 0.6, legs: 0.7, arms: 0.5, tucked: true }
     : coverall ? { torso: 1, legs: 1, arms: 0.8, tucked: !!look.boots }
-    : look.coat ? { torso: 0.75, legs: 0.45, arms: 0.45 }
+    : look.coat ? { torso: 1, legs: 0.45, arms: 0.95 }
     : { torso: 0.45, legs: 0.4, arms: 0.3 };
+  // бронежилет поверх верхнего слоя одежды
+  const armorOffset = look.coat || look.hazmat ? 0.044 : 0.035;
+  if (armed) layer('vest', materials.armor, armorOffset, { relax: 12, loose: 0 });
+  const weapon = armed && spec.ready && !spec.limp ? placeRifle(kind, spec, pelvis, torsoQuat) : null;
   const human = buildHumanBody({ kind, look, garments, baggy, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
-    pelvis, pelvisQuat, torsoQuat, headQuat, hands: spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead,
-    elbowPoles: spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
+    pelvis, pelvisQuat, torsoQuat, headQuat, hands: weapon ? weapon.hands : spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead, grip: !!weapon,
+    elbowPoles: weapon ? weapon.elbowPoles : spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
   });
   add(human.group);
   const { joints, headCenter, rest } = human;
@@ -412,9 +464,26 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
     tablet.quaternion.copy(torsoQuat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, 0.6, 0)));
   }
 
+  // ---- боевое снаряжение: подсумки на бронежилете, каска, автомат ----
+  if (armed) {
+    // три магазинных подсумка внизу спереди, радиостанция слева на груди, аптечка справа
+    for (const x of [-0.085, 0, 0.085]) placed(box(0.072, 0.11, 0.045, materials.armor, 0.01), front(x, waistY + 0.07, armorOffset + 0.022), torsoQuat);
+    placed(box(0.06, 0.12, 0.04, materials.armorDark, 0.01), front(-0.1, chestY + 0.02, armorOffset + 0.02), torsoQuat);
+    placed(box(0.09, 0.07, 0.04, materials.armor, 0.01), front(0.1, chestY - 0.02, armorOffset + 0.02), torsoQuat);
+    if (!look.hazmat) {
+      // общевойсковой шлем: купол ниже ушей сбоку и сзади, спереди край над бровями; площадка крепления спереди
+      const base = browY - 0.004, height = crownY - base + 0.016;
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.6), materials.armorHelmet);
+      inHead(shell, 0, base, -0.012, headExact).scale.set(skullX + 0.03, height, skullZ + 0.032);
+      shell.rotation.x = -0.26;
+    }
+  }
+  if (weapon) add(weapon.rifle);
+
   setShadows(person);
   person.traverse((node) => { if (node.isSkinnedMesh) node.frustumCulled = false; });
   person.userData = { head: headCenter.clone(), joints };
+  if (weapon) person.userData.muzzle = weapon.rifle.localToWorld(weapon.rifle.userData.muzzle.clone());
   if (look.child) {
     // ребёнок: вся фигура меньше; суставы и голова — в тех же координатах после уменьшения
     const holder = new THREE.Group();
@@ -467,19 +536,20 @@ function sample(progress) {
   return { spec: dead, angle: Math.PI / 2 };
 }
 const finalOffsets = new Map();
-export function civilianFall(kind, progress) {
+export function civilianFall(kind, progress, armed = false) {
   const posed = (value) => {
     const { spec, angle } = sample(value);
-    const model = buildCivilian({ kind, pose: { ...spec, limp: true } });
+    const model = buildCivilian({ kind, pose: { ...spec, limp: true }, armed });
     model.rotation.x = -angle;
     model.updateMatrixWorld(true);
     return { model, angle, box: new THREE.Box3().setFromObject(model, true) };
   };
-  if (!finalOffsets.has(kind)) {
+  const offsetKey = kind + (armed ? ':armed' : '');
+  if (!finalOffsets.has(offsetKey)) {
     const center = posed(1).box.getCenter(V(0, 0, 0));
-    finalOffsets.set(kind, V(-center.x, 0, -center.z));
+    finalOffsets.set(offsetKey, V(-center.x, 0, -center.z));
   }
-  const offset = finalOffsets.get(kind);
+  const offset = finalOffsets.get(offsetKey);
   const { model, angle, box } = posed(progress);
   const slide = Math.sin(angle) * smoothstep(0, 1, progress);
   model.position.set(offset.x * slide, -box.min.y, offset.z * slide);
