@@ -358,8 +358,10 @@ function fabricTextures(weave, seed) {
     // складки: мягкие длинные волны с изломами
     const warp = tileNoise(u, v, 3, 2, seed + 2) * 0.4;
     const wrinkles = tileNoise(u + warp, v * 0.6, 4, 4, seed) * 1.6 + Math.pow(Math.abs(Math.sin((v * 0.7 + u * 0.2 + warp) * Math.PI * 6)), 0.3) * -0.35;
-    heights[y * size + x] = pattern * 0.06 + wrinkles;
-    shade[y * size + x] = pattern * 0.05 + tileNoise(u, v, 8, 3, seed + 5) * 0.08 + (rng() - 0.5) * 0.04 - Math.max(0, -wrinkles) * 0.06;
+    // складки теперь в геометрии (human.js): в карте нормалей — плетение и мелкая мятость
+    heights[y * size + x] = pattern * 0.12 + wrinkles * 0.35;
+    // цвет: нить, неровность окраски, потёртости пятнами
+    shade[y * size + x] = pattern * 0.07 + tileNoise(u, v, 8, 3, seed + 5) * 0.06 + tileNoise(u, v, 2, 2, seed + 9) * 0.07 + (rng() - 0.5) * 0.05 - Math.max(0, -wrinkles) * 0.03;
   }
   const result = { normal: normalFromHeight(heights, size, 4), shade };
   result.normal.repeat.set(2, 2);
@@ -392,7 +394,7 @@ export function fabric(color, weave = 'plain', { roughness = 0.92, sheen = 0.5, 
   // цвет карты — в sRGB; базовый цвет материала белый, чтобы не умножать дважды
   const material = new THREE.MeshPhysicalMaterial({
     map: fabricMap(color, textures.shade),
-    normalMap: textures.normal, normalScale: new THREE.Vector2(0.3, 0.3), roughness, side: THREE.DoubleSide,
+    normalMap: textures.normal, normalScale: new THREE.Vector2(0.55, 0.55), roughness, side: THREE.DoubleSide,
     sheen, sheenRoughness: 0.75, sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.5),
   });
   materialCache.set(key, material);

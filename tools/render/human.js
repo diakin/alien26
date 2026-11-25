@@ -536,6 +536,163 @@ function bagDisplace(kind, point, source, bag) {
   return out;
 }
 
+// ---------------- складки ----------------
+// Складки — смещение по нормали на сетке одежды, поделённой один раз (края по 1 см): у колена и под ним — поперечные,
+// у щиколотки — набегающие на обувь (у заправленных в ботинки — напуск над голенищем), у локтя и манжеты — поперечные,
+// вдоль штанин и рукавов — продольные (ткань висит), у пояса — сборка, от подмышек — косые. Форма складки: гребень
+// узкий, впадина широкая; смещение в основном внутрь, чтобы не протыкать верхние слои.
+function hash3(x, y, z) { const value = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return value - Math.floor(value); }
+function noise3(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  const fx = x - ix, fy = y - iy, fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), sz = fz * fz * (3 - 2 * fz);
+  let total = 0;
+  for (let corner = 0; corner < 8; corner++) {
+    const dx = corner & 1, dy = (corner >> 1) & 1, dz = (corner >> 2) & 1;
+    total += hash3(ix + dx, iy + dy, iz + dz) * (dx ? sx : 1 - sx) * (dy ? sy : 1 - sy) * (dz ? sz : 1 - sz);
+  }
+  return total;
+}
+// профиль складки по фазе (период 1): 0,3 на гребне, −1 во впадине; плавный, гребень острее
+const crease = (phase) => { const wave = Math.cos(phase * Math.PI * 2); return wave > 0 ? 0.45 * wave ** 0.6 : -((-wave) ** 0.8); };
+const gauss = (value, width) => Math.exp(-(value * value) / (2 * width * width));
+
+function foldDisplace(kind, point, legWeight, armWeight, folds) {
+  const shape = bagFrame(kind), frame = restOf(kind).frame;
+  const amount = folds.amount ?? 1, scale = folds.scale ?? 1;
+  const jitter = noise3(point.x * 9 + 3.1, point.y * 9, point.z * 9) * 2 - 1;
+  let total = 0;
+  if (legWeight > 0.3 && point.y < shape.hipY + 0.03) {
+    const side = point.x > 0 ? 1 : -1;
+    const near = shape.legs[side > 0 ? 'l' : 'r'](point);
+    const radial = point.clone().sub(near.axis);
+    // угол вокруг ноги: 0 — спереди, π/2 — снаружи, π — сзади
+    const angle = Math.atan2(radial.x * side, radial.z), back = (1 - Math.cos(angle)) / 2;
+    const along = shape.hipY - point.y;
+    // колено: поперечные складки, сзади сильнее
+    total += 0.0065 * gauss(near.t - 0.52, 0.08) * (0.45 + 0.55 * back) * crease(along / (0.042 * scale) + 0.7 * Math.sin(angle + jitter * 2.5));
+    // низ штанины: набегает на обувь; заправленные — напуск над голенищем
+    // напуск — наружу, поверх голенища
+    if (folds.hem === false) { /* низ штанины в высоких сапогах — без складок */ } else if (folds.tucked) total += 0.008 * gauss(point.y - (shape.footY + 0.14), 0.035) * (0.9 + crease(along / (0.03 * scale) + 0.9 * Math.sin(angle * 2 + jitter * 3)));
+    else total += 0.006 * smooth(0.8, 0.94, near.t) * crease(along / (0.032 * scale) + 0.8 * Math.sin(angle * 1.5 + jitter * 3));
+    // продольные складки: ткань висит от бедра до низа
+    total += 0.0035 * smooth(0.12, 0.3, near.t) * (1 - smooth(0.85, 0.97, near.t)) * crease(angle * 4 / (Math.PI * 2) * scale ** -0.5 + jitter * 0.6 + side * 0.2);
+    // от промежности по внутренней стороне бедра — косые
+    const inner = Math.max(0, -Math.sin(angle));
+    total += 0.004 * gauss(near.t - 0.12, 0.07) * inner * crease((along * 0.8 - Math.abs(point.x) * 0.9) / (0.04 * scale) + jitter);
+  } else if (armWeight > 0.3) {
+    const side = point.x > 0 ? 1 : -1;
+    const near = shape.arms[side > 0 ? 'l' : 'r'](point);
+    const radial = point.clone().sub(near.axis);
+    const angle = Math.atan2(radial.x * side, radial.z), front = (1 + Math.cos(angle)) / 2;
+    const along = near.t * 0.55;
+    // локоть: поперечные складки, на сгибе (спереди в опущенной руке) сильнее
+    total += 0.0055 * gauss(near.t - 0.5, 0.085) * (0.35 + 0.65 * front) * crease(along / (0.034 * scale) + 0.8 * Math.sin(angle + jitter * 2.5));
+    // манжета: набегает к запястью
+    total += 0.0045 * smooth(0.76, 0.9, near.t) * crease(along / (0.028 * scale) + jitter * 2);
+    // у плеча и подмышки — косые
+    total += 0.0035 * (1 - smooth(0.12, 0.3, near.t)) * Math.max(0, -Math.sin(angle)) * crease((along + angle * 0.03) / (0.035 * scale) + jitter);
+    // продольные вдоль рукава
+    total += 0.0022 * smooth(0.15, 0.3, near.t) * (1 - smooth(0.75, 0.9, near.t)) * crease(angle * 3 / (Math.PI * 2) + jitter * 0.5);
+  } else {
+    const theta = Math.atan2(point.x, point.z - shape.chestZ);
+    // сборка у пояса (под ремнём сильнее) — вертикальные складки
+    const waist = folds.belted ? gauss(point.y - frame.waist - 0.012, 0.05) : 0.45 * gauss(point.y - frame.waist + 0.04, 0.07);
+    total += 0.0045 * waist * crease(theta * 15 / (Math.PI * 2) / scale + jitter * 0.8);
+    // косые от подмышек к середине груди и спины
+    const armpit = gauss(Math.abs(point.x) - 0.12, 0.05) * gauss(point.y - (shape.chestY - 0.03), 0.07);
+    total += 0.0035 * armpit * crease((Math.abs(point.x) * 0.75 + point.y * 0.65) / (0.04 * scale) + jitter);
+    // свободный низ и полы: продольные складки
+    const hang = smooth(frame.waist - 0.04, frame.waist - 0.16, point.y);
+    total += 0.004 * hang * crease(theta * 10 / (Math.PI * 2) / scale + jitter);
+    // спина ниже лопаток у свободной одежды
+    const back = Math.max(0, -Math.cos(theta));
+    total += 0.0025 * back * smooth(shape.chestY - 0.02, shape.chestY - 0.12, point.y) * smooth(frame.waist - 0.06, frame.waist + 0.05, point.y) * crease(theta * 8 / (Math.PI * 2) + jitter);
+  }
+  return total * amount * 1.8;
+}
+
+// разбить каждый треугольник на четыре (середины рёбер); атрибуты — средние, веса костей — четыре наибольших
+function subdivide(geometry) {
+  const index = geometry.index.array, count = geometry.attributes.position.count;
+  const edges = new Map(), extra = [];
+  const midpoint = (first, second) => {
+    const key = first < second ? first * count + second : second * count + first;
+    let vertex = edges.get(key);
+    if (vertex === undefined) { vertex = count + extra.length; extra.push([first, second]); edges.set(key, vertex); }
+    return vertex;
+  };
+  const faces = [];
+  for (let triangle = 0; triangle < index.length; triangle += 3) {
+    const a = index[triangle], b = index[triangle + 1], c = index[triangle + 2];
+    const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+    faces.push(a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca);
+  }
+  const total = count + extra.length, result = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(geometry.attributes)) {
+    if (name === 'normal' || name === 'uv') continue;
+    const size = attribute.itemSize, source = attribute.array;
+    const array = new source.constructor(total * size);
+    array.set(source);
+    if (name === 'skinIndex' || name === 'skinWeight') continue;
+    extra.forEach(([first, second], offset) => {
+      for (let item = 0; item < size; item++) array[(count + offset) * size + item] = (source[first * size + item] + source[second * size + item]) / 2;
+    });
+    result.setAttribute(name, new THREE.BufferAttribute(array, size));
+  }
+  if (geometry.attributes.skinIndex) {
+    const bones = geometry.attributes.skinIndex.array, weights = geometry.attributes.skinWeight.array;
+    const skinIndex = new Uint16Array(total * 4), skinWeight = new Float32Array(total * 4);
+    skinIndex.set(bones); skinWeight.set(weights);
+    extra.forEach(([first, second], offset) => {
+      const merged = new Map();
+      for (const vertex of [first, second]) for (let slot = 0; slot < 4; slot++) {
+        const bone = bones[vertex * 4 + slot], weight = weights[vertex * 4 + slot] / 2;
+        if (weight > 0) merged.set(bone, (merged.get(bone) || 0) + weight);
+      }
+      const best = [...merged].sort((left, right) => right[1] - left[1]).slice(0, 4);
+      const sum = best.reduce((value, [, weight]) => value + weight, 0) || 1;
+      best.forEach(([bone, weight], slot) => { skinIndex[(count + offset) * 4 + slot] = bone; skinWeight[(count + offset) * 4 + slot] = weight / sum; });
+    });
+    result.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+    result.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  }
+  result.setIndex(new THREE.BufferAttribute(new Uint32Array(faces), 1));
+  return result;
+}
+
+// складки на слое: поделить сетку, сместить по нормали (точка покоя и доли ног/рук — из атрибутов)
+function addFolds(geometry, kind, folds) {
+  const refined = subdivide(geometry);
+  refined.computeVertexNormals();
+  smoothNormals(refined);
+  const position = refined.attributes.position, normal = refined.attributes.normal, rest = refined.attributes.rest, limb = refined.attributes.limb;
+  const point = V(0, 0, 0);
+  for (let index = 0; index < position.count; index++) {
+    point.set(rest.getX(index), rest.getY(index), rest.getZ(index));
+    const shift = Math.max(-Math.max(0, limb.getZ(index) - 0.0065), foldDisplace(kind, point, limb.getX(index), limb.getY(index), folds));
+    position.setXYZ(index, position.getX(index) + normal.getX(index) * shift, position.getY(index) + normal.getY(index) * shift, position.getZ(index) + normal.getZ(index) * shift);
+  }
+  refined.deleteAttribute('rest'); refined.deleteAttribute('limb');
+  refined.computeVertexNormals();
+  smoothNormals(refined);
+  return refined;
+}
+// точка покоя и доли ног/рук у вершин куска сетки (для складок после деления)
+function tagRest(geometry, part, rest) {
+  const count = geometry.attributes.position.count, points = new Float32Array(count * 3), limbs = new Float32Array(count * 3);
+  for (let index = 0; index < count; index++) {
+    const source = part.source[index];
+    points.set(rest.point(source).toArray(), index * 3);
+    limbs[index * 3] = boneWeight(source, THIGH) + boneWeight(source, CALF) + boneWeight(source, FOOT);
+    limbs[index * 3 + 1] = boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND);
+    // зазор до тела: складка внутрь не глубже его части
+    limbs[index * 3 + 2] = Math.hypot(geometry.attributes.position.getX(index) - points[index * 3], geometry.attributes.position.getY(index) - points[index * 3 + 1], geometry.attributes.position.getZ(index) - points[index * 3 + 2]);
+  }
+  geometry.setAttribute('rest', new THREE.BufferAttribute(points, 3));
+  geometry.setAttribute('limb', new THREE.BufferAttribute(limbs, 3));
+}
+
 // ---------------- воротник и лацканы ----------------
 // радиус поверхности тела вокруг оси шеи на высоте y в направлении angle (0 — вперёд, ±π — назад)
 function surfaceRadius(kind, y, angle, centerZ) {
@@ -735,9 +892,11 @@ export function buildHumanBody(options, pose) {
         return baggy ? point.add(bagDisplace(kind, rest.point(part.source[index]), part.source[index], bag)) : point;
       }, { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
       applyMask(geometry, mask);
-      smoothNormals(geometry);
-      boxUV(geometry, garment.density || 2.4);
-      addSkinned(geometry, maskedMaterial(garment.material), 'garment');
+      let layered = geometry;
+      if (garment.folds) { tagRest(geometry, part, rest); layered = addFolds(geometry, kind, garment.folds); }
+      else smoothNormals(layered);
+      boxUV(layered, garment.density || 2.4);
+      addSkinned(layered, maskedMaterial(garment.material), 'garment');
       continue;
     }
     const geometry = partGeometry(part, restPoint(part), { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
@@ -755,8 +914,10 @@ export function buildHumanBody(options, pose) {
       }
       geometry.computeVertexNormals();
     }
-    boxUV(geometry, garment.density || 2.4);
-    addSkinned(geometry, maskedMaterial(garment.material), 'garment');
+    let layered = geometry;
+    if (garment.folds) { tagRest(geometry, part, rest); layered = addFolds(geometry, kind, garment.folds); }
+    boxUV(layered, garment.density || 2.4);
+    addSkinned(layered, maskedMaterial(garment.material), 'garment');
   }
 
   // волосы: кожа головы, приподнятая там, где растут волосы; под капюшоном и шапочкой — нет
@@ -808,16 +969,28 @@ export function buildHumanBody(options, pose) {
     const z = frontOf(kind, x, y, spread);
     return z + bagDisplace(kind, V(x, y, z), null, bag).z;
   };
+  // воротник и лацканы — в покое, с весами костей ближайшей вершины одежды: гнутся вместе с шеей и плечами
+  const tightsPoints = Array.from(PARTS.tights.source, (source) => [rest.point(source), source]);
   const posedMesh = (positions, indices, material) => {
     const geometry = new THREE.BufferGeometry();
-    const posed = new Float32Array(positions.length);
-    for (let index = 0; index < positions.length; index += 3) posed.set(torsoPoint(positions[index], positions[index + 1], positions[index + 2]).toArray(), index);
-    geometry.setAttribute('position', new THREE.BufferAttribute(posed, 3));
+    const count = positions.length / 3;
+    const skinIndex = new Uint16Array(count * 4), skinWeight = new Float32Array(count * 4);
+    for (let index = 0; index < count; index++) {
+      const point = V(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);
+      let best = null, bestDistance = Infinity;
+      for (const [candidate, source] of tightsPoints) { const distance = candidate.distanceToSquared(point); if (distance < bestDistance) { bestDistance = distance; best = source; } }
+      for (let slot = 0; slot < 4; slot++) { skinIndex[index * 4 + slot] = SKIN_INDEX[best * 4 + slot]; skinWeight[index * 4 + slot] = SKIN_WEIGHT[best * 4 + slot]; }
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+    geometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     boxUV(geometry, 2.4);
-    const mesh = new THREE.Mesh(geometry, doubleSided(material));
+    const mesh = new THREE.SkinnedMesh(geometry, doubleSided(material));
     mesh.castShadow = mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    mesh.bind(skeleton, new THREE.Matrix4());
     return mesh;
   };
   // сетка-полоса: rows рядов по columns точек, точки — функция (ряд, столбец) → [x, y, z] в покое

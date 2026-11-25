@@ -176,19 +176,23 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   // ---- одежда слоями (human.js): брюки, верх, халат или комбинезон, жилет, фартук, перчатки ----
   const garments = [];
   const layer = (region, material, offset, extra = {}) => garments.push({ region, material, offset, ...extra });
+  // складки: форма отглажена — мягче; рабочая одежда и ПВХ — сильнее, у ПВХ крупнее
+  const belted = look.belt || look.uniform || kind === 'man' || kind === 'boy';
+  const folds = (amount, extra = {}) => ({ folds: { amount, tucked: !!look.boots, belted, ...extra } });
+  const foldAmount = look.uniform ? 0.65 : coverall ? 1.25 : kind === 'woman' || kind === 'girl' ? 0.6 : 1;
   if (look.hazmat) {
-    layer('coverall', materials.top, 0.02, { density: 1.6 });
+    layer('coverall', materials.top, 0.02, { density: 1.6, ...folds(1.4, { scale: 1.7, hem: false }) });
     layer('glove', materials.glove, 0.026, { relax: 0, loose: 0 });
-    layer('boot', materials.boot, 0.03, { relax: 2, loose: 0 });
+    layer('boot', materials.boot, 0.03, { relax: 12, loose: 0 });
   } else if (coverall) {
-    layer('coverall', materials.top, 0.009);
+    layer('coverall', materials.top, 0.009, folds(foldAmount));
   } else {
-    layer('legs', materials.legs, 0.005);
-    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008 });
+    layer('legs', materials.legs, 0.005, folds(foldAmount));
+    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008, ...folds(foldAmount * (look.coat ? 0.5 : 1)) });
   }
   if (look.coat) {
-    layer('top', materials.coat, 0.017, { flare: 0.012 });
-    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, material: materials.coat, offset: 0.02 });
+    layer('top', materials.coat, 0.017, { flare: 0.012, ...folds(0.8) });
+    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, material: materials.coat, offset: 0.02, ...folds(0.8) });
   }
   if (look.vest) {
     layer('vest', materials.vest, 0.022);
@@ -197,8 +201,7 @@ export function buildCivilian({ kind = 'man', pose = 'idle' } = {}) {
   if (look.apron) layer('apron', materials.apron, look.coat ? 0.026 : 0.02, { thin: true });
   if (look.gloves && !look.hazmat) layer('glove', materials.glove, 0.004, { thin: true, relax: 0, loose: 0 });
   // обувь — по форме стопы; ремень — лента по поясу брюк
-  if (!look.hazmat) layer(look.boots ? 'workBoot' : 'shoes', look.boots ? materials.boot : materials.shoe, look.boots ? 0.014 : 0.009, { relax: 2, loose: 0, thin: true });
-  const belted = look.belt || look.uniform || kind === 'man' || kind === 'boy';
+  if (!look.hazmat) layer(look.boots ? 'workBoot' : 'shoes', look.boots ? materials.boot : materials.shoe, look.boots ? 0.014 : 0.009, { relax: look.boots ? 12 : 2, loose: 0, thin: true });
   if (belted) layer('belt', materials.dark, look.uniform ? 0.03 : 0.016, { thin: true, relax: 12, loose: 0, maskSmooth: 0 });
 
   // свободный крой (доля 0..1): форма и рабочие комбинезоны — мешковатые; остальная одежда — чуть свободнее тела
