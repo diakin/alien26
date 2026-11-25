@@ -36,6 +36,36 @@ var BaseStore = (function () {
     ['Ольга Дёмина', 'медсестра', 'Процедурная, аптека', 'Каюта 15'],
     ['Виталий Сомов', 'электрик', 'Энергоцентр', 'Каюта 16'], ['Игорь Лаптев', 'сантехник', 'Водоснабжение', 'Каюта 16']
   ];
+  // комсостав, врачи и дежурная смена из резерва отряда (состав постоянный, в хранилище не пишется)
+  var COMMAND = [
+    ['Виктор Ларин', 'командир базы, полковник', 'Командный центр', 'Командир базы', 'commander'],
+    ['Олег Карпов', 'начальник штаба, подполковник', 'Командный центр', 'Нач. штаба', 'commander'],
+    ['Максим Зуев', 'командир отряда, майор', 'Брифинг', 'Ком. отряда', 'commander'],
+    ['Евгений Ростов', 'главный врач', 'Кабинет врача', 'Гл. врач', 'doctor'],
+    ['Константин Ветлугин', 'хирург', 'Операционная', 'Хирург', 'surgeon'],
+    ['Андрей Сухов', 'дежурный офицер по базе', 'Дежурная часть', 'Каюта 4', 'officer'],
+    ['Павел Рыжов', 'помощник дежурного', 'Дежурная часть', 'Каюта 4', 'officer'],
+    ['Тимур Галиев', 'часовой КПП', 'КПП', 'Каюта 5', 'officer'],
+    ['Денис Орехов', 'дежурный по оружейной', 'Оружейная', 'Каюта 5', 'officer']
+  ];
+  // вид спрайта (tools/render/civilian.js, набор civ<вид>) по имени; спасённые учёные — в белом халате
+  var LOOKS = {
+    'Глеб Ветров': 'scientist', 'Алла Миронова': 'labwoman', 'Виктор Ганиев': 'hazmat', 'Елена Крутова': 'labwoman',
+    'Павел Орлов': 'scientist', 'Мария Тихонова': 'labwoman', 'Роман Ясин': 'scientist', 'Нина Сафарова': 'hazmat',
+    'Степан Лунёв': 'engineer', 'Иван Кравец': 'engineer', 'Олеся Брагина': 'engineerw', 'Дмитрий Шульга': 'engineer',
+    'Артём Зимин': 'engineer', 'Карина Ли': 'engineerw', 'Фёдор Макаров': 'engineer', 'Юрий Пахомов': 'engineer',
+    'Анна Белова': 'cookw', 'Сергей Котов': 'cook', 'Людмила Рябова': 'cleaner', 'Николай Гусев': 'cleanerm',
+    'Ольга Дёмина': 'nurse', 'Виталий Сомов': 'electrician', 'Игорь Лаптев': 'plumber'
+  };
+  function commandStaff() { return COMMAND.map(function (entry) { return { name: entry[0], specialty: entry[1], workplace: entry[2], cabin: entry[3], look: entry[4] }; }); }
+  // все, кто живёт на базе, кроме бойцов отряда: для меню и для фигур на карте базы (game.js)
+  function people() {
+    var list = commandStaff();
+    [state.scientists, state.engineers, state.support || []].forEach(function (group) {
+      group.forEach(function (person) { list.push({ name: person.name, specialty: person.specialty, workplace: person.workplace, cabin: person.cabin, look: LOOKS[person.name] || 'scientist' }); });
+    });
+    return list;
+  }
   function supportStaff() { return SUPPORT.map(function (entry) { return { name: entry[0], specialty: entry[1], workplace: entry[2], cabin: entry[3] }; }); }
   // каюта для спасённого: резервные 17 и 18 по двое, дальше — свободное место в каюте 9 у учёных
   function rescueCabin(people) {
@@ -126,6 +156,7 @@ var BaseStore = (function () {
 
   return {
     get state() { return state; }, SHIP_SEATS: SHIP_SEATS, SHIP_CAPACITY: SHIP_CAPACITY,
-    save: save, cargoWeight: cargoWeight, moveCargo: moveCargo, setCrew: setCrew, receiveMission: receiveMission, reset: reset
+    save: save, cargoWeight: cargoWeight, moveCargo: moveCargo, setCrew: setCrew, receiveMission: receiveMission, reset: reset,
+    commandStaff: commandStaff, people: people
   };
 })();

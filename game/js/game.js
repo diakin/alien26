@@ -310,6 +310,9 @@
       (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
     }
     if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
+    // персонал базы (BaseStore.people, js/basestore.js) — на рабочих местах из плана базы (BASE_PLAN): в мирной обстановке
+    // стоят, при нападении присели и прячутся, как гражданские задания
+    if (window.ALIENS_MAP === 'base' && window.BaseStore && window.BASE_PLAN) list = list.concat(baseStaffUnits(list));
     // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
     if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
       var adults = 0, children = 0;
@@ -321,6 +324,52 @@
       });
     }
     return list;
+  }
+  // фигуры персонала базы: по одной свободной клетке в помещении рабочего места, от середины помещения к краям;
+  // не на клетках у дверей и лестниц, не на клетках, занятых бойцами и пришельцами
+  function baseStaffUnits(placed) {
+    var PLAN_COL = 1, PLAN_ROW = 6;                    // сдвиг плана на поле (tools/render/outpost_layout.js)
+    var taken = {}, avoid = {};
+    var key = function (col, row, level) { return level + ':' + col + ':' + row; };
+    placed.forEach(function (unit) { for (var dy = 0; dy < unit.size; dy++) for (var dx = 0; dx < unit.size; dx++) taken[key(unit.col + dx, unit.row + dy, unit.level)] = true; });
+    (MAP.doors || []).forEach(function (door) {
+      avoid[key(door[0], door[1], door[2])] = true;
+      if (door[3] === 0) avoid[key(door[0] - 1, door[1], door[2])] = true; else avoid[key(door[0], door[1] - 1, door[2])] = true;
+    });
+    (MAP.stairs || []).forEach(function (stair) {
+      for (var step = -1; step <= stair[5]; step++) avoid[key(stair[1] + stair[3] * step, stair[2] + stair[4] * step, stair[0])] = avoid[key(stair[1] + stair[3] * step, stair[2] + stair[4] * step, stair[0] + 1)] = true;
+    });
+    var result = [];
+    BaseStore.people().forEach(function (person, number) {
+      var room = BASE_PLAN.rooms.filter(function (item) { return item.name === person.workplace; })[0];
+      if (!room) return;
+      var level = room.floor || 0, centerCol = room.x + room.width / 2 - 0.5, centerRow = room.y + room.height / 2 - 0.5, cells = [];
+      for (var row = room.y; row < room.y + room.height; row++) for (var col = room.x; col < room.x + room.width; col++) cells.push([col, row]);
+      cells.sort(function (first, second) { return Math.hypot(first[0] - centerCol, first[1] - centerRow) - Math.hypot(second[0] - centerCol, second[1] - centerRow); });
+      // в одном помещении несколько человек — расходятся по клеткам через одну, чтобы не стоять вплотную
+      var spot = null;
+      for (var pass = 0; pass < 2 && !spot; pass++) {
+        spot = cells.filter(function (cell) {
+          var col = cell[0] + PLAN_COL, row = cell[1] + PLAN_ROW;
+          if (taken[key(col, row, level)] || avoid[key(col, row, level)] || !walkable(col, row, level)) return false;
+          if (pass === 0) for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if (taken[key(col + dx, row + dy, level)]) return false;
+          return true;
+        })[0] || null;
+      }
+      if (!spot) return;
+      var col = spot[0] + PLAN_COL, row = spot[1] + PLAN_ROW;
+      taken[key(col, row, level)] = true;
+      var profile = civilianProfile({ kind: person.look, name: person.name }, number + 1);
+      profile.callsign = person.name.split(' ').slice(-1)[0].toUpperCase();
+      profile.rank = person.specialty; profile.role = 'ПЕРСОНАЛ БАЗЫ'; profile.subtitle = 'ПЕРСОНАЛ БАЗЫ · ' + person.workplace.toUpperCase();
+      profile.staff = true;
+      // лицом к середине помещения
+      var direction = Iso.directionOf(centerCol - spot[0], centerRow - spot[1]);
+      var unit = makeUnit(profile, [col, row, level, direction >= 0 ? direction : (number % 8)]);
+      unit.kneeling = PAGE_MODE !== 'manage';
+      result.push(unit);
+    });
+    return result;
   }
   var MISSION_RUN = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);   // номер запуска — склад базы принимает итоги один раз
   var units = roster();
@@ -1484,7 +1533,7 @@
   function rescueNear(rescuer) {
     if (!isFighter(rescuer) || rescuer.dead) return;
     units.forEach(function (person) {
-      if (person.side !== 'civilians' || person.dead || person.level !== rescuer.level) return;
+      if (person.side !== 'civilians' || person.dead || person.level !== rescuer.level || person.staff) return;   // персонал базы остаётся на месте
       for (var deltaRow = 0; deltaRow < rescuer.size; deltaRow++) for (var deltaCol = 0; deltaCol < rescuer.size; deltaCol++) {
         if (!adjacentOpen(rescuer.col + deltaCol, rescuer.row + deltaRow, person.col, person.row, person.level)) continue;
         person.side = 'squad';
