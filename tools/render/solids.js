@@ -2,6 +2,7 @@
 // Общий модуль: набор тайлов (tileset.js) и данные карты без тайлов (baselogic.js).
 import * as THREE from 'three';
 import { TILE, TILES, LEVELS, LEVEL_H } from './outpost_layout.js';
+import { FLAT_FURNITURE } from './furniture.js';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // клетки (и уровни, если levelCut), которые задевают рамки мешей группы
@@ -66,7 +67,7 @@ export function solidBoxes(layout, buildObject) {
   const boxes = [];
   for (const item of layout.objects) {
     if (item.kind === 'towerLeg' || item.kind === 'ladder') continue;
-    if (item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor') continue;
+    if (item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor' || FLAT_FURNITURE.has(item.kind)) continue;
     const group = buildObject(item, LEVELS - 1);
     if (!group) continue;
     group.updateMatrixWorld(true);

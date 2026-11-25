@@ -1,6 +1,7 @@
 # План модернизации базы «Ямантау» (проект): квадрат 56×56 клеток по 1,25 м, зоны, коридоры 3 клетки, шлюзы.
 # python3 plan_v2.py <папка вывода> — пишет base_plan_v2.png (схема), base_plan_v2.json (зоны, помещения, двери),
-# base_plan_v2.txt (площади). Пока не подключён к карте: карта строится из plan.py (base_plan.json).
+# base_plan_v2.txt (площади) и план для карты: tools/render/base_plan.js (разметка, MAP=base) и game/js/base_plan.js
+# (меню базы). Прежний план — plan.py, к карте больше не подключён.
 import os, json, sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -317,6 +318,92 @@ def render(path):
         draw.text((ix + 26, y), text, fill=(220, 220, 220), font=font(12))
     image.save(path)
 
+# назначение помещений — для меню базы (вкладка «Модули»)
+NOTES = {
+    'Платформа подъёмника': 'платформа 25 × 25 м, высота 10 м; конвертоплан КТ-6; шахта до поверхности',
+    'Техполоса': 'заправка, подвоз боеприпасов, пульт подъёмника',
+    'КПП': 'пост у шлюза ангара',
+    'Проезд к цеху': 'K7 из ангара в цех, не выходя к остальной базе',
+    'Шлюз ангара': 'ворота в проезд и в коридор H1, открываются по очереди',
+    'Цех (стенд K7)': 'стенд ремонта K7, кран-балка, станки; высота 2 уровня',
+    'Грузовой лифт': 'платформа 5×5 м, шахта до поверхности',
+    'Приёмка': 'разгрузка с лифта',
+    'Общий склад': 'стеллажи, контейнеры',
+    'Пост контроля реактора': 'пульт энергоблока, связь с ярусом −5',
+    'Лифт к реактору': 'отдельный лифт на ярус −5',
+    'Энергоцентр': 'распределительные щиты, аккумуляторы, резервный генератор',
+    'Командный центр': 'пульты, карта-глобус, связь',
+    'Брифинг': 'стол, экран',
+    'Снаряжение': 'шкафчики бойцов, сборы перед вылетом',
+    'Узел связи': 'аппаратура связи, радары',
+    'Дежурная часть': 'дежурный офицер по базе и помощник, мониторы камер',
+    'Оружейная': 'стойки с оружием, верстак',
+    'Склад боеприпасов': 'бетонные стены, бронедверь',
+    'Мастерская оружейника': 'ремонт и пристрелка оружия',
+    'Кабинет учёных': 'столы, шкафы',
+    'Приборная': 'измерительные приборы',
+    'Химико-аналитическая': 'вытяжные шкафы, хроматограф, спектрометр',
+    'Ксенобиологическая': 'боксы биобезопасности, микроскопы, стол для вскрытия',
+    'Физическая': 'стенды испытаний, осциллографы, источники питания',
+    'Шлюз санобработки': 'обработка перед входом к образцам',
+    'Пост наблюдения': 'мониторы боксов',
+    'Операционная': 'операционный стол, светильник, наркозный аппарат',
+    'Реанимация': 'реанимационная кровать, мониторы',
+    'ПИТ-1': 'палата интенсивной терапии, одиночные кровати',
+    'ПИТ-2': 'палата интенсивной терапии, одиночные кровати',
+    'Столовая и отдых': 'столы на 16 мест, диваны',
+    'Камбуз': 'плита, мойка, холодильник, остров',
+    'Санблок 1 (душевые)': 'душевые кабины, умывальники, туалеты',
+    'Санблок 2 (душевые)': 'душевые кабины, умывальники, туалеты',
+    'Спортзал': 'дорожки, велотренажёры, силовые станции, штанги, маты',
+    'Раздевалка, душевые': 'шкафчики, скамьи, душевые кабины',
+}
+
+def map_plan():
+    """План в формате карты: модули (зоны) с номерами, помещения, коридоры, двери и ворота."""
+    modules = {'0': 'Коридоры'}
+    module_of = {}
+    for number, zone in enumerate(ZONES, 1):
+        modules[str(number)] = zone[1]
+        module_of[zone[0]] = number
+    rooms = [dict(module=module_of[r[0]], zone=r[0], name=r[1], x=r[2], y=r[3], width=r[4], height=r[5], levels=r[6], kind=r[7],
+                  note=NOTES.get(r[1], '2 места' if r[1].startswith('Каюта') else 'одноместная' if r[7] == 'single' else ''))
+             for r in ROOMS]
+    room_at = {}
+    for index, room in enumerate(rooms):
+        for row in range(room['y'], room['y'] + room['height']):
+            for col in range(room['x'], room['x'] + room['width']):
+                room_at[(col, row)] = index
+    step = {'N': (0, -1), 'S': (0, 1), 'W': (-1, 0), 'E': (1, 0)}
+    def airlock_of(x, y, side):
+        for cell in ((x, y), (x + step[side][0], y + step[side][1])):
+            index = room_at.get(cell)
+            if index is not None and rooms[index]['kind'] == 'airlock':
+                return index
+        return -1
+    doors = [dict(x=g[0], y=g[1], side=g[2], size=g[3], kind='gate', airlock=airlock_of(*g[:3])) for g in GATES]
+    doors += [dict(x=d[0], y=d[1], side=d[2], size=d[3], kind='door' if d[3] == 1 else 'double', airlock=-1) for d in DOORS]
+    cells = {}
+    for room in rooms:
+        cells[str(room['module'])] = cells.get(str(room['module']), 0) + room['width'] * room['height']
+    cells['0'] = sum(item[3] * item[4] for item in CORRIDORS)
+    return {'cellMeters': CELL_METERS, 'levelMeters': 2.5, 'grid': [GRID_W, GRID_H], 'modules': modules,
+            'zones': [dict(key=z[0], module=module_of[z[0]], name=z[1], x=z[3][0], y=z[3][1], width=z[3][2], height=z[3][3]) for z in ZONES],
+            'rooms': rooms,
+            'corridors': [dict(name=c[0], x=c[1], y=c[2], width=c[3], height=c[4], note='коридор между зонами') for c in CORRIDORS],
+            'thickWalls': [dict(x=t[0], y=t[1], width=t[2], height=t[3]) for t in THICK],
+            'doors': doors, 'cells': cells, 'total': sum(cells.values())}
+
+def write_map_plan():
+    plan = map_plan()
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, '..', 'render', 'base_plan.js'), 'w', encoding='utf-8') as output:
+        output.write('// Сгенерировано tools/base/plan_v2.py. Не править вручную.\n')
+        output.write('export const BASE_PLAN = ' + json.dumps(plan, ensure_ascii=False, indent=1) + ';\n')
+    with open(os.path.join(here, '..', '..', 'game', 'js', 'base_plan.js'), 'w', encoding='utf-8') as output:
+        output.write('// Сгенерировано tools/base/plan_v2.py. Не править вручную.\n')
+        output.write('var BASE_PLAN = ' + json.dumps(plan, ensure_ascii=False, separators=(',', ':')) + ';\n')
+
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else '.'
     os.makedirs(out, exist_ok=True)
@@ -332,4 +419,5 @@ if __name__ == '__main__':
                'doors': [dict(x=d[0], y=d[1], side=d[2], size=d[3]) for d in DOORS]},
               open(os.path.join(out, 'base_plan_v2.json'), 'w'), ensure_ascii=False, indent=1)
     open(os.path.join(out, 'base_plan_v2.txt'), 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+    write_map_plan()
     print('\n'.join(lines))

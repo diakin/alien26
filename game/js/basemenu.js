@@ -9,7 +9,8 @@ var BaseMenu = (function () {
   if (!/[?&]mode=manage/.test(location.search) || !window.BASE_PLAN) return null;
 
   // сдвиг плана на поле карты — как BASE_COL, BASE_ROW в tools/render/outpost_layout.js
-  var PLAN_COL = 1, PLAN_ROW = 12;
+  var PLAN_COL = 1, PLAN_ROW = 6;            // сдвиг плана на поле карты (tools/render/outpost_layout.js, BASE_COL и BASE_ROW)
+  var MODULES = Object.keys(BASE_PLAN.modules).map(Number).filter(function (module) { return module > 0; });
 
   var style = document.createElement('style');
   style.textContent = [
@@ -87,7 +88,7 @@ var BaseMenu = (function () {
   var INFO = {
     modules: function () {
       var rows = '';
-      [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (module) {
+      MODULES.forEach(function (module) {
         var rooms = roomsOf(module);
         rows += '<tr class="group"><td colspan="4">' + escape(BASE_PLAN.modules[module]) + ' · ' + rooms.length + ' пом.</td></tr>';
         rooms.forEach(function (room) {
@@ -110,12 +111,12 @@ var BaseMenu = (function () {
       var soldiers = squad().map(function (soldier, index) {
         var aboard = crew.indexOf(soldier.callsign) >= 0;
         return '<tr><td><b>' + escape(soldier.callsign) + '</b> ' + escape(soldier.name) + '</td><td>' + escape(soldier.rank) + ' · ' + escape((soldier.role || '').toLowerCase()) + '</td><td>' +
-          placeLink('Каюта ' + (index + 1)) + '</td><td class="state' + (aboard ? '' : ' wait') + '">' + (aboard ? 'в экипаже КТ-6' : 'на базе') + '</td></tr>';
+          placeLink('Каюта ' + (Math.floor(index / 2) + 1)) + '</td><td class="state' + (aboard ? '' : ' wait') + '">' + (aboard ? 'в экипаже КТ-6' : 'на базе') + '</td></tr>';
       }).join('');
       return { facts: 'Учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
         body: '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) +
           '<h4>ОТРЯД</h4><table><tr><th>БОЕЦ</th><th>ЗВАНИЕ · РОЛЬ</th><th>КАЮТА</th><th>СОСТОЯНИЕ</th></tr>' + soldiers +
-          '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех') + '</td><td class="state' + (BaseStore.state.ship.mech ? '' : ' wait') + '">' +
+          '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех (стенд K7)') + '</td><td class="state' + (BaseStore.state.ship.mech ? '' : ' wait') + '">' +
           (BaseStore.state.ship.mech ? 'в экипаже КТ-6' : 'на базе') + '</td></tr></table>' };
     },
     store: function () {
@@ -129,7 +130,7 @@ var BaseMenu = (function () {
       var artifacts = state.artifacts.length ? state.artifacts.map(function (entry) {
         return '<tr><td>' + escape(entry.name) + '</td><td class="number">' + entry.count + '</td><td class="dim">' + escape(entry.from || '') + '</td></tr>';
       }).join('') : '<tr><td colspan="3" class="state wait">нет: артефакты сдаются на склад после задания (эвакуация или зачистка)</td></tr>';
-      return { facts: 'Склады: ' + placeLink('Общий склад') + ', ' + placeLink('Оружейная') + ', ' + placeLink('Склад боеприпасов') + ', ' + placeLink('Изолятор образцов') + '.',
+      return { facts: 'Склады: ' + placeLink('Общий склад') + ', ' + placeLink('Оружейная') + ', ' + placeLink('Склад боеприпасов') + ', изолятор образцов (' + placeLink('Бокс 1') + ', ' + placeLink('Бокс 2') + ', ' + placeLink('Бокс 3') + ').',
         body: '<h4>ОРУЖИЕ И СНАРЯЖЕНИЕ</h4><table><tr><th>ПРЕДМЕТ</th><th></th><th>НА СКЛАДЕ</th><th>НА БОРТУ КТ-6</th></tr>' + items + '</table>' +
           '<h4>ИМУЩЕСТВО</h4><table><tr><th>НАИМЕНОВАНИЕ</th><th>КОЛИЧЕСТВО</th></tr>' + property + '</table>' +
           '<h4>АРТЕФАКТЫ</h4><table><tr><th>НАИМЕНОВАНИЕ</th><th>КОЛИЧЕСТВО</th><th>ОТКУДА</th></tr>' + artifacts + '</table>' };
@@ -167,25 +168,25 @@ var BaseMenu = (function () {
           'Каждый боец летит со своим снаряжением. Груз пока не расходуется: после задания он снова на борту.' };
     },
     modules: function () {
-      var rows = [1, 2, 3, 4, 5, 6, 7, 8].map(function (module) {
+      var rows = MODULES.map(function (module) {
         var rooms = roomsOf(module);
         return '<tr><td>' + escape(BASE_PLAN.modules[module]) + '</td><td>' + rooms.map(roomLink).join(', ') + '</td>' +
           '<td class="number">' + (BASE_PLAN.cells[module] || 0) + '</td><td class="state">построен</td></tr>';
       }).join('');
       return { title: 'МОДУЛИ БАЗЫ', facts: 'Всего ' + BASE_PLAN.total + ' клеток (' + Math.round(BASE_PLAN.total * BASE_PLAN.cellMeters * BASE_PLAN.cellMeters) + ' м²), из них коридоры — ' + (BASE_PLAN.cells[0] || 0) + '. Щелчок по помещению — камера к нему.',
         body: '<table><tr><th>МОДУЛЬ</th><th>ПОМЕЩЕНИЯ</th><th>КЛЕТОК</th><th>СОСТОЯНИЕ</th></tr>' + rows + '</table>',
-        note: 'Строительство новых модулей появится вместе с экономикой базы: деньги, сроки, второй ярус.' };
+        note: 'Строительство новых модулей (большой и малый радары, батареи ПВО, фотолаборатория, склады, мастерские, жилые модули) появится вместе с экономикой базы: деньги, сроки, место в скале.' };
     },
     research: function () {
       var topics = [['Плазменный пистолет', 'оружие пришельцев'], ['Энергоячейка', 'питание плазменного оружия'], ['Вскрытие пришельца-стража', 'тело пришельца'], ['Броня из сплавов пришельцев', 'после изучения образцов']];
-      return { title: 'ИССЛЕДОВАНИЕ', facts: 'Учёные: 8 · лаборатории: 2 (' + cellsOf(function (room) { return room.module === 5; }) + ' клеток с изолятором) · в работе: нет',
+      return { title: 'ИССЛЕДОВАНИЕ', facts: 'Учёные: ' + BaseStore.state.scientists.length + ' · лаборатории: 3 (' + cellsOf(function (room) { return room.zone === 'labs' || room.zone === 'isolator'; }) + ' клеток с изолятором) · в работе: нет',
         body: '<table><tr><th>ТЕМА</th><th>ЧТО НУЖНО</th><th>СОСТОЯНИЕ</th></tr>' + topics.map(function (topic) {
           return '<tr><td>' + topic[0] + '</td><td>' + topic[1] + '</td><td class="state wait">нет образца</td></tr>'; }).join('') + '</table>',
         note: 'Образцы с заданий пока не доставляются на базу: перенос артефактов из итогов задания — следующий шаг.' };
     },
     manufacture: function () {
       var items = [['Карабин КС-9', 'оружие отряда'], ['Магазин КС-9', '30 патронов'], ['Граната', 'осколочная'], ['Аптечка', 'полевая']];
-      return { title: 'ИЗГОТОВЛЕНИЕ', facts: 'Инженеры: 8 · цех: 1 (стенд ремонта K7) · очередь: пусто',
+      return { title: 'ИЗГОТОВЛЕНИЕ', facts: 'Инженеры: ' + BaseStore.state.engineers.length + ' · цех: 1 (стенд ремонта K7) · очередь: пусто',
         body: '<table><tr><th>ИЗДЕЛИЕ</th><th>ОПИСАНИЕ</th><th>СОСТОЯНИЕ</th></tr>' + items.map(function (item) {
           return '<tr><td>' + item[0] + '</td><td>' + item[1] + '</td><td class="state">можно</td></tr>'; }).join('') + '</table>',
         note: 'Заказ изделий появится вместе с экономикой базы: стоимость, срок, склад.' };

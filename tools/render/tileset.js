@@ -19,12 +19,13 @@ import { TILE, TILES, LEVELS, LEVEL_H, FLOOR, MAP_NAME } from './outpost_layout.
 import { TILTROTOR } from './vehicles.js';
 import {
   layout, V, CENTER, SS, renderer, scene, sun, MAT, PART, hashTile, isIndoor, insideConcrete,
-  buildWall, buildDoorLeaf, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
+  buildWall, buildDoorLeaf, buildGateLeaf, gateShape, floorTile, buildStairs, buildLadder, buildObject, buildTower, facadeDetails, resetDoorLeaves, doorLeafKind,
 } from './outpost_scene.js';
 import { SURFACE } from './city_layout.js';
 import { groundMaterialFor, cityGroundExtras, floorMaterial, CITY_MAT, roofCellKey } from './city_scene.js';
 import { groundBumpTexture } from './outpost_textures.js';
 import { touchedSlices, solidBoxes } from './solids.js';
+import { FLAT_FURNITURE } from './furniture.js';
 
 // ---------------- камера с целым шагом клетки ----------------
 // шаг клетки на экране ровно (61, 35): угол камеры asin(35/61) = 35,01°, масштаб 69,01 пикселя на метр
@@ -352,13 +353,19 @@ for (let level = 0; level < LEVELS; level++) {
         const ids = [false, true].map((cut) => {
           const usesCut = wall.type === 'wall' || wall.type === 'door' || wall.type === 'window';
           const signature = simple ? `wall|${orient}|${level}|${wall.type}|${wall.style}`
-            : `wall|${orient}|${level}|${wall.type}|${wall.style}|${front}|${back}|${hashTile(col, row, level) % 3}|${usesCut && cut}`;
+            : `wall|${orient}|${level}|${wall.type}|${wall.style}|${front}|${back}|${hashTile(col, row, level) % 3}|${usesCut && cut}${wall.gate ? '|' + gateShape(orient, col, row, level, wall).signature : ''}`;
           return job(signature, { part: orient === 'W' ? PART.wallW : PART.wallN, level, col, row, shadow: true, slice: null },
             () => buildWall(orient, col, row, level, wall, usesCut && cut));
         });
         (orient === 'W' ? plan.wallW : plan.wallN)[level][row * stride + col] = ids[0];
         if (ids[1] !== ids[0]) plan.cutOf[ids[0]] = ids[1];
-        if (wall.type === 'door') {
+        if (wall.type === 'door' && wall.gate) {
+          // створка широкого проёма: на всю клетку (без стоек там, где группа продолжается), сдвигается вверх в игре
+          const shape = gateShape(orient, col, row, level, wall);
+          const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${shape.signature}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () =>
+            buildGateLeaf(orient, col, row, level, shape.left, shape.right, Math.min(shape.heavy ? 2.35 : 2.1, cut ? 0.8 : LEVEL_H), shape.heavy)));
+          plan.doors.push([col, row, level, orient, leaves[0], leaves[1]]);
+        } else if (wall.type === 'door') {
           const leafKind = doorLeafKind(wall);
           const leaves = [false, true].map((cut) => job(`door|${orient}|${level}|${cut}|${leafKind}`, { part: orient === 'W' ? PART.doorW : PART.doorN, level, col, row, shadow: false, slice: null }, () => {
             const width = 0.92, top = Math.min(2.1, cut ? 0.8 : LEVEL_H - 0.22);
@@ -442,7 +449,7 @@ for (const item of layout.objects) {
   if (item.kind === 'towerLeg') continue;
   if (item.kind === 'tiltrotor') { addTiltrotor(item); continue; }
   if (item.kind === 'rockFill') { addRock(item); continue; }
-  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor';
+  const ladder = item.kind === 'ladder', paint = item.kind === 'paint' || item.kind === 'liftPlatform' || item.kind === 'galleyFloor' || FLAT_FURNITURE.has(item.kind);
   const unique = ladder || RANDOM_KINDS.has(item.kind);
   const signature = `object|${item.kind}|${item.level}|${item.cols}x${item.rows}|${item.color || ''}|${item.type || ''}|${item.flip ? 'flip' : ''}|${item.rotation || 0}` + (unique ? `|${item.col}|${item.row}` : '');
   // приставная лестница: после стены своей клетки (часть 2 и 3), но до юнита (3,5) — он стоит перед ней;

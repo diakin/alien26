@@ -503,15 +503,65 @@
     return { col: door[0], row: door[1], level: door[2], orient: door[3] === 0 ? 'W' : 'N', open: 0,
       centerX: door[3] === 0 ? door[0] : door[0] + 0.5, centerY: door[3] === 0 ? door[1] + 0.5 : door[1] };
   });
+  // широкие проёмы (MAP.gates): двери группы открываются и закрываются вместе. Ворота шлюза (airlock — номер шлюза,
+  // у шлюза двое ворот) открываются по очереди: пока одни не закрылись, другие не откроются. Кто идёт через проём,
+  // ждёт у него, пока створка не поднимется (updateUnit); ждущий важнее тех, кто просто стоит рядом с другими воротами.
+  var GATE_SPEED = { gate: 1.3, double: DOOR_SPEED };
+  var gates = (MAP.gates || []).map(function (gate, index) {
+    gate.doors.forEach(function (doorIndex) { doors[doorIndex].gate = index; });
+    return { kind: gate.kind, airlock: gate.airlock, doors: gate.doors, open: 0, requested: false };
+  });
+  var airlockOwner = {};                 // шлюз -> ворота, которым сейчас можно быть открытыми
+  function nearDoor(door) {
+    return units.some(function (unit) {
+      if (unit.dead || unit.level !== door.level) return false;
+      var reach = DOOR_REACH + (unit.size - 1) * 0.8;
+      var dx = unit.x - door.centerX, dy = unit.y - door.centerY;
+      return dx * dx + dy * dy < reach * reach;
+    });
+  }
   function updateDoors(seconds) {
     doors.forEach(function (door) {
-      var wanted = units.some(function (unit) {
-        if (unit.level !== door.level) return false;
-        var dx = unit.x - door.centerX, dy = unit.y - door.centerY;
-        return dx * dx + dy * dy < DOOR_REACH * DOOR_REACH;
-      }) ? 1 : 0;
+      if (door.gate !== undefined) return;
+      var wanted = nearDoor(door) ? 1 : 0;
       door.open += Math.max(-DOOR_SPEED * seconds, Math.min(DOOR_SPEED * seconds, wanted - door.open));
     });
+    var waiting = {};
+    gates.forEach(function (gate) { if (gate.requested && gate.airlock >= 0) waiting[gate.airlock] = true; });
+    gates.forEach(function (gate, index) {
+      var wanted = gate.requested || (!(gate.airlock >= 0 && waiting[gate.airlock]) && gate.doors.some(function (doorIndex) { return nearDoor(doors[doorIndex]); }));
+      if (gate.airlock >= 0) {
+        var owner = airlockOwner[gate.airlock];
+        if (owner !== undefined && owner !== index) wanted = false;
+        else if (wanted) airlockOwner[gate.airlock] = index;
+      }
+      var speed = GATE_SPEED[gate.kind] || DOOR_SPEED;
+      gate.open += Math.max(-speed * seconds, Math.min(speed * seconds, (wanted ? 1 : 0) - gate.open));
+      if (gate.open <= 0 && !wanted && gate.airlock >= 0 && airlockOwner[gate.airlock] === index) { gate.open = 0; delete airlockOwner[gate.airlock]; }
+      gate.requested = false;
+      gate.doors.forEach(function (doorIndex) { doors[doorIndex].open = gate.open; });
+    });
+  }
+  // ворота, через которые проходит шаг юнита (площадка size×size из (col, row) в (nextCol, nextRow) на том же уровне)
+  function gatesOnStep(unit, nextCol, nextRow) {
+    if (!gates.length || nextCol === undefined) return [];
+    var deltaCol = nextCol - unit.col, deltaRow = nextRow - unit.row, found = [];
+    function edge(orient, col, row) {
+      var door = doorByEdge[orient + ':' + col + ':' + row + ':' + unit.level];
+      if (door && door.gate !== undefined && found.indexOf(door.gate) < 0) found.push(door.gate);
+    }
+    function cross(col, row, toCol, toRow) {
+      if (toCol !== col) edge('W', Math.max(col, toCol), row);
+      else if (toRow !== row) edge('N', col, Math.max(row, toRow));
+    }
+    for (var dy = 0; dy < unit.size; dy++) for (var dx = 0; dx < unit.size; dx++) {
+      var col = unit.col + dx, row = unit.row + dy;
+      if (deltaCol && deltaRow) {
+        cross(col, row, col + deltaCol, row); cross(col, row, col, row + deltaRow);
+        cross(col + deltaCol, row, col + deltaCol, row + deltaRow); cross(col, row + deltaRow, col + deltaCol, row + deltaRow);
+      } else cross(col, row, col + deltaCol, row + deltaRow);
+    }
+    return found;
   }
 
   // ---------------- туман войны ----------------
@@ -2858,6 +2908,11 @@
     var targetX = next.col + unit.size / 2, targetY = next.row + unit.size / 2;
     var deltaX = targetX - unit.x, deltaY = targetY - unit.y;
     var distanceTiles = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    // шаг через ворота или двойную дверь: ждать, пока створка поднимется
+    if (unit.segmentLength === 0 && next.level === unit.level) {
+      var closed = gatesOnStep(unit, next.col, next.row).filter(function (gateIndex) { gates[gateIndex].requested = true; return gates[gateIndex].open < 0.9; });
+      if (closed.length) return;
+    }
     if (unit.segmentLength === 0) {
       // начало шага в следующую клетку: направление и длина считаются один раз
       unit.segmentLength = Math.max(distanceTiles, 1e-6);
@@ -3233,19 +3288,21 @@
     if (!door || !Assets.ready(atlas)) return;
     var tile = Iso.tileMeters;
     var cut = cutLevel === door.level;
-    var top = cut ? 0.8 : 2.12;
+    var gate = door.gate !== undefined ? gates[door.gate] : null;
+    var top = cut ? 0.8 : gate ? (gate.kind === 'gate' ? 2.36 : 2.11) : 2.12;
     var base = door.level * LEVEL_H;
-    var left = (tile - DOOR_WIDTH) / 2 / tile - 0.02, right = (tile + DOOR_WIDTH) / 2 / tile + 0.02;
+    var left = gate ? -0.02 : (tile - DOOR_WIDTH) / 2 / tile - 0.02, right = gate ? 1.02 : (tile + DOOR_WIDTH) / 2 / tile + 0.02;
     // точка в плоскости стены: along — доля клетки вдоль грани, across — сдвиг поперёк, height — м
     function wallPoint(along, across, height) {
       return door.orient === 'W' ? Iso.toScreen(door.col + across, door.row + along, base + height) : Iso.toScreen(door.col + along, door.row + across, base + height);
     }
-    var slide = door.open * (DOOR_WIDTH + 0.04) / tile;
-    var start = wallPoint(0, 0, 0), shifted = wallPoint(slide, 0, 0);
+    // обычная створка уезжает в стену, створка ворот поднимается к верху проёма
+    var slide = gate ? 0 : door.open * (DOOR_WIDTH + 0.04) / tile, lift = gate ? door.open * top : 0;
+    var start = wallPoint(0, 0, 0), shifted = wallPoint(slide, 0, lift);
     context.save();
     context.beginPath();
     [-0.04, 0.04].forEach(function (across) {
-      var corners = [wallPoint(left, across, -0.03), wallPoint(right, across, -0.03), wallPoint(right, across, top), wallPoint(left, across, top)];
+      var corners = [wallPoint(left, across, lift - 0.03), wallPoint(right, across, lift - 0.03), wallPoint(right, across, top), wallPoint(left, across, top)];
       context.moveTo(corners[0].x - camera.x, corners[0].y - camera.y);
       for (var index = 1; index < 4; index++) context.lineTo(corners[index].x - camera.x, corners[index].y - camera.y);
       context.closePath();
@@ -3652,7 +3709,7 @@
     soldierProfiles: function () { return soldierProfiles().map(function (profile) { return { callsign: profile.callsign, name: profile.name, rank: profile.rank, role: profile.role }; }); },
     highlightArea: highlightArea,
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
-    doors: doors, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
+    doors: doors, gates: gates, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, get gl3d() { return glActive() ? gl3d : null; }, get glProgress() { return glProgress; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
   };
 })();

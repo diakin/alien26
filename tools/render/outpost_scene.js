@@ -11,6 +11,7 @@ import {
   concreteTextures, groundBumpTexture, groundTexture,
 } from './outpost_textures.js';
 import { GALLEY_KINDS, buildGalleyObject } from './galley.js';
+import { FURNITURE_KINDS, buildFurnitureObject } from './furniture.js';
 import { buildCityWall, buildCityDoorLeaf, buildCityObject, floorMaterial, CITY_MAT, STAIR_MATERIALS, isCityFacade } from './city_scene.js';
 const CITY = MAP_NAME === 'city';
 
@@ -173,6 +174,20 @@ export function buildWall(orient, col, row, level, wall, cut) {
     const materials = wallMaterials(orient, col, row, level, style === 'concrete' ? 'hab' : style);
     if (type === 'wall' || (type === 'window' && cut)) {
       group.add(wallBox(orient, col, row, level, -extend, TILE + extend, 0, full, materials));
+    } else if (type === 'door' && wall.gate) {
+      // клетка широкого проёма (ворота шлюза или двойная дверь): стойки только по краям группы, подъёмная створка
+      const { startOpen, endOpen, heavy, left, right, post } = gateShape(orient, col, row, level, wall);
+      const top = Math.min(heavy ? 2.35 : 2.1, full);
+      if (!startOpen) group.add(wallBox(orient, col, row, level, -extend, 0, 0, full, materials));
+      if (!endOpen) group.add(wallBox(orient, col, row, level, TILE, TILE + extend, 0, full, materials));
+      if (full > top + 0.01) group.add(wallBox(orient, col, row, level, startOpen ? 0 : -0.001, endOpen ? TILE : TILE + 0.001, top, full, materials));
+      const frameMaterial = heavy ? MAT.yellow() : MAT.orange();
+      const frame = Array(6).fill(frameMaterial);
+      if (!startOpen) group.add(wallBox(orient, col, row, level, 0, post, 0, top, frame, THICK + 0.08));
+      if (!endOpen) group.add(wallBox(orient, col, row, level, TILE - post, TILE, 0, top, frame, THICK + 0.08));
+      if (full > top + 0.01) group.add(wallBox(orient, col, row, level, left - 0.001, right + 0.001, top, top + 0.12, frame, THICK + 0.08));
+      group.add(wallBox(orient, col, row, level, left, right, 0, 0.03, Array(6).fill(MAT.darkSteel()), THICK + 0.14));
+      doorLeaves.add(buildGateLeaf(orient, col, row, level, left, right, top, heavy));
     } else if (type === 'door') {
       const width = 0.92, top = Math.min(2.1, full);
       const left = (TILE - width) / 2, right = (TILE + width) / 2;
@@ -258,6 +273,49 @@ export function buildDoorLeaf(orient, col, row, level, left, right, top, kind = 
   }
   group.add(wallBox(orient, col, row, level, left + 0.06, left + 0.1, Math.min(0.85, height - 0.1), Math.min(1.15, height - 0.05), dark, 0.085));
   group.userData.door = { orient, col, row, level };
+  return tag(group, orient === 'W' ? PART.doorW : PART.doorN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
+}
+
+// клетка широкого проёма: есть ли соседние клетки той же группы в начале и в конце грани (там нет стойки)
+export function gateShape(orient, col, row, level, wall) {
+  const sameGroup = (neighbor) => !!(neighbor && neighbor.gate && neighbor.gate.group === wall.gate.group);
+  const grid = orient === 'W' ? layout.wallW[level] : layout.wallN[level];
+  const startOpen = sameGroup(orient === 'W' ? (grid[row - 1] || [])[col] : grid[row][col - 1]);
+  const endOpen = sameGroup(orient === 'W' ? (grid[row + 1] || [])[col] : grid[row][col + 1]);
+  const post = 0.1, heavy = wall.gate.kind === 'gate';
+  return { startOpen, endOpen, heavy, post, left: startOpen ? 0 : post, right: endOpen ? TILE : TILE - post,
+    signature: `gate:${wall.gate.kind}:${startOpen}:${endOpen}` };
+}
+
+// подъёмная створка широкого проёма: секции с рёбрами, у ворот шлюза — чёрно-жёлтая полоса внизу.
+// Сворачивается вверх: узел userData.rollUp масштабируется по высоте вокруг верха проёма (map3d.js, setDoor)
+export function buildGateLeaf(orient, col, row, level, left, right, top, heavy) {
+  const group = new THREE.Group();
+  const pivot = new THREE.Group();
+  const topWorld = level * LEVEL_H + top;
+  pivot.position.y = topWorld;
+  pivot.userData.rollUp = true;
+  const inner = new THREE.Group();
+  inner.position.y = -topWorld;
+  pivot.add(inner);
+  group.add(pivot);
+  const height = top - 0.01;
+  const panel = Array(6).fill(heavy ? MAT.wall('hab', 1) : MAT.wall('cabin', 0));
+  const rib = Array(6).fill(MAT.darkSteel());
+  inner.add(wallBox(orient, col, row, level, left - 0.005, right + 0.005, 0.01, height, panel, 0.07));
+  const sections = Math.max(3, Math.round(height / 0.5));
+  for (let index = 1; index < sections; index++) {
+    const y = 0.01 + (height - 0.01) * index / sections;
+    inner.add(wallBox(orient, col, row, level, left, right, y - 0.015, y + 0.015, rib, 0.085));
+  }
+  if (heavy && height > 0.6) {
+    const stripes = 4, yellow = Array(6).fill(MAT.yellow()), black = Array(6).fill(MAT.darkSteel());
+    for (let index = 0; index < stripes; index++) {
+      const from = left + (right - left) * index / stripes, to = left + (right - left) * (index + 1) / stripes;
+      inner.add(wallBox(orient, col, row, level, from, to, 0.04, 0.3, (index + col + row) % 2 ? yellow : black, 0.08));
+    }
+  }
+  group.userData.door = { orient, col, row, level, rollUp: true };
   return tag(group, orient === 'W' ? PART.doorW : PART.doorN, level, orient === 'W' ? { biasCol: 0.15 } : { biasRow: 0.15 });
 }
 
@@ -400,6 +458,11 @@ export function buildObject(item, viewLevel) {
   }
   if (GALLEY_KINDS.has(item.kind)) {
     group.add(buildGalleyObject(item));
+    group.position.copy(origin);
+    return tag(group, PART.object, item.level);
+  }
+  if (FURNITURE_KINDS.has(item.kind)) {
+    group.add(buildFurnitureObject(item));
     group.position.copy(origin);
     return tag(group, PART.object, item.level);
   }
@@ -613,7 +676,8 @@ export function buildObject(item, viewLevel) {
       // item.bottom — низ блока (для тайла уровня: блок от пола уровня, закрытый сверху, а не отсечённый)
       const top = item.top !== undefined ? Math.min(item.top, item.height) : item.height, bottom = item.bottom || 0;
       const variant = item.variant || 0;
-      const side = MAT.baseRock(variant), cut = MAT.rockCut(variant);
+      // бетон (толстые стены склада боеприпасов) или скала
+      const side = item.concrete ? MAT.concrete() : MAT.baseRock(variant), cut = item.concrete ? MAT.concrete() : MAT.rockCut(variant);
       const rockBox = add(box(TILE + 0.014, top - bottom, TILE + 0.014, [side, side, cut, side, side, side], cx - 0.01, (top + bottom) / 2, cz - 0.01));
       rockBox.userData.noShadowReceive = true;
       const position = rockBox.geometry.attributes.position, uv = rockBox.geometry.attributes.uv, normal = rockBox.geometry.attributes.normal;

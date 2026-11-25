@@ -111,7 +111,7 @@ async function buildBase(doors, onProgress) {
             const leaves = getDoorLeaves();
             const index = doorIndex.get(`${col}|${row}|${level}|${orient}`);
             if (wall.type === 'door' && index !== undefined && leaves.children.length) {
-              if (!doorLeaves[index]) doorLeaves[index] = { along: orient === 'W' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), level };
+              if (!doorLeaves[index]) doorLeaves[index] = { along: orient === 'W' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), level, rollUp: !!wall.gate };
               doorLeaves[index][cut ? 'cut' : 'full'] = leaves;
               setEnvIntensity(leaves, 0.28);
               root.add(leaves);
@@ -279,7 +279,12 @@ const Map3D = {
   setDoor(index, open, slide) {
     const door = doorLeaves[index];
     if (!door) return;
-    for (const leaves of [door.full, door.cut]) if (leaves) leaves.position.copy(door.along).multiplyScalar(open * slide);
+    for (const leaves of [door.full, door.cut]) {
+      if (!leaves) continue;
+      // створка широкого проёма поднимается (сворачивается к верху проёма), обычная дверь уезжает в стену
+      if (door.rollUp) leaves.traverse((node) => { if (node.userData.rollUp) node.scale.y = Math.max(0.03, 1 - open); });
+      else leaves.position.copy(door.along).multiplyScalar(open * slide);
+    }
   },
   // карта целиком (непрозрачный фон)
   render() {
