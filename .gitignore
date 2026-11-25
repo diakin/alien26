@@ -7,3 +7,6 @@ tools/render/sprites_*/
 tools/render/field_out/
 desktop_webview2/lib/
 desktop_webview2/dist/
+# данные людей MakeHuman — генерируются tools/render/mh/mhbuild.py (около 100 МБ)
+tools/render/mh/*.json
+tools/render/mh/*.png

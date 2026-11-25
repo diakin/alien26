@@ -24,7 +24,9 @@
     mech: { size: 2, speed: 1.6, stride: 1.6, height: 4.0, pickWidth: 80, canKneel: false, groundOnly: true },
     // гражданские (civilian.js): шаг 0,7 м, цикл 1,4 м; у детей модель меньше в 0,65 раза
     civilian: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true },
-    child: { size: 1, speed: 1.1, stride: 0.92, height: 1.2, pickWidth: 18, canKneel: true }
+    child: { size: 1, speed: 1.1, stride: 0.92, height: 1.2, pickWidth: 18, canKneel: true },
+    // персонал базы при обороне: военнослужащие по контракту, модель гражданского с бронежилетом, каской и автоматом
+    staff: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true }
   };
   // боец или машина отряда (не гражданский)
   function isFighter(unit) { return unit.side === 'squad' && unit.kind !== 'civilian' && unit.kind !== 'child'; }
@@ -55,7 +57,7 @@
     return 5;
   }
   // кадры гражданских (civ*) грузятся только когда понадобятся (drawableSprite): на картах без них не тратят трафик
-  Object.keys(SPRITE_ANCHORS).forEach(function (name) { if (!/^civ/.test(name)) images[name] = Assets.image(spriteSource(name), spritePriority(name)); });
+  Object.keys(SPRITE_ANCHORS).forEach(function (name) { if (!/^(civ|staff)/.test(name)) images[name] = Assets.image(spriteSource(name), spritePriority(name)); });
   // Имя кадра, который можно нарисовать сейчас: нужный, а пока он не загружен — стойка того же юнита
   // в том же направлении (или в любом). Для лежащих тел подходит только кадр тела. null — рисовать нечего.
   function drawableSprite(name) {
@@ -287,6 +289,19 @@
       loadout: []
     };
   }
+  // Персонал базы — служащие по контракту с Минобороны: при нападении на базу берут оружие и обороняются.
+  // На стороне отряда; по умолчанию действуют сами (staffDecide), игрок может взять любого под управление щелчком.
+  // В мирной обстановке — в рабочей одежде без оружия (стойка ease), в бою — бронежилет, каска, автомат (набор staff<вид>).
+  function staffProfile(person) {
+    return {
+      kind: 'staff', name: person.name, camo: 'staff' + person.look, portrait: 'civ' + person.look, side: 'squad', staff: true, ai: true,
+      callsign: person.name.split(' ').slice(-1)[0].toUpperCase(), rank: person.specialty, role: 'ПЕРСОНАЛ БАЗЫ',
+      subtitle: 'ПЕРСОНАЛ БАЗЫ · ' + person.workplace.toUpperCase(), missions: 0,
+      accuracy: 48, reactions: 42, strength: 30, bravery: 45, throwing: 40, armor: 8,
+      maxTimeUnits: 54, health: 34, maxHealth: 34, stamina: 56, maxStamina: 56, morale: 60, optics: '—',
+      loadout: [['carbine', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt']]
+    };
+  }
   // снаряжение корабля с базы (basestore.js, «Снарядить корабль»): на заданиях с конвертопланом летят отмеченные
   // бойцы (по местам высадки в порядке посадки), K7 — если отмечен, груз лежит в ящике у отряда
   var SHIP = (function () {
@@ -310,6 +325,9 @@
       (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
     }
     if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
+    // персонал базы (BaseStore.people, js/basestore.js) — на рабочих местах из плана базы (BASE_PLAN): в мирной обстановке
+    // стоят, при нападении присели и прячутся, как гражданские задания
+    if (window.ALIENS_MAP === 'base' && window.BaseStore && window.BASE_PLAN) list = list.concat(baseStaffUnits(list));
     // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
     if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
       var adults = 0, children = 0;
@@ -321,6 +339,48 @@
       });
     }
     return list;
+  }
+  // фигуры персонала базы: по одной свободной клетке в помещении рабочего места, от середины помещения к краям;
+  // не на клетках у дверей и лестниц, не на клетках, занятых бойцами и пришельцами
+  function baseStaffUnits(placed) {
+    var PLAN_COL = 1, PLAN_ROW = 6;                    // сдвиг плана на поле (tools/render/outpost_layout.js)
+    var taken = {}, avoid = {};
+    var key = function (col, row, level) { return level + ':' + col + ':' + row; };
+    placed.forEach(function (unit) { for (var dy = 0; dy < unit.size; dy++) for (var dx = 0; dx < unit.size; dx++) taken[key(unit.col + dx, unit.row + dy, unit.level)] = true; });
+    (MAP.doors || []).forEach(function (door) {
+      avoid[key(door[0], door[1], door[2])] = true;
+      if (door[3] === 0) avoid[key(door[0] - 1, door[1], door[2])] = true; else avoid[key(door[0], door[1] - 1, door[2])] = true;
+    });
+    (MAP.stairs || []).forEach(function (stair) {
+      for (var step = -1; step <= stair[5]; step++) avoid[key(stair[1] + stair[3] * step, stair[2] + stair[4] * step, stair[0])] = avoid[key(stair[1] + stair[3] * step, stair[2] + stair[4] * step, stair[0] + 1)] = true;
+    });
+    var result = [];
+    BaseStore.people().forEach(function (person, number) {
+      var room = BASE_PLAN.rooms.filter(function (item) { return item.name === person.workplace; })[0];
+      if (!room) return;
+      var level = room.floor || 0, centerCol = room.x + room.width / 2 - 0.5, centerRow = room.y + room.height / 2 - 0.5, cells = [];
+      for (var row = room.y; row < room.y + room.height; row++) for (var col = room.x; col < room.x + room.width; col++) cells.push([col, row]);
+      cells.sort(function (first, second) { return Math.hypot(first[0] - centerCol, first[1] - centerRow) - Math.hypot(second[0] - centerCol, second[1] - centerRow); });
+      // в одном помещении несколько человек — расходятся по клеткам через одну, чтобы не стоять вплотную
+      var spot = null;
+      for (var pass = 0; pass < 2 && !spot; pass++) {
+        spot = cells.filter(function (cell) {
+          var col = cell[0] + PLAN_COL, row = cell[1] + PLAN_ROW;
+          if (taken[key(col, row, level)] || avoid[key(col, row, level)] || !walkable(col, row, level)) return false;
+          if (pass === 0) for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if (taken[key(col + dx, row + dy, level)]) return false;
+          return true;
+        })[0] || null;
+      }
+      if (!spot) return;
+      var col = spot[0] + PLAN_COL, row = spot[1] + PLAN_ROW;
+      taken[key(col, row, level)] = true;
+      var profile = staffProfile(person);
+      // лицом к середине помещения
+      var direction = Iso.directionOf(centerCol - spot[0], centerRow - spot[1]);
+      var unit = makeUnit(profile, [col, row, level, direction >= 0 ? direction : (number % 8)]);
+      result.push(unit);
+    });
+    return result;
   }
   var MISSION_RUN = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);   // номер запуска — склад базы принимает итоги один раз
   var units = roster();
@@ -642,7 +702,7 @@
   // виден ли юнит игроку: свои всегда; пришелец — если видна его клетка или он недавно стрелял
   function isSeen(unit) {
     if (!unit || unit.side !== 'aliens' || !fogEnabled() || !fog.visible) return true;
-    if (unit.revealedTurn === turn || (unit.revealedTurn === turn - 1 && phase === 'squad')) return true;
+    if (unit.revealedTurn === turn || (unit.revealedTurn === turn - 1 && phase !== 'aliens')) return true;
     for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
       if (cellVisible(unit.col + deltaCol, unit.row + deltaRow, unit.level)) return true;
     }
@@ -1058,15 +1118,19 @@
 
   function reload() {
     if (busy()) return;
-    if (!selected.weapon) { say('Нет оружия'); return; }
-    if (selected.ammo >= selected.magazine) { say('Магазин полон'); return; }
-    if (selected.reserve <= 0) { say('Нет запасных магазинов'); return; }
+    reloadUnit(selected);
+  }
+  // перезарядка юнита (выбранного игроком или персонала под ИИ); true — перезаряжен
+  function reloadUnit(selected) {
+    if (!selected.weapon) { say('Нет оружия'); return false; }
+    if (selected.ammo >= selected.magazine) { say('Магазин полон'); return false; }
+    if (selected.reserve <= 0) { say('Нет запасных магазинов'); return false; }
     if (!selected.inventory) {                       // K7: лента пушки
-      if (COST.reload > selected.timeUnits) { say('Не хватает очков действия'); return; }
+      if (COST.reload > selected.timeUnits) { say('Не хватает очков действия'); return false; }
       selected.timeUnits -= COST.reload;
       selected.reserve--;
       selected.ammo = selected.magazine;
-      return;
+      return true;
     }
     // магазин из ближней ячейки: 15 ОД плюс цена «достать»; остаток патронов — обратно магазином на его место
     var ammoType = selected.ammoType;
@@ -1077,13 +1141,14 @@
       return !!source;
     });
     var cost = COST.reload + Items.SLOTS[source.slot].take;
-    if (cost > selected.timeUnits) { say('Не хватает очков действия: перезарядка ' + cost + ' ОД'); return; }
+    if (cost > selected.timeUnits) { say('Не хватает очков действия: перезарядка ' + cost + ' ОД'); return false; }
     selected.timeUnits -= cost;
     var left = selected.ammo;
     selected.ammo = source.item.rounds;
     if (left > 0) source.item.rounds = left;
     else selected.inventory.splice(selected.inventory.indexOf(source), 1);
-    say('Перезарядка: ' + cost + ' ОД');
+    if (!selected.ai || selected.manualTurn === turn) say('Перезарядка: ' + cost + ' ОД');
+    return true;
   }
 
   // ---------------- руки: предмет, меню действий (режимы огня, бросок) ----------------
@@ -1264,11 +1329,13 @@
     if (phase !== 'squad' || mission.over) return;
     if (shots.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
     aiming = false; aimTarget = null; inspected = null;
-    startAlienPhase();
+    startStaffPhase();
   }
 
   function selectUnit(unit, center) {
     if (unit && unit.side !== 'squad') return;
+    // персонал базы: выбранный щелчком в этот ход действует по командам игрока, ИИ его пропускает
+    if (unit && unit.ai && unit.manualTurn !== turn && combat) { unit.manualTurn = turn; say(unit.callsign + ': управление вручную до конца хода'); }
     inspected = null;
     if (unit !== selected) { aiming = false; aimTarget = null; throwing = null; }
     selected = unit;
@@ -1277,7 +1344,8 @@
     updateHover();
   }
   function selectNext() {
-    var squad = units.filter(function (unit) { return unit.side === 'squad'; });
+    // по очереди — бойцы и машина отряда; персонал базы — только щелчком
+    var squad = units.filter(function (unit) { return unit.side === 'squad' && (!unit.ai || unit.manualTurn === turn); });
     if (!squad.length) return;
     var index = selected ? squad.indexOf(selected) : -1;
     selectUnit(squad[(index + 1) % squad.length], true);
@@ -1463,7 +1531,7 @@
     if (selected === unit) {
       selected = null; aiming = false; aimTarget = null;
       // в ход пришельцев выбор переходит к следующему бойцу без переноса камеры — она показывает падение
-      if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad'; })[0] || null;
+      if (phase === 'aliens') selected = units.filter(function (other) { return other.side === 'squad' && !other.ai; })[0] || null;
       else selectNext();
     }
     if (unit.vip) say(unit.name + ' погиб');
@@ -1484,7 +1552,7 @@
   function rescueNear(rescuer) {
     if (!isFighter(rescuer) || rescuer.dead) return;
     units.forEach(function (person) {
-      if (person.side !== 'civilians' || person.dead || person.level !== rescuer.level) return;
+      if (person.side !== 'civilians' || person.dead || person.level !== rescuer.level || person.staff) return;   // персонал базы остаётся на месте
       for (var deltaRow = 0; deltaRow < rescuer.size; deltaRow++) for (var deltaCol = 0; deltaCol < rescuer.size; deltaCol++) {
         if (!adjacentOpen(rescuer.col + deltaCol, rescuer.row + deltaRow, person.col, person.row, person.level)) continue;
         person.side = 'squad';
@@ -1765,7 +1833,7 @@
     var lost = function (test) { return startUnits.filter(function (unit) { return test(unit) && unit.dead; }); };
     var evacuated = mission.evacuated || [];
     var leftBehind = function (test) { return kind === 'evac' ? units.filter(function (unit) { return test(unit) && evacuated.indexOf(unit) < 0; }) : []; };
-    var isSoldier = function (unit) { return isFighter(unit) && unit.kind !== 'mech'; };
+    var isSoldier = function (unit) { return isFighter(unit) && unit.kind !== 'mech' && !unit.staff; };
     var isRobot = function (unit) { return unit.kind === 'mech'; };
     var aliens = startUnits.filter(function (unit) { return unit.side === 'aliens'; });
     var killedAliens = lost(function (unit) { return unit.side === 'aliens'; });
@@ -1867,7 +1935,7 @@
   }
   function setPhaseLabel() {
     var label = document.getElementById('phase');
-    if (label) label.textContent = phase === 'squad' ? 'ФАЗА ОТРЯДА' : 'ХОД ПРИШЕЛЬЦЕВ';
+    if (label) label.textContent = phase === 'squad' ? 'ФАЗА ОТРЯДА' : phase === 'staff' ? 'ПЕРСОНАЛ БАЗЫ' : 'ХОД ПРИШЕЛЬЦЕВ';
   }
   // ---- переговоры пришельцев в их ход (Sound.alienTalk) ----
   // В начале хода один пришелец вызывает, один-два отвечают; когда пришелец начинает действовать — иногда короткая
@@ -2045,11 +2113,17 @@
     Music.setMood(musicMood());
   }
 
+  // враги для стрелка: для пришельцев — отряд, для персонала базы — пришельцы, которых видит отряд (туман войны)
+  function isEnemyOf(shooter, unit) {
+    if (unit.dead) return false;
+    if (shooter.side === 'aliens') return unit.side === 'squad';
+    return unit.side === 'aliens' && isSeen(unit);
+  }
   function visibleTargets(alien) {
     var weapon = weaponOf(alien);
     var result = [];
     units.forEach(function (unit) {
-      if (unit.side !== 'squad') return;
+      if (!isEnemyOf(alien, unit)) return;
       var point = targetPointOf(unit), from = muzzleOf(alien, point);
       var distance = Combat.distanceMeters(combatWorld, from, point);
       if (distance > weapon.range) return;
@@ -2131,7 +2205,7 @@
     var seen = 0, shootable = [];
     var ownWeapon = weaponOf(alien);
     units.forEach(function (unit) {
-      if (unit.side !== 'squad') return;
+      if (!isEnemyOf(alien, unit)) return;
       var weapon = weaponOf(unit);
       var from = muzzleOf(unit, body);
       var distance = Combat.distanceMeters(combatWorld, from, body);
@@ -2144,10 +2218,10 @@
     return { seen: seen, shootable: shootable };
   }
   // укрытие: стены и препятствия на гранях клетки со стороны ближайшего бойца
-  function coverAt(node) {
+  function coverAt(node, mover) {
     var nearest = null, best = Infinity;
     units.forEach(function (unit) {
-      if (unit.side !== 'squad') return;
+      if (mover ? !isEnemyOf(mover, unit) : unit.side !== 'squad') return;
       var distance = Math.abs(unit.x - node.col - 0.5) + Math.abs(unit.y - node.row - 0.5);
       if (distance < best) { best = distance; nearest = unit; }
     });
@@ -2240,6 +2314,100 @@
     });
     return moveTo(choiceItem, hurt ? 'отход' : choiceItem && choiceItem.shootable.length ? 'позиция' : 'подход');
   }
+  // ---------------- персонал базы под ИИ ----------------
+  // Действует после хода отряда, до пришельцев. Не рискует: стреляет (одиночным, прицельным — если хватает ОД),
+  // только если после выстрела остаётся на отход в укрытие и ещё треть ОД — на ответный огонь; не больше двух выстрелов
+  // за ход; после стрельбы уходит туда, где его не видит ни один замеченный пришелец. Ранен — сразу в укрытие.
+  // Если врагов не видно и его самого не видно — стоит на месте (не идёт навстречу).
+  function staffDecide(unit) {
+    var weapon = weaponOf(unit);
+    var here = nodeKey(unit.col, unit.row, unit.level);
+    var reach = reachable(unit, unit.timeUnits);
+    var cache = {};
+    var info = function (key) {
+      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(unit, node); cache[key] = { key: key, node: node, seen: exposure.seen, cover: coverAt(node, unit), cost: reach.cost[key] || 0 }; }
+      return cache[key];
+    };
+    // ближайшая клетка, где никто из замеченных пришельцев не видит; при равной цене — с укрытием
+    var hideSpot = function (budget) {
+      var keys = reach.keys.filter(function (key) { return reach.cost[key] <= budget; }).sort(function (first, second) { return reach.cost[first] - reach.cost[second]; });
+      var best = null;
+      for (var index = 0; index < keys.length && index < 120; index++) {
+        var item = info(keys[index]);
+        if (item.seen > 0) continue;
+        if (!best) best = item;
+        else if (item.cost <= best.cost + COST.step && item.cover > best.cover) best = item;
+        else if (item.cost > best.cost + COST.step) break;
+      }
+      return best;
+    };
+    var moveTo = function (item) { return item && item.key !== here ? { move: reach.path(item.key) } : null; };
+    var exposed = info(here).seen > 0;
+    var hurt = unit.health < unit.maxHealth * 0.5;
+    var reserveFire = Math.ceil(unit.maxTimeUnits / 3);
+    if (hurt) return exposed ? moveTo(hideSpot(unit.timeUnits)) : null;
+    if (weapon && unit.ammo <= 0 && unit.reserve > 0 && !unit.aiReloaded && unit.timeUnits >= COST.reload + 8) return { reload: true };
+    var targets = weapon && unit.ammo > 0 && (unit.aiShots || 0) < 2 ? visibleTargets(unit) : [];
+    if (targets.length) {
+      var best = null;
+      targets.forEach(function (target) {
+        var value = targetValue(unit, target, weapon.modes[0]);
+        if (!best || value > best.value) best = { target: target, value: value };
+      });
+      var turnCost = turnCostTo(unit, best.target.point);
+      var hide = hideSpot(unit.timeUnits);
+      var reserve = (hide ? hide.cost : 0) + reserveFire;
+      // режимы: прицельный, затем одиночный
+      var choice = null;
+      [0, 1].forEach(function (index) {
+        if (choice === null && weapon.modes[index] && unit.timeUnits - weapon.modes[index].cost - turnCost >= reserve) choice = index;
+      });
+      if (choice !== null) return { fire: { unit: best.target.unit, point: best.target.point }, mode: choice };
+    }
+    if (exposed) return moveTo(hideSpot(unit.timeUnits));
+    return null;
+  }
+  var staffQueue = [], staffWaitUntil = 0;
+  function startStaffPhase() {
+    staffQueue = combat ? units.filter(function (unit) { return unit.ai && !unit.dead && unit.manualTurn !== turn; }) : [];
+    if (!staffQueue.length) { startAlienPhase(); return; }
+    phase = 'staff';
+    setPhaseLabel();
+    staffQueue.forEach(function (unit) { unit.aiShots = 0; unit.aiMoves = 0; unit.aiReloaded = false; });
+    staffWaitUntil = performance.now() + 300;
+    say('Персонал базы');
+  }
+  function updateStaffAI(now) {
+    if (phase !== 'staff' || mission.over || now < staffWaitUntil || shots.length || shotView) return;
+    if (units.some(function (unit) { return unit.path.length > 0; })) return;
+    while (staffQueue.length && (staffQueue[0].dead || units.indexOf(staffQueue[0]) < 0)) staffQueue.shift();
+    var unit = staffQueue[0];
+    if (!unit) { startAlienPhase(); return; }
+    var speed = Settings.values.aiSpeed;
+    var decision = unit.aiMoves < 3 ? staffDecide(unit) : null;
+    if (decision && decision.reload) {
+      unit.aiReloaded = true;
+      reloadUnit(unit);
+      staffWaitUntil = now + 250 / speed;
+      return;
+    }
+    if (decision && decision.fire) {
+      if (fire(unit, decision.fire, decision.mode)) unit.aiShots++;
+      else unit.aiShots = 2;
+      staffWaitUntil = now + 450 / speed;
+      return;
+    }
+    if (decision && decision.move && decision.move.length) {
+      unit.timeUnits -= pathCost(unit, decision.move);
+      unit.path = decision.move;
+      unit.aiMoves++;
+      staffWaitUntil = now + 200 / speed;
+      return;
+    }
+    staffQueue.shift();
+    staffWaitUntil = now + 120 / speed;
+  }
+
   // ---- показ выстрела пришельца в его ход (при настройке «Камера следит за пришельцами») ----
   // 1) камера на стрелявшем: видны поворот, вспышка у ствола и вылет пули;
   // 2) если место попадания не видно в этом кадре — камера переходит к нему; пули очереди долетают уже при новом кадре
@@ -3626,6 +3794,7 @@
     updateThrows(now);
     updateWrecks(now);
     updateShotView(now);
+    updateStaffAI(now);
     updateAI(now);
     updateGather();
     updateMission(now);

@@ -7,7 +7,7 @@ import { setEnvIntensity } from './lib.js';
 import { buildReptileAlien, setAlienFacing, buildPlasmaPistol } from './alien3.js';
 import { buildMechPosed } from './mechpose.js';
 import { buildAutocannonModel } from './mech.js';
-import { buildCivilian } from './civilian.js';
+import { buildCivilian, prepareHuman } from './civilian.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
@@ -21,7 +21,7 @@ const LOADOUTS = {
   green: { camo: 'green', goggles: true, tanRifle: true },
 };
 
-window.renderPortrait = (camo) => {
+const renderPortraitNow = (camo) => {
   const studio = new THREE.Scene();
   studio.environment = environment;
   studio.background = new THREE.Color(0x1b2024);
@@ -119,5 +119,9 @@ window.renderWeapon = (camo) => {
   renderer.setClearColor(0x000000, 0);
   renderer.render(scene, camera);
   return renderer.domElement.toDataURL('image/png');
+};
+window.renderPortrait = async (camo) => {
+  if (camo.startsWith('civ')) await prepareHuman(camo.slice(3));
+  return renderPortraitNow(camo);
 };
 window.ready = true;

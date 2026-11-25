@@ -114,8 +114,8 @@ var BaseMenu = (function () {
           placeLink('Каюта ' + (Math.floor(index / 2) + 1)) + '</td><td class="state' + (aboard ? '' : ' wait') + '">' + (aboard ? 'в экипаже КТ-6' : 'на базе') + '</td></tr>';
       }).join('');
       var support = state.support || [];
-      return { facts: 'Учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', обслуживающего персонала ' + support.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
-        body: '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) + '<h4>ОБСЛУЖИВАЮЩИЙ ПЕРСОНАЛ</h4>' + people(support) +
+      return { facts: 'Комсостав, врачи и дежурная смена — ' + BaseStore.commandStaff().length + ', учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', обслуживающего персонала ' + support.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
+        body: '<h4>КОМСОСТАВ, ВРАЧИ, ДЕЖУРНАЯ СМЕНА</h4>' + people(BaseStore.commandStaff()) + '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) + '<h4>ОБСЛУЖИВАЮЩИЙ ПЕРСОНАЛ</h4>' + people(support) +
           '<h4>ОТРЯД</h4><table><tr><th>БОЕЦ</th><th>ЗВАНИЕ · РОЛЬ</th><th>КАЮТА</th><th>СОСТОЯНИЕ</th></tr>' + soldiers +
           '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех (стенд K7)') + '</td><td class="state' + (BaseStore.state.ship.mech ? '' : ' wait') + '">' +
           (BaseStore.state.ship.mech ? 'в экипаже КТ-6' : 'на базе') + '</td></tr></table>' };
