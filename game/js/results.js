@@ -34,13 +34,27 @@ var Results = (function () {
     '#results .buttons { display: flex; justify-content: flex-end; gap: 10px; margin: 14px 12px 0; }',
     '#results button { background: #12181b; border: 1px solid #4c6a58; color: #d8e8d0; font: bold 12px Arial, sans-serif; letter-spacing: 1px; padding: 9px 16px; cursor: pointer; }',
     '#results button:hover { border-color: #c8f0a0; color: #c8f0a0; }',
-    '#results button.main { border-color: #e8a33a; color: #ffd28a; }'
+    '#results button.main { border-color: #e8a33a; color: #ffd28a; }',
+    '#results .buttons .left { margin-right: auto; }',
+    '#resultsReopen { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 55; display: none; background: rgba(14, 20, 18, 0.92);',
+    '  border: 1px solid #e8a33a; color: #ffd28a; font: bold 12px Arial, sans-serif; letter-spacing: 1px; padding: 8px 14px; cursor: pointer; }',
+    '#resultsReopen:hover { color: #fff0c8; }'
   ].join('\n');
   document.head.appendChild(style);
 
   var root = document.createElement('div');
   root.id = 'results';
   document.body.appendChild(root);
+  // после «ОК» окно скрыто, по карте можно ходить; эта кнопка открывает итоги снова
+  var reopen = document.createElement('button');
+  reopen.id = 'resultsReopen';
+  reopen.textContent = 'ИТОГИ ЗАДАНИЯ';
+  document.body.appendChild(reopen);
+  var summarySheet = '';
+  reopen.addEventListener('click', function () {
+    if (!summarySheet) return;
+    root.innerHTML = summarySheet; root.className = 'open'; reopen.style.display = 'none'; fit();
+  });
 
   function escape(text) {
     return String(text).replace(/[&<>"]/g, function (symbol) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[symbol]; });
@@ -106,10 +120,12 @@ var Results = (function () {
             peopleList(summary.robotsLost.concat(summary.robotsLeft.map(function (robot) { return { callsign: robot.callsign, name: robot.name, rank: 'не эвакуирован' }; })))) +
         '</table>' +
         '<div class="buttons">' +
+          '<button class="left" data-action="ok">ОК</button>' +
           '<button data-action="retry">ПОВТОРИТЬ ЗАДАНИЕ</button>' +
           '<button class="main" data-action="globe">К ГЛОБУСУ</button>' +
         '</div>' +
       '</div>';
+    summarySheet = root.innerHTML;
     root.className = 'open';
     fit();
   }
@@ -124,6 +140,10 @@ var Results = (function () {
   root.addEventListener('click', function (event) {
     var button = event.target.closest('button');
     if (!button) return;
+    if (button.dataset.action === 'ok') {
+      root.className = ''; reopen.style.display = 'block';
+      if (window.Game && Game.freeRoam) Game.freeRoam();
+    }
     if (button.dataset.action === 'retry') location.reload();
     if (button.dataset.action === 'globe') location.href = 'globe.html';
     if (button.dataset.action === 'cancel') closeConfirm(false);

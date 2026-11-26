@@ -334,7 +334,8 @@
       MISSION.civilians.forEach(function (person) {
         var number = person.vip ? 0 : person.child ? ++children : ++adults;
         var unit = makeUnit(civilianProfile(person, number), [person.col, person.row, person.level, person.dir]);
-        unit.kneeling = true;
+        // hidden — спрятались в укрытии (хранилище, домик): стоят; иначе — присели, руки на голове
+        unit.kneeling = !person.hidden;
         list.push(unit);
       });
     }
@@ -419,6 +420,16 @@
     return null;
   }
   // может ли mover встать углом площадки в (col, row) на уровне level
+  // укрытия задания (MAP.mission.shelters: [col0, row0, col1, row1, level]) — хранилище банка, детский домик:
+  // гражданские спрятались там, пришельцы туда не заходят
+  var SHELTERS = MISSION && MISSION.shelters || [];
+  function inShelter(col, row, level) {
+    for (var index = 0; index < SHELTERS.length; index++) {
+      var area = SHELTERS[index];
+      if (level === area[4] && col >= area[0] && col <= area[2] && row >= area[1] && row <= area[3]) return true;
+    }
+    return false;
+  }
   function isFreeFor(mover) {
     var size = mover ? mover.size : 1;
     return function (col, row, level) {
@@ -427,6 +438,7 @@
         for (var dx = 0; dx < size; dx++) {
           var cellCol = col + dx, cellRow = row + dy;
           if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover) || wreckAt(cellCol, cellRow, level)) return false;
+          if (mover && mover.side === 'aliens' && inShelter(cellCol, cellRow, level)) return false;
           if (size > 1 && stairRun(cellCol, cellRow, level)) return false;       // на лестничный марш большой юнит не встаёт
           // внутри площадки большого юнита не должно быть стен
           if (dx > 0 && !edgeOpen(cellCol - 1, cellRow, cellCol, cellRow, level)) return false;
@@ -1114,7 +1126,8 @@
   window.addEventListener('resize', resize);
 
   // ---------------- действия ----------------
-  function busy() { return mission.over || !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
+  // после итогов задания (кнопка ОК) можно ходить по карте: mission.roam
+  function busy() { return (mission.over && !mission.roam) || !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
 
   function moveSelectedTo(tile) {
     if (busy() || !tile) return;
@@ -1262,6 +1275,7 @@
     return { tile: tile, point: point, distance: distance, chance: throwChance(selected, distance), cost: throwCost(selected) + turnCostTo(selected, point), far: distance > throwRange(selected) };
   }
   function throwGrenade(target) {
+    if (mission.over) { say('Задание окончено'); throwing = null; return; }
     var entry = throwing && handEntry(selected, throwing.slot);
     if (!entry || entry.item.type !== 'grenade') { throwing = null; return; }
     if (target.far) { say('Слишком далеко: бросок до ' + Math.round(throwRange(selected)) + ' м'); return; }
@@ -1361,6 +1375,12 @@
   }
 
   function endTurn() {
+    // задание окончено, осмотр карты: ход пришельцев не наступает, очки действия восстанавливаются
+    if (mission.roam && phase === 'squad' && !units.some(function (unit) { return unit.path.length > 0; })) {
+      turn++;
+      units.forEach(function (unit) { if (unit.side === 'squad') unit.timeUnits = turnTimeUnits(unit); });
+      setPhaseLabel(); say('Осмотр карты: очки действия восстановлены'); return;
+    }
     if (phase !== 'squad' || mission.over) return;
     if (shots.length || units.some(function (unit) { return unit.path.length > 0; })) { say('Дождитесь окончания действия'); return; }
     aiming = false; aimTarget = null; inspected = null;
@@ -1492,6 +1512,7 @@
 
   function fire(shooter, target, modeIndex, delay) {
     delay = delay || 0;
+    if (mission.over) { say('Задание окончено'); return false; }
     if (shooter.side === 'aliens') shooter.revealedTurn = turn;
     var weapon = weaponOf(shooter);
     if (!weapon) { say('Нет оружия'); return false; }
@@ -1998,7 +2019,7 @@
   }
   function setPhaseLabel() {
     var label = document.getElementById('phase');
-    if (label) label.textContent = phase === 'squad' ? 'ФАЗА ОТРЯДА' : phase === 'staff' ? 'ПЕРСОНАЛ БАЗЫ' : 'ХОД ПРИШЕЛЬЦЕВ';
+    if (label) label.textContent = mission.roam ? 'ОСМОТР КАРТЫ' : phase === 'squad' ? 'ФАЗА ОТРЯДА' : phase === 'staff' ? 'ПЕРСОНАЛ БАЗЫ' : 'ХОД ПРИШЕЛЬЦЕВ';
   }
   // ---- переговоры пришельцев в их ход (Sound.alienTalk) ----
   // В начале хода один пришелец вызывает, один-два отвечают; когда пришелец начинает действовать — иногда короткая
@@ -2035,7 +2056,7 @@
     if (combat) startAlienTalk();
     setPhaseLabel();
     units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; unit.aiShots = 0; } });
-    approachField = null;                          // отряд мог переместиться: поле путей строится заново
+    approachField = null; soldierField = null;     // отряд мог переместиться: поля путей строятся заново
     aiQueue = units.filter(function (unit) { return unit.side === 'aliens'; });
     aiWaitUntil = performance.now() + 500;
     say(combat ? 'Ход пришельцев' : 'Ход пришельцев: мирная обстановка');
@@ -2232,12 +2253,14 @@
   // Расстояние до ближайшего бойца по настоящим путям (в ОД; юниты не мешают): по нему пришелец приближается,
   // и каждый шаг действительно сокращает путь — без хождения туда-обратно вокруг препятствий.
   var approachField = null;
-  function buildApproachField() {
+  function buildApproachField() { approachField = fieldFrom(units.filter(function (unit) { return unit.side === 'squad'; })); }
+  // поле расстояний по путям от клеток юнитов (или точек { col, row, level, size: 1 })
+  function fieldFrom(sources) {
     var walker = { size: 1 }, neighbours = neighbourFunction(walker, function (col, row, level) { return walkable(col, row, level); });
     var field = {}, open = [];
-    units.forEach(function (unit) {
-      if (unit.side !== 'squad') return;
-      for (var dy = 0; dy < unit.size; dy++) for (var dx = 0; dx < unit.size; dx++) { var key = nodeKey(unit.col + dx, unit.row + dy, unit.level); field[key] = 0; open.push(key); }
+    sources.forEach(function (unit) {
+      var size = unit.size || 1;
+      for (var dy = 0; dy < size; dy++) for (var dx = 0; dx < size; dx++) { var key = nodeKey(unit.col + dx, unit.row + dy, unit.level); field[key] = 0; open.push(key); }
     });
     // волна с ведром по стоимости (шаги 4, 6, лестницы — целые)
     var buckets = [open], distance = 0;
@@ -2255,9 +2278,71 @@
       }
       distance++;
     }
-    approachField = field;
+    return field;
   }
-  function fieldSteps(key) { var value = approachField && approachField[key]; return value === undefined ? 99 : value / COST.step; }
+  function fieldSteps(key) { return stepsIn(approachField, key); }
+  function stepsIn(field, key) { var value = field && field[key]; return value === undefined ? 99 : value / COST.step; }
+
+  // ---- тактика пришельцев в задании (MAP.mission.posts, attackers) ----
+  // В начале боя пришельцы делятся: attackers (5) — те, кто не стоит у постов, ближние к отряду, — идут в атаку;
+  // остальные — охрана: каждый идёт к ближнему посту (зал банка, детская площадка) и держит там оборону — выбирает
+  // клетку с укрытием в радиусе поста, стреляет по тем, кого видит, за пределы поста не уходит.
+  // Атакующие смотрят, кто из отряда вышел из зоны эвакуации (конвертоплана):
+  //   вышел только робот — прячутся в укрытиях, на открытое место не выходят, стреляют лишь из-за укрытия;
+  //   вышли бойцы — идут на бойцов (поле путей только до них), бьют прежде всего по ним, держатся вне обзора робота
+  //   и не ближе 6 клеток к нему;  никто не вышел — обычный скрытный подход.
+  // Подкрепление из портала ролей не получает и действует как обычно.
+  var POSTS = MISSION && MISSION.posts || [];
+  var rolesAssigned = false, postFields = {}, soldierField = null;
+  function assignAlienRoles() {
+    rolesAssigned = true;
+    if (!POSTS.length) return;
+    var aliens = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead; });
+    var squad = units.filter(function (unit) { return unit.side === 'squad'; });
+    if (!squad.length) return;
+    var centerX = squad.reduce(function (sum, unit) { return sum + unit.x; }, 0) / squad.length;
+    var centerY = squad.reduce(function (sum, unit) { return sum + unit.y; }, 0) / squad.length;
+    var toSquad = function (alien) { return Math.hypot(alien.x - centerX, alien.y - centerY); };
+    var nearestPost = function (alien) {
+      var best = null, bestDistance = Infinity;
+      POSTS.forEach(function (post) { var distance = Math.hypot(alien.x - post.col - 0.5, alien.y - post.row - 0.5); if (distance < bestDistance) { bestDistance = distance; best = post; } });
+      return { post: best, distance: bestDistance };
+    };
+    var atPost = function (alien) { var near = nearestPost(alien); return near.distance <= near.post.radius + 3; };
+    var count = MISSION.attackers || 5;
+    var byDistance = aliens.slice().sort(function (first, second) { return toSquad(first) - toSquad(second); });
+    var attackers = byDistance.filter(function (alien) { return !atPost(alien); }).slice(0, count);
+    byDistance.forEach(function (alien) { if (attackers.length < count && attackers.indexOf(alien) < 0) attackers.push(alien); });
+    aliens.forEach(function (alien) {
+      if (attackers.indexOf(alien) >= 0) alien.role = 'attack';
+      else { alien.role = 'guard'; alien.post = nearestPost(alien).post; }
+    });
+  }
+  function postField(post) {
+    if (!postFields[post.name]) postFields[post.name] = fieldFrom([{ col: post.col, row: post.row, level: post.level }]);
+    return postFields[post.name];
+  }
+  function alienTactic(alien) {
+    if (!alien.role) return null;
+    if (alien.role === 'guard') return { kind: 'guard', field: postField(alien.post), radius: alien.post.radius };
+    var soldiersOut = units.filter(function (unit) { return isFighter(unit) && !unit.dead && unit.kind !== 'mech' && !aboard(unit); });
+    if (soldiersOut.length) {
+      if (!soldierField) soldierField = fieldFrom(soldiersOut);
+      return { kind: 'assault', field: soldierField };
+    }
+    if (units.some(function (unit) { return unit.side === 'squad' && unit.kind === 'mech' && !unit.dead && !aboard(unit); })) return { kind: 'hide' };
+    return null;
+  }
+  // клеток до ближайшего робота отряда (по прямой, чебышёв)
+  function mechDistance(node) {
+    var best = 99;
+    units.forEach(function (unit) {
+      if (unit.side !== 'squad' || unit.kind !== 'mech' || unit.dead) return;
+      var dx = Math.max(0, unit.col - node.col, node.col - (unit.col + unit.size - 1)), dy = Math.max(0, unit.row - node.row, node.row - (unit.row + unit.size - 1));
+      best = Math.min(best, Math.max(dx, dy));
+    });
+    return best;
+  }
 
   function cellBlocked(col, row, level) {
     return !inside(col, row) || !walkable(col, row, level) || !!combatWorld.solids[level * GRID * GRID + row * GRID + col];
@@ -2267,7 +2352,7 @@
   function exposureAt(alien, node) {
     var elevation = elevationOf(node.col, node.row, node.level);
     var body = { x: node.col + 0.5, y: node.row + 0.5, h: elevation + alien.height * 0.62 };
-    var seen = 0, shootable = [];
+    var seen = 0, seenByMech = 0, shootable = [];
     var ownWeapon = weaponOf(alien);
     units.forEach(function (unit) {
       if (!isEnemyOf(alien, unit)) return;
@@ -2278,10 +2363,10 @@
       if (distance > Math.max(weapon ? weapon.range : 0, ownWeapon ? ownWeapon.range : 0)) return;
       var line = Combat.trace(combatWorld, from, body, distance, unit);
       if (line.kind !== 'none' && !(line.kind === 'unit' && line.unit === alien)) return;
-      if (weapon && distance <= weapon.range) seen++;
+      if (weapon && distance <= weapon.range) { seen++; if (unit.kind === 'mech') seenByMech++; }
       if (ownWeapon && distance <= ownWeapon.range) shootable.push({ unit: unit, distance: distance });
     });
-    return { seen: seen, shootable: shootable };
+    return { seen: seen, seenByMech: seenByMech, shootable: shootable };
   }
   // укрытие: стены и препятствия на гранях клетки со стороны ближайшего бойца
   function coverAt(node, mover) {
@@ -2324,22 +2409,30 @@
     var here = nodeKey(alien.col, alien.row, alien.level);
     var cache = {};
     var info = function (key) {
-      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(alien, node); cache[key] = { key: key, node: node, seen: exposure.seen, shootable: exposure.shootable, cover: coverAt(node), cost: reach.cost[key] || 0 }; }
+      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(alien, node); cache[key] = { key: key, node: node, seen: exposure.seen, seenByMech: exposure.seenByMech, shootable: exposure.shootable, cover: coverAt(node), cost: reach.cost[key] || 0 }; }
       return cache[key];
     };
-    // ближайшая по ОД клетка, где пришельца никто не видит
+    var tactic = alienTactic(alien);
+    var stepsTo = tactic && tactic.field ? function (key) { return stepsIn(tactic.field, key); } : fieldSteps;
+    // ближайшая по ОД клетка, где пришельца никто не видит (охрана — в пределах поста)
     var hideSpot = function (budget) {
-      var keys = reach.keys.filter(function (key) { return key !== here && reach.cost[key] <= budget; }).sort(function (first, second) { return reach.cost[first] - reach.cost[second]; });
+      var keys = reach.keys.filter(function (key) { return key !== here && reach.cost[key] <= budget && (!tactic || tactic.kind !== 'guard' || stepsTo(key) <= tactic.radius + 1); })
+        .sort(function (first, second) { return reach.cost[first] - reach.cost[second]; });
       for (var index = 0; index < keys.length && index < 90; index++) { var item = info(keys[index]); if (item.seen === 0) return item; }
       return null;
     };
     var moveTo = function (item, reason) { return item && item.key !== here ? { move: reach.path(item.key), reason: reason } : null; };
 
     var targets = alien.ammo > 0 && !hurt ? visibleTargets(alien) : [];
+    // вышел один робот: стреляют только из-за укрытия, иначе уходят в укрытие
+    if (tactic && tactic.kind === 'hide' && coverAt(keyNode(here)) < 1) targets = [];
+    // вышли бойцы: по роботу не стреляют — уходят из его обзора и ищут бойцов
+    if (tactic && tactic.kind === 'assault') targets = targets.filter(function (target) { return target.unit.kind !== 'mech'; });
     if (targets.length) {
       var best = null;
       targets.forEach(function (target) {
-        var value = targetValue(alien, target, modes[0]);
+        // вышли бойцы: робота стараются не трогать — бьют по бойцам
+        var value = targetValue(alien, target, modes[0]) * (tactic && tactic.kind === 'assault' && target.unit.kind === 'mech' ? 0.15 : 1);
         if (!best || value > best.value) best = { target: target, value: value };
       });
       var turn = turnCostTo(alien, best.target.point);
@@ -2356,24 +2449,39 @@
     if (alien.aiMoves >= 3) return null;
 
     // оценка клеток: сначала грубо по пути и укрытию, видимость — только у лучших (трассировка дорогая)
-    var currentSteps = fieldSteps(here);
+    var currentSteps = stepsTo(here);
     var rough = reach.keys.map(function (key) {
-      var node = keyNode(key), steps = fieldSteps(key);
-      var score = hurt ? steps : -Math.abs(steps - 7) * 1.2 - Math.max(0, steps - currentSteps) * 2 + coverAt(node) * 2;
+      var node = keyNode(key), steps = stepsTo(key), score;
+      if (hurt) score = steps;
+      else if (tactic && tactic.kind === 'guard') score = -Math.max(0, steps - tactic.radius) * 3 + coverAt(node) * 2;
+      else if (tactic && tactic.kind === 'hide') score = coverAt(node) * 3 - Math.max(0, 10 - steps) * 2 - Math.max(0, currentSteps - steps) * 1.5;
+      else score = -Math.abs(steps - 7) * 1.2 - Math.max(0, steps - currentSteps) * 2 + coverAt(node) * 2 - (tactic && tactic.kind === 'assault' ? Math.max(0, 6 - mechDistance(node)) * 3 : 0);
       return { key: key, score: score - reach.cost[key] * 0.02 };
     }).sort(function (first, second) { return second.score - first.score; });
     var candidates = rough.slice(0, 140).map(function (entry) { return entry.key; });
     if (candidates.indexOf(here) < 0) candidates.push(here);
     var choiceItem = null, choiceScore = -Infinity;
     candidates.forEach(function (key) {
-      var item = info(key), steps = fieldSteps(key), left = alien.timeUnits - item.cost, score;
+      var item = info(key), steps = stepsTo(key), left = alien.timeUnits - item.cost, score;
+      var canShoot = item.shootable.length > 0 && left >= modes[snapIndex].cost + 2;
       if (hurt) {
         score = (item.seen === 0 ? 60 : -40 * item.seen) + steps * 1.5 + item.cover * 4;
+      } else if (tactic && tactic.kind === 'guard') {
+        // оборона поста: клетка с укрытием в радиусе поста, откуда можно стрелять; за пределы поста — не уходит
+        score = (canShoot ? 40 + item.cover * 12 - 20 * Math.max(0, item.seen - 1) : item.seen === 0 ? 15 + item.cover * 6 : 4 - 25 * item.seen)
+          - Math.max(0, steps - tactic.radius) * 8;
+      } else if (tactic && tactic.kind === 'hide') {
+        // против одного робота: не видно, есть укрытие, не ближе 10 клеток; стрелять — только из хорошего укрытия
+        // к роботу не приближаются: каждая клетка ближе к нему — минус
+        score = (item.seen === 0 ? 50 + item.cover * 8 : -60 * item.seen) - Math.max(0, 10 - fieldSteps(key)) * 4 - Math.max(0, currentSteps - steps) * 3;
+        if (canShoot && item.cover >= 2 && item.seen <= 1) score = Math.max(score, 30 + item.cover * 10);
+        if (key === here && item.seen === 0 && item.cover >= 1) score += 12;      // уже в укрытии и не видно — остаётся
       } else {
-        var canShoot = item.shootable.length > 0 && left >= modes[snapIndex].cost + 2;
         var firing = canShoot ? 45 - 22 * Math.max(0, item.seen - 1) + item.cover * 12 - Math.abs(steps - 7) * 1.5 + left * 0.25 : -Infinity;
         var sneaking = item.seen === 0 ? 20 + item.cover * 6 - steps * 2.2 : 5 - 30 * item.seen - steps * 2;
         score = Math.max(firing, sneaking);
+        // вышли бойцы: держатся вне обзора робота и не ближе 6 клеток к нему
+        if (tactic && tactic.kind === 'assault') score -= item.seenByMech * 30 + Math.max(0, 6 - mechDistance(item.node)) * 6;
       }
       if (key === here) score += 1;                    // при равенстве — остаться
       if (score > choiceScore) { choiceScore = score; choiceItem = item; }
@@ -2551,6 +2659,7 @@
     var alien = aiQueue[0];
     if (!alien) { finishAlienPhase(); return; }
     if (!approachField) buildApproachField();
+    if (!rolesAssigned) assignAlienRoles();
     var decision = aiDecide(alien);
     var firstAction = !alien.aiMoves && !alien.aiShots;
     if (decision && decision.fire) {
@@ -3791,6 +3900,13 @@
   setPhaseLabel();
   var Game = window.Game = {
     isSeen: function (unit) { return isSeen(unit); },
+    // окно итогов закрыто кнопкой ОК: можно ходить по карте и смотреть, стрелять и эвакуироваться нельзя
+    freeRoam: function () {
+      if (!mission.over) return;
+      mission.roam = true; phase = 'squad'; aiQueue = []; staffQueue = [];
+      if (!selected) selected = units.filter(function (unit) { return unit.side === 'squad'; })[0] || null;
+      setPhaseLabel(); say('Задание окончено: осмотр карты');
+    },
     COST: COST, MAGAZINE: MAGAZINE, FIRE_MODES: FIRE_MODES, GRID: GRID,
     units: units, obstacles: obstacles, camera: camera, KINDS: KINDS,
     get selected() { return selected; },
@@ -3958,7 +4074,7 @@
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; buildApproachField(); return aiDecide(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };

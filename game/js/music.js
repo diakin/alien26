@@ -1,9 +1,14 @@
-// Музыка, синтезированная в браузере (Web Audio), без файлов. Темы:
+// Музыка, синтезированная в браузере (Web Audio), без файлов. Все темы — в стиле амбиент, без ударных установок.
 //   calm    — «Застава»: общая, ре минор, 76 ударов в минуту, 32 такта (около 100 с по кругу);
-//   shade   — «Тень»: тактическая, фон для боя без мелодии и ритма (как в UFO), 128 с по кругу;
-//   contact — та же «Тень» в варианте контакта с врагом: глухой пульс, чаще удары по металлу;
-//   battle  — «Контакт» (ритмичная, прежняя): ми минор с фригийской II ступенью, 112 ударов в минуту, 32 такта (около 69 с).
+//   dawn    — «Рассвет»: общая, светлая, до мажор с лидийской IV ступенью;
+//   shade   — «Тень»: тактическая, фон без мелодии и ритма (как в UFO), 128 с по кругу; contact — она же с пульсом;
+//   landing — «Высадка», assault — «Штурм»: тактическая и при контакте, ля минор;
+//   gloom   — «Мрак»: мрачная, низкие кластеры и далёкие удары; gloomContact — с пульсом;
+//   probe, hive, mine — «Зонд», «Улей», «Шахта»: фон с повторяющимися звуками (как в тактике UFO);
+//            *Contact — их варианты при контакте: плотнее и резче;
+//   return  — «Возвращение»: конец задания.
 // Настроение из game.js: calm — мирная обстановка, tactical — бой без контакта, battle — контакт или стрельба.
+// У каждого настроения свой набор тем; темы сменяют друг друга по очереди после каждой паузы.
 // Ноты планируются потактово чуть заранее (lookahead), поэтому темп не зависит от частоты кадров игры.
 // Смена темы — плавный переход: старая затихает за 3 с, новая нарастает за 2 с.
 // Music.setMood(имя) задаёт тему по обстановке (из game.js); настройка «Музыка» может закрепить одну тему.
@@ -219,26 +224,6 @@ var Music = (function () {
     route(kit, envelope, 0.8, 0.55, 0.25, pan);
   }
 
-  // бас боевой темы: пила с резонансным фильтром, который быстро закрывается, и синус для низа
-  function pulseBass(kit, note, time, duration, peak) {
-    if (muted(kit, 'bass')) return;
-    var context = kit.context, frequency = midiFrequency(note);
-    var lowpass = filter(context, 'lowpass', 1600, 5);
-    lowpass.frequency.setValueAtTime(1700, time);
-    lowpass.frequency.exponentialRampToValueAtTime(230, time + 0.16);
-    var envelope = context.createGain();
-    envelope.gain.value = 0;
-    var end = sustainEnvelope(envelope.gain, time, 0.005, duration * 0.7, 0.07, peak);
-    var saw = oscillator(context, 'sawtooth', frequency);
-    var sub = oscillator(context, 'sine', frequency);
-    var subLevel = context.createGain();
-    subLevel.gain.value = 0.5;
-    saw.connect(lowpass); lowpass.connect(envelope);
-    sub.connect(subLevel); subLevel.connect(envelope);
-    saw.start(time); sub.start(time); saw.stop(end); sub.stop(end);
-    route(kit, envelope, 1, 0.04, 0, 0);
-  }
-
   // аккорд-удар (как у духовых): три пилы, фильтр открыт в начале и быстро закрывается
   function stab(kit, notes, time, peak) {
     if (muted(kit, 'stab')) return;
@@ -259,45 +244,6 @@ var Music = (function () {
     route(kit, envelope, 1, 0.35, 0.15, 0);
   }
 
-  // ударные
-  function kick(kit, time, peak) {
-    if (muted(kit, 'drums')) return;
-    var context = kit.context;
-    var body = oscillator(context, 'sine', 140);
-    body.frequency.setValueAtTime(140, time);
-    body.frequency.exponentialRampToValueAtTime(42, time + 0.18);
-    var envelope = context.createGain();
-    var end = percussiveEnvelope(envelope.gain, time, 0.003, 0.38, peak);
-    body.connect(envelope); body.start(time); body.stop(end);
-    route(kit, envelope, 1, 0.05, 0, 0);
-    var click = noiseSource(kit, time, 0.03), clickFilter = filter(context, 'highpass', 1500), clickLevel = context.createGain();
-    percussiveEnvelope(clickLevel.gain, time, 0.001, 0.02, peak * 0.25);
-    click.connect(clickFilter); clickFilter.connect(clickLevel);
-    route(kit, clickLevel, 1, 0, 0, 0);
-  }
-  function snare(kit, time, peak) {
-    if (muted(kit, 'drums')) return;
-    var context = kit.context;
-    var rattle = noiseSource(kit, time, 0.25), band = filter(context, 'bandpass', 1900, 0.8), rattleLevel = context.createGain();
-    percussiveEnvelope(rattleLevel.gain, time, 0.002, 0.17, peak);
-    rattle.connect(band); band.connect(rattleLevel);
-    route(kit, rattleLevel, 1, 0.3, 0, 0.08);
-    var body = oscillator(context, 'triangle', 205);
-    body.frequency.setValueAtTime(205, time);
-    body.frequency.exponentialRampToValueAtTime(160, time + 0.09);
-    var bodyLevel = context.createGain();
-    var end = percussiveEnvelope(bodyLevel.gain, time, 0.002, 0.09, peak * 0.8);
-    body.connect(bodyLevel); body.start(time); body.stop(end);
-    route(kit, bodyLevel, 1, 0.2, 0, 0.08);
-  }
-  function hat(kit, time, peak, length, pan) {
-    if (muted(kit, 'drums')) return;
-    var context = kit.context;
-    var source = noiseSource(kit, time, length + 0.02), high = filter(context, 'highpass', 7200), level = context.createGain();
-    percussiveEnvelope(level.gain, time, 0.001, length, peak);
-    source.connect(high); high.connect(level);
-    route(kit, level, 1, 0.08, 0, pan);
-  }
   // низкий барабан (тайко) и томы для сбивок
   function drum(kit, time, frequency, peak, decay, pan) {
     if (muted(kit, 'drums')) return;
@@ -314,20 +260,6 @@ var Music = (function () {
     skin.connect(skinFilter); skinFilter.connect(skinLevel);
     route(kit, skinLevel, 1, 0.4, 0, pan);
   }
-  // нарастающий шум перед новой частью
-  function riser(kit, time, duration, peak) {
-    if (muted(kit, 'riser')) return;
-    var context = kit.context;
-    var source = noiseSource(kit, time, duration), band = filter(context, 'bandpass', 400, 2.5), level = context.createGain();
-    band.frequency.setValueAtTime(400, time);
-    band.frequency.exponentialRampToValueAtTime(6000, time + duration);
-    level.gain.setValueAtTime(0, time);
-    level.gain.linearRampToValueAtTime(peak, time + duration * 0.95);
-    level.gain.linearRampToValueAtTime(0, time + duration);
-    source.connect(band); band.connect(level);
-    route(kit, level, 1, 0.5, 0, 0);
-  }
-
   // ---------------- тема «Застава» (общая) ----------------
   // Гармония на 16 тактов: часть A (Dm Bbmaj7 Gm A Dm F C A) и часть B (Bb F Gm Dm Bb C Asus4 A).
   // Подушка ведётся плавно (общие ноты остаются на месте), бас — отдельной нотой ниже.
@@ -384,87 +316,10 @@ var Music = (function () {
           });
         });
       } else {
-        // второй проход без мелодии: колокола на сильные доли и редкие удары низкого барабана
+        // второй проход без мелодии: колокола на сильные доли
         bell(kit, chord.pad[2] + 12, time, 0.2, -0.2);
         if (bar % 2) bell(kit, chord.pad[1] + 12, time + 2.5 * beat, 0.14, 0.25);
-        if (bar % 4 === 0) drum(kit, time, 70, 0.3, 0.9, 0);
       }
-    }
-  };
-
-  // ---------------- тема «Контакт» (тактическая) ----------------
-  // Гармония: часть A (Em Em C D Em Em F D) — F как фригийская ступень даёт напряжение;
-  // часть B (Am Em C B Am C F B) — мажорный B тянет обратно в Em.
-  var BATTLE_CHORDS = [
-    { bass: 40, pad: [59, 64, 67] }, { bass: 40, pad: [59, 64, 67] }, { bass: 36, pad: [60, 64, 67] }, { bass: 38, pad: [57, 62, 66] },
-    { bass: 40, pad: [59, 64, 67] }, { bass: 40, pad: [59, 64, 67] }, { bass: 41, pad: [57, 60, 65] }, { bass: 38, pad: [57, 62, 66] },
-    { bass: 33, pad: [57, 60, 64] }, { bass: 40, pad: [59, 64, 67] }, { bass: 36, pad: [60, 64, 67] }, { bass: 35, pad: [59, 63, 66] },
-    { bass: 33, pad: [57, 60, 64] }, { bass: 36, pad: [60, 64, 67] }, { bass: 41, pad: [57, 60, 65] }, { bass: 35, pad: [59, 63, 66] }
-  ];
-  var BATTLE_MELODY = [
-    [0, 0, 76, 1.5], [0, 1.5, 71, 0.5], [0, 2, 76, 1], [0, 3, 78, 1],
-    [1, 0, 79, 2], [1, 2, 78, 1], [1, 3, 76, 1],
-    [2, 0, 79, 2], [2, 2, 76, 1], [2, 3, 72, 1],
-    [3, 0, 74, 2], [3, 2, 78, 1], [3, 3, 81, 1],
-    [4, 0, 79, 1.5], [4, 1.5, 78, 0.5], [4, 2, 76, 2],
-    [5, 0, 71, 1], [5, 1, 76, 1], [5, 2, 79, 1], [5, 3, 83, 1],
-    [6, 0, 81, 2], [6, 2, 79, 1], [6, 3, 77, 1],
-    [7, 0, 78, 3], [7, 3, 74, 1],
-    [8, 0, 81, 1.5], [8, 1.5, 76, 0.5], [8, 2, 81, 1], [8, 3, 83, 1],
-    [9, 0, 79, 2], [9, 2, 76, 2],
-    [10, 0, 76, 1], [10, 1, 79, 1], [10, 2, 84, 2],
-    [11, 0, 83, 2], [11, 2, 75, 1], [11, 3, 78, 1],
-    [12, 0, 76, 1], [12, 1, 81, 1], [12, 2, 84, 1], [12, 3, 83, 1],
-    [13, 0, 79, 2], [13, 2, 76, 2],
-    [14, 0, 77, 1], [14, 1, 81, 1], [14, 2, 84, 2],
-    [15, 0, 83, 2], [15, 2, 75, 1], [15, 3, 78, 1]
-  ];
-  var BASS_PATTERN = [0, 0, 12, 0, 0, 7, 0, 12];   // смещения от основного тона по восьмым
-
-  var BATTLE = {
-    name: 'battle', tempo: 112, bars: 32,
-    echo: 0.75 * 60 / 112,
-    scheduleBar: function (kit, bar, absoluteBar, time) {
-      var beat = 60 / this.tempo, sixteenth = beat / 4, barLength = beat * 4;
-      var chord = BATTLE_CHORDS[bar % 16], leadPass = bar >= 16, half = bar % 16 >= 8;
-      pad(kit, chord.pad, time, barLength + 0.02, { cutoff: 900, peak: 0.032, attack: 0.35, release: 0.7, detune: 9, reverb: 0.35 });
-      for (var eighth = 0; eighth < 8; eighth++) {
-        var accent = eighth === 0 || eighth === 3 || eighth === 6;
-        pulseBass(kit, chord.bass + BASS_PATTERN[eighth], time + eighth * beat / 2, beat * 0.42, accent ? 0.15 : 0.1);
-      }
-      if (absoluteBar >= 2) {
-        for (var step = 0; step < 16; step++) {
-          var at = time + step * sixteenth;
-          if (step === 0 || step === 6 || step === 8) kick(kit, at, step === 6 ? 0.33 : 0.45);
-          if (step === 4 || step === 12) snare(kit, at, 0.4);
-          if (step % 4 === 2) hat(kit, at, 0.16, 0.04, 0.25);
-          else if (step % 2) hat(kit, at, 0.06, 0.025, -0.25);
-        }
-        if (bar % 2 === 0) drum(kit, time, 92, 0.32, 0.6, 0);
-        if (bar % 4 === 3) drum(kit, time + 10 * sixteenth, 92, 0.22, 0.5, 0);
-        // сбивка томами в конце каждой восьмёрки тактов
-        if (bar % 8 === 7) [210, 175, 140, 110].forEach(function (frequency, index) { drum(kit, time + (12 + index) * sixteenth, frequency, 0.24, 0.28, 0.3 - index * 0.2); });
-      }
-      // пульс шестнадцатыми по звукам аккорда; на проходе с мелодией тише
-      var tones = [chord.pad[0], chord.pad[1], chord.pad[2], chord.pad[1]];
-      for (var pulse = 0; pulse < 16; pulse++) {
-        pluck(kit, tones[pulse % 4] + 12, time + pulse * sixteenth, {
-          type: 'square', peak: leadPass ? 0.06 : 0.1, decay: 0.12, cutoff: 1900, reverb: 0.15, echo: 0.12, pan: pulse % 2 ? 0.4 : -0.4
-        });
-      }
-      if (!leadPass && half && absoluteBar >= 2) {
-        stab(kit, chord.pad.map(function (note) { return note + 12; }), time, 0.14);
-        stab(kit, chord.pad.map(function (note) { return note + 12; }), time + 6 * sixteenth, 0.1);
-      }
-      if (leadPass) {
-        BATTLE_MELODY.forEach(function (entry) {
-          if (entry[0] !== bar - 16) return;
-          lead(kit, entry[2], time + entry[1] * beat, entry[3] * beat, {
-            types: ['sawtooth', 'square'], peak: 0.08, cutoff: 2300, attack: 0.02, release: 0.25, vibrato: 0.004, vibratoRate: 5.6, reverb: 0.35, echo: 0.2
-          });
-        });
-      }
-      if (bar === 15 || bar === 31) riser(kit, time, barLength, 0.06);
     }
   };
 
@@ -689,8 +544,8 @@ var Music = (function () {
   // Записи мелодий: [такт, доля, нота, длительность в долях].
 
   // «Высадка»: 70 ударов, 32 такта (≈110 с). Плавная подушка над гулом, тихое остинато восьмыми (3+3+2),
-  // фразы валторны на тактах 4–7 и 12–15; на втором проходе — длинная мелодия ниже, редкие удары литавры,
-  // «сонар» и тиканье. Неаполитанский Bb перед доминантой и задержания sus4 держат напряжение.
+  // фразы валторны на тактах 4–7 и 12–15; на втором проходе — длинная мелодия ниже, редкий далёкий металл,
+  // «сонар» и стеклянные призвуки. Неаполитанский Bb перед доминантой и задержания sus4 держат напряжение.
   var LANDING_CHORDS = [
     { bass: 33, pad: [57, 60, 64] }, { bass: 33, pad: [59, 60, 64] }, { bass: 29, pad: [57, 60, 64] }, { bass: 29, pad: [57, 60, 65] },
     { bass: 26, pad: [57, 62, 65] }, { bass: 26, pad: [57, 62, 64] }, { bass: 28, pad: [57, 59, 64] }, { bass: 28, pad: [56, 59, 64] },
@@ -734,8 +589,7 @@ var Music = (function () {
           if (entry[0] !== bar - 16) return;
           lead(kit, entry[2] - 12, time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.045, cutoff: 1200, attack: 0.3, release: 1.0, vibrato: 0.003, reverb: 0.5, echo: 0.15 });
         });
-        if (bar % 2 === 0) drum(kit, time, 62, 0.22, 1.1, 0);
-        for (var tick = 1; tick < 8; tick += 2) hat(kit, time + tick * beat / 2, 0.035, 0.02, 0.3);
+        if (bar % 8 === 2) metal(kit, 40, time + 1.5 * beat, 0.3, 0.5);
         if (bar % 4 === 1) glass(kit, chord.pad[2] + 24, time + beat, barLength * 2, 0.02, -0.4);
       }
       if (bar === 15 || bar === 31) swell(kit, time, barLength, 0.06);
@@ -908,7 +762,198 @@ var Music = (function () {
     }
   };
 
-  var THEMES = { calm: CALM, battle: BATTLE, shade: SHADE, contact: SHADE_CONTACT, landing: LANDING, assault: ASSAULT, 'return': RETURN };
+  // ---------------- инструменты для новых фоновых тем ----------------
+  // мягкий «блип»: синус и треугольник октавой выше, быстрый спад, долгое эхо — повторяющиеся звуки, как в UFO
+  function blip(kit, note, time, peak, pan, decay) {
+    if (muted(kit, 'pluck')) return;
+    var context = kit.context, frequency = midiFrequency(note);
+    var envelope = context.createGain();
+    var end = percussiveEnvelope(envelope.gain, time, 0.006, decay || 0.5, peak);
+    var lowpass = filter(context, 'lowpass', 2400, 0.7);
+    [['sine', 1, 1], ['triangle', 2, 0.25]].forEach(function (voiceInfo) {
+      var voice = oscillator(context, voiceInfo[0], frequency * voiceInfo[1]), level = context.createGain();
+      level.gain.value = voiceInfo[2];
+      voice.connect(level); level.connect(lowpass);
+      voice.start(time); voice.stop(end);
+    });
+    lowpass.connect(envelope);
+    route(kit, envelope, 0.7, 0.5, 0.6, pan);
+  }
+  // сухой щелчок механизма: очень короткий шум через узкую полосу
+  function clack(kit, time, peak, pan, frequency) {
+    if (muted(kit, 'tick')) return;
+    var context = kit.context;
+    var source = noiseSource(kit, time, 0.03), band = filter(context, 'bandpass', frequency || 4200, 5), level = context.createGain();
+    percussiveEnvelope(level.gain, time, 0.001, 0.025, peak);
+    source.connect(band); band.connect(level);
+    route(kit, level, 0.8, 0.3, 0.35, pan);
+  }
+  // низкий «вом»: синус и пила через фильтр, который открывается и закрывается за время ноты
+  function throb(kit, note, time, duration, peak) {
+    if (muted(kit, 'bass')) return;
+    var context = kit.context, frequency = midiFrequency(note);
+    var lowpass = filter(context, 'lowpass', 120, 3);
+    lowpass.frequency.setValueAtTime(120, time);
+    lowpass.frequency.exponentialRampToValueAtTime(520, time + duration * 0.35);
+    lowpass.frequency.exponentialRampToValueAtTime(110, time + duration);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, duration * 0.25, duration * 0.35, duration * 0.4, peak);
+    [['sine', 0, 1], ['sawtooth', 5, 0.35]].forEach(function (voiceInfo) {
+      var voice = oscillator(context, voiceInfo[0], frequency, voiceInfo[1]), level = context.createGain();
+      level.gain.value = voiceInfo[2];
+      voice.connect(level); level.connect(lowpass);
+      voice.start(time); voice.stop(end);
+    });
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, 0.2, 0, 0);
+  }
+
+  // ---------------- «Мрак» (мрачная) ----------------
+  // 48 ударов, такт 5 с, 32 такта (160 с). Очень низкий гул, медленные кластеры с тритоном и малой секундой,
+  // глухой мотив «рога» в нижнем регистре (до — ре-бемоль — соль), далёкий металл, ветер, редкий стеклянный призвук.
+  // Вариант при контакте — тот же фон и глухой пульс.
+  var GLOOM_BLOCKS = [
+    { bass: 24, notes: [43, 44, 48] },        // C: соль, ля-бемоль, до
+    { bass: 24, notes: [42, 46, 49] },        // C: фа-диез, си-бемоль, ре-бемоль — тритон над басом
+    { bass: 22, notes: [41, 44, 49] },        // Bb
+    { bass: 25, notes: [44, 47, 50] },        // Db: уменьшённое
+    { bass: 24, notes: [43, 44, 48] },
+    { bass: 20, notes: [39, 44, 47] },        // Ab
+    { bass: 23, notes: [42, 47, 50] },        // B: си, ре, фа-диез над си
+    { bass: 24, notes: [43, 46, 49, 50] }
+  ];
+  var GLOOM_HORN = [[0, 0, 48, 2], [0, 2, 49, 2], [1, 0, 43, 4]];      // [такт от начала фразы, доля, нота, длительность]
+  var GLOOM_EVENTS = [
+    [1, 1, 'metal', 33, 0.4, -0.5], [3, 0, 'draft', 120, 0.13, 480], [5, 2.5, 'metal', 31, 0.42, 0.6], [6, 1, 'glass', 76, 0.02, -0.3],
+    [9, 0.5, 'metal', 35, 0.36, 0.4], [11, 0, 'draft', 100, 0.12, 420], [13, 3, 'metal', 30, 0.45, -0.6], [15, 0, 'swell', 0, 0.07, 0],
+    [17, 2, 'metal', 34, 0.38, 0.5], [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.02, 0.4], [22, 3, 'metal', 32, 0.42, -0.4],
+    [25, 0.5, 'metal', 36, 0.36, 0.6], [27, 0, 'draft', 110, 0.12, 460], [29, 2, 'metal', 31, 0.44, -0.5], [31, 0, 'swell', 0, 0.07, 0]
+  ];
+  function gloomTheme(name, contact) {
+    return {
+      name: name, tempo: 48, bars: 32, echo: 1.25, level: 1.3,
+      scheduleBar: function (kit, bar, absoluteBar, time) {
+        var beat = 60 / this.tempo, barLength = beat * 4;
+        var block = GLOOM_BLOCKS[Math.floor(bar / 4)];
+        if (bar % 4 === 0 || absoluteBar === 0) {
+          var length = (4 - bar % 4) * barLength + 2;
+          deepDrone(kit, block.bass + 12, time, length, 0.17);
+          deepDrone(kit, block.bass + 6, time + 1, length, 0.05);          // тритон под гулом, еле слышно
+          shade(kit, block.notes, time, length, 0.065);
+        }
+        // мотив «рога» в тактах 2–3 каждых восьми
+        if (bar % 8 === 2 || bar % 8 === 3) GLOOM_HORN.forEach(function (entry) {
+          if (entry[0] !== bar % 8 - 2) return;
+          lead(kit, entry[2] + (bar >= 16 ? -12 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.04, cutoff: 650, attack: 0.6, release: 1.6, vibrato: 0.002, reverb: 0.7, echo: 0.2 });
+        });
+        GLOOM_EVENTS.forEach(function (entry) { if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength); });
+        if (contact) { heartbeat(kit, time, 0.3); heartbeat(kit, time + 2 * beat, bar % 4 === 3 ? 0.36 : 0.26); }
+      }
+    };
+  }
+  var GLOOM = gloomTheme('gloom', false), GLOOM_CONTACT = gloomTheme('gloomContact', true);
+
+  // ---------------- «Рассвет» (светлая) ----------------
+  // 62 удара, 32 такта (≈124 с). До мажор с лидийским фа-диезом: широкая светлая подушка, мягкий бас,
+  // редкие ноты «фортепиано» в неровных местах (без мерного пульса), колокола, стеклянное мерцание;
+  // мелодия из пентатоники в тактах 4–7 и 20–23 — лёгкая, с паузами.
+  var DAWN_CHORDS = [
+    { bass: 36, pad: [55, 60, 64, 67] }, { bass: 36, pad: [54, 59, 64, 67] }, { bass: 33, pad: [55, 60, 64, 69] }, { bass: 31, pad: [55, 59, 62, 67] },
+    { bass: 29, pad: [57, 60, 64, 67] }, { bass: 29, pad: [57, 62, 64, 69] }, { bass: 31, pad: [55, 59, 62, 69] }, { bass: 36, pad: [55, 60, 62, 67] },
+    { bass: 33, pad: [55, 60, 64, 69] }, { bass: 28, pad: [55, 59, 64, 67] }, { bass: 29, pad: [57, 60, 64, 69] }, { bass: 38, pad: [57, 62, 66, 69] },
+    { bass: 36, pad: [55, 60, 64, 67] }, { bass: 29, pad: [57, 60, 64, 67] }, { bass: 31, pad: [55, 60, 62, 67] }, { bass: 31, pad: [55, 59, 62, 67] }
+  ];
+  var DAWN_MELODY = [
+    [0, 0, 76, 2], [0, 2.5, 79, 1.5], [1, 0, 81, 3], [2, 0, 79, 1.5], [2, 1.5, 76, 0.5], [2, 2, 74, 2], [3, 0, 76, 4],
+  ];
+  // ноты «фортепиано»: [доля, номер звука аккорда (0..3), октава] — в каждом такте по своему узору
+  var DAWN_NOTES = [
+    [[0.5, 3, 1], [2.25, 1, 1]], [[1, 2, 1], [3.5, 0, 2]], [[0, 1, 1], [1.75, 3, 1], [3, 2, 1]], [[2.5, 0, 2]],
+    [[0.75, 2, 1], [2, 3, 1]], [[1.5, 1, 1], [3.25, 3, 1]], [[0, 3, 1], [2.75, 1, 2]], [[1, 0, 2], [2.5, 2, 1]]
+  ];
+  var DAWN = {
+    name: 'dawn', tempo: 62, bars: 32, echo: 0.75 * 60 / 62, level: 1.2,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4;
+      var chord = DAWN_CHORDS[bar % 16];
+      pad(kit, chord.pad, time, barLength + 0.1, { cutoff: 1900, peak: 0.024, attack: 1.6, release: 2.4, detune: 6, reverb: 0.6 });
+      drone(kit, chord.bass, time, barLength, 0.1);
+      if (absoluteBar >= 1) DAWN_NOTES[bar % 8].forEach(function (entry) {
+        pluck(kit, chord.pad[entry[1]] + 12 * entry[2], time + entry[0] * beat, { type: 'triangle', peak: vary(0.13, 0.25), decay: 1.4, cutoff: 3200, reverb: 0.55, echo: 0.35, pan: entry[1] % 2 ? 0.35 : -0.35 });
+      });
+      var phrase = bar % 16 - 4;
+      if (phrase >= 0 && phrase < 4 && (bar < 8 || (bar >= 16 && bar < 24))) DAWN_MELODY.forEach(function (entry) {
+        if (entry[0] !== phrase) return;
+        lead(kit, entry[2] + (bar >= 16 ? 5 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sine', 'triangle'], peak: 0.065, cutoff: 3600, attack: 0.15, release: 1.2, vibrato: 0.004, reverb: 0.65, echo: 0.3 });
+      });
+      if (bar % 4 === 0) bell(kit, chord.pad[3] + 12, time + beat, 0.12, 0.3);
+      if (bar % 8 === 6) glass(kit, chord.pad[2] + 24, time, barLength * 2, 0.022, -0.4);
+      if (bar % 16 === 15) swell(kit, time, barLength, 0.035);
+    }
+  };
+
+  // ---------------- фон с повторяющимися звуками (как в тактике UFO) ----------------
+  // Блоки по 8 тактов: основной тон баса и тёмный кластер. Над ними — короткий узор, который повторяется каждый такт
+  // (меняется только высота от блока к блоку), как механическое «дыхание» чужого корабля. Вариант при контакте
+  // плотнее: добавляются низкие «вомы», металл и пульс.
+  // «Зонд»: 72 удара. Узор из восьми «блипов» по восьмым (ми, ми октавой выше, фа, ...), долгое эхо делает из него сетку.
+  var PROBE_BLOCKS = [{ root: 28, notes: [47, 52, 53] }, { root: 24, notes: [48, 51, 55] }, { root: 29, notes: [48, 53, 56] }, { root: 28, notes: [46, 52, 55] }];
+  var PROBE_PATTERN = [[0, 0, 0.11], [1, 12, 0.06], [2, 1, 0.09], [3, 12, 0.05], [4, 0, 0.1], [5, 7, 0.06], [6, 1, 0.08], [7, 10, 0.05]];
+  // «Улей»: 80 ударов. Щелчки по шестнадцатым в группах 3+3+2, под ними низкий «вом» на два тона через полутон.
+  var HIVE_BLOCKS = [{ root: 33, notes: [57, 58, 64] }, { root: 33, notes: [57, 60, 63] }, { root: 29, notes: [56, 60, 65] }, { root: 28, notes: [56, 59, 65] }];
+  var HIVE_TICKS = [0, 3, 6, 8, 11, 14];
+  // «Шахта»: 90 ударов. Два удара по металлу в каждом такте (на 1 и на «и» третьей доли), мотив из трёх звуков через такт.
+  var MINE_BLOCKS = [{ root: 26, notes: [50, 53, 56] }, { root: 26, notes: [50, 51, 57] }, { root: 22, notes: [49, 53, 58] }, { root: 21, notes: [49, 52, 56] }];
+  var MINE_MOTIF = [[1, 36, 0.09], [1.5, 39, 0.07], [3, 34, 0.08]];
+  function loopTheme(name, kind, contact) {
+    var settings = { probe: { tempo: 72, blocks: PROBE_BLOCKS }, hive: { tempo: 80, blocks: HIVE_BLOCKS }, mine: { tempo: 90, blocks: MINE_BLOCKS } }[kind];
+    return {
+      name: name, tempo: settings.tempo, bars: 32, echo: kind === 'probe' ? 0.75 * 60 / 72 : kind === 'hive' ? 0.5 * 60 / 80 : 1.5 * 60 / 90, level: 1.25,
+      scheduleBar: function (kit, bar, absoluteBar, time) {
+        var beat = 60 / this.tempo, barLength = beat * 4;
+        var block = settings.blocks[Math.floor(bar / 8)];
+        if (bar % 8 === 0 || absoluteBar === 0) {
+          var length = (8 - bar % 8) * barLength + 2;
+          deepDrone(kit, block.root + 12, time, length, 0.14);
+          shade(kit, block.notes, time, length, contact ? 0.06 : 0.05);
+        }
+        var lift = contact ? 1.3 : 1;
+        if (kind === 'probe') {
+          PROBE_PATTERN.forEach(function (step) {
+            blip(kit, block.root + 24 + step[1], time + step[0] * beat / 2, step[2] * lift, step[0] % 2 ? 0.45 : -0.45, 0.45);
+          });
+          if (bar % 2 === 1) ping(kit, 88 + (bar % 8 === 7 ? 3 : 0), time + 2.5 * beat, 0.07, 0.5);
+          if (contact) { throb(kit, block.root + 12, time, beat * 1.5, 0.13); throb(kit, block.root + 12, time + 2 * beat, beat * 1.5, 0.11); }
+        } else if (kind === 'hive') {
+          (contact ? [0, 2, 3, 5, 6, 8, 10, 11, 13, 14] : HIVE_TICKS).forEach(function (step) {
+            var strong = HIVE_TICKS.indexOf(step) >= 0;
+            clack(kit, time + step * beat / 4, (strong ? 0.09 : 0.045) * lift, step % 2 ? 0.4 : -0.4, strong ? 3800 : 5600);
+          });
+          throb(kit, block.root + 12, time, beat * 2, 0.12 * lift);
+          throb(kit, block.root + 13, time + 2 * beat, beat * 2, 0.11 * lift);
+          if (bar % 4 === 2) glass(kit, block.notes[2] + 24, time + beat, barLength * 2, 0.02, 0.4);
+          if (contact) heartbeat(kit, time + 3 * beat, 0.24);
+        } else {
+          metal(kit, block.root + 12, time, 0.26 * lift, -0.3);
+          metal(kit, block.root + 17, time + 2.5 * beat, 0.2 * lift, 0.3);
+          if (bar % 2 === 0) MINE_MOTIF.forEach(function (entry) { blip(kit, block.root + entry[1], time + entry[0] * beat, entry[2] * lift, 0.2, 0.7); });
+          if (bar % 8 === 4) draft(kit, time, barLength * 3, 0.11, 180, 700);
+          if (contact) { throb(kit, block.root + 12, time + beat, beat, 0.1); throb(kit, block.root + 12, time + 3 * beat, beat, 0.1); if (bar % 2) ping(kit, 86, time + 1.5 * beat, 0.08, -0.5); }
+        }
+        if (bar % 8 === 7) swell(kit, time, barLength, contact ? 0.08 : 0.06);
+      }
+    };
+  }
+  var PROBE = loopTheme('probe', 'probe', false), PROBE_CONTACT = loopTheme('probeContact', 'probe', true);
+  var HIVE = loopTheme('hive', 'hive', false), HIVE_CONTACT = loopTheme('hiveContact', 'hive', true);
+  var MINE = loopTheme('mine', 'mine', false), MINE_CONTACT = loopTheme('mineContact', 'mine', true);
+
+  var THEMES = {
+    calm: CALM, dawn: DAWN, shade: SHADE, contact: SHADE_CONTACT, landing: LANDING, assault: ASSAULT, 'return': RETURN,
+    gloom: GLOOM, gloomContact: GLOOM_CONTACT, probe: PROBE, probeContact: PROBE_CONTACT, hive: HIVE, hiveContact: HIVE_CONTACT,
+    mine: MINE, mineContact: MINE_CONTACT
+  };
 
 
   // ---------------- воспроизведение в игре ----------------
@@ -919,7 +964,7 @@ var Music = (function () {
   var FADE_OUT = 3;
   var timing = { play: 30, pause: 30 };
   var context = null, master = null, runs = [], mood = 'calm', timer = null;
-  var resumeBar = { calm: 0, battle: 0, shade: 0, contact: 0, landing: 0, assault: 0, 'return': 0 };   // с какого такта продолжить тему
+  var resumeBar = {};                             // с какого такта продолжить тему (по имени)
   var pauseUntil = 0, lastTheme = null;
 
   function createMaster(audioContext, destination) {
@@ -941,25 +986,36 @@ var Music = (function () {
     refresh();
   }
 
-  // настроение → тема по набору (настройка «Боевая музыка», musicSet):
-  //   0 — «Высадка» до контакта, «Штурм» при контакте; 1 — «Тень» и «Тень» с пульсом (фон, как в UFO);
-  //   2 — «Тень» и прежняя ритмичная. Конец задания (debrief) — «Возвращение» в любом наборе.
-  function themeFor(moodName) {
-    var settings = window.Settings ? Settings.values : {};
-    var set = settings.musicSet === undefined ? 0 : settings.musicSet;
-    if (moodName === 'debrief') return 'return';
-    if (moodName === 'tactical') return set === 0 ? 'landing' : 'shade';
-    if (moodName === 'battle') return set === 0 ? 'assault' : set === 2 ? 'battle' : 'contact';
-    return 'calm';
-  }
-  function wanted() {
+  // Наборы тем по настроению и настройке «Фоновая музыка боя» (musicSet):
+  //   0 — все по очереди; 1 — «Высадка» и «Штурм»; 2 — «Тень» (фон, как в UFO); 3 — «Зонд», «Улей», «Шахта»
+  //   (повторяющиеся звуки, как в UFO); 4 — «Мрак». Мирная обстановка — «Застава» и «Рассвет», конец задания — «Возвращение».
+  var POOLS = {
+    tactical: [['landing', 'shade', 'gloom', 'probe', 'hive', 'mine'], ['landing'], ['shade'], ['probe', 'hive', 'mine'], ['gloom']],
+    battle: [['assault', 'contact', 'probeContact', 'hiveContact', 'gloomContact', 'mineContact'], ['assault'], ['contact'], ['probeContact', 'hiveContact', 'mineContact'], ['gloomContact']]
+  };
+  var poolTurn = {};                              // какая тема набора звучит: сдвигается после каждой паузы
+  function wantedMood() {
     var settings = window.Settings ? Settings.values : {};
     if (settings.musicVolume === 0) return null;
-    if (settings.musicTheme === 1 && mood !== 'debrief') return 'calm';
-    if (settings.musicTheme === 2) return themeFor(mood === 'calm' ? 'tactical' : mood);
-    if (mood === 'debrief') return themeFor(mood);
-    return themeFor(mood);
+    if (mood === 'debrief') return 'debrief';
+    if (settings.musicTheme === 1) return 'calm';
+    if (settings.musicTheme === 2) return mood === 'calm' ? 'tactical' : mood;
+    return mood;
   }
+  function poolFor(moodName) {
+    var settings = window.Settings ? Settings.values : {};
+    var set = settings.musicSet || 0;
+    if (moodName === 'debrief') return ['return'];
+    if (moodName === 'calm') return ['calm', 'dawn'];
+    return (POOLS[moodName] || POOLS.tactical)[set] || POOLS[moodName][0];
+  }
+  function wanted() {
+    var moodName = wantedMood();
+    if (!moodName) return null;
+    var pool = poolFor(moodName);
+    return pool[(poolTurn[moodName] || 0) % pool.length];
+  }
+  function nextInPool() { var moodName = wantedMood(); if (moodName) poolTurn[moodName] = (poolTurn[moodName] || 0) + 1; }
   function pauseSeconds() {
     var settings = window.Settings ? Settings.values : {};
     return settings.musicPause === undefined ? timing.pause : settings.musicPause;
@@ -973,7 +1029,7 @@ var Music = (function () {
     var startTime = context.currentTime + 0.1;
     gain.gain.setValueAtTime(0, startTime);
     gain.gain.linearRampToValueAtTime(theme.level || 1, startTime + 2);
-    var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: resumeBar[name], absoluteBar: 0,
+    var run = { theme: theme, gain: gain, kit: createKit(context, gain, theme.echo), bar: resumeBar[name] || 0, absoluteBar: 0,
       nextTime: startTime, stopping: false, endTime: name === 'return' ? Infinity : startTime + timing.play };   // «Возвращение» — без пауз
     runs.push(run);
     lastTheme = name;
@@ -1006,6 +1062,7 @@ var Music = (function () {
     var playing = current();
     if (playing && pauseSeconds() > 0 && now >= playing.endTime - FADE_OUT) {
       stopRun(playing);                            // фрагмент отзвучал: затихание и пауза
+      nextInPool();                                // после паузы — следующая тема набора
       pauseUntil = now + FADE_OUT + pauseSeconds();
       playing = null;
     }
