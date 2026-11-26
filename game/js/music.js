@@ -6,6 +6,8 @@
 //   gloom   — «Мрак»: мрачная, низкие кластеры и далёкие удары; gloomContact — с пульсом;
 //   probe, hive, mine — «Зонд», «Улей», «Шахта»: фон с повторяющимися звуками (как в тактике UFO);
 //            *Contact — их варианты при контакте: плотнее и резче;
+//   impulse, alarm, knock — «Импульс», «Тревога», «Стук»: фон с резкими акцентами около 4 раз в секунду;
+//   loss, weep — «Утрата», «Плач»: душераздирающие (конец задания с погибшими, или по выбору в настройках);
 //   return  — «Возвращение»: конец задания.
 // Настроение из game.js: calm — мирная обстановка, tactical — бой без контакта, battle — контакт или стрельба.
 // У каждого настроения свой набор тем; темы сменяют друг друга по очереди после каждой паузы.
@@ -949,10 +951,239 @@ var Music = (function () {
   var HIVE = loopTheme('hive', 'hive', false), HIVE_CONTACT = loopTheme('hiveContact', 'hive', true);
   var MINE = loopTheme('mine', 'mine', false), MINE_CONTACT = loopTheme('mineContact', 'mine', true);
 
+  // ---------------- инструменты для тем с резкими акцентами ----------------
+  // резкий короткий удар, как струнные «спиккато» или щипок медью: пила и квадрат, фильтр открыт на долю секунды,
+  // к атаке — щелчок шума. bright — насколько ярко (0..1)
+  function snap(kit, note, time, peak, pan, bright) {
+    if (muted(kit, 'pluck')) return;
+    var context = kit.context, frequency = midiFrequency(note), open = 900 + 4200 * (bright === undefined ? 0.6 : bright);
+    var lowpass = filter(context, 'lowpass', open, 2.2);
+    lowpass.frequency.setValueAtTime(open, time);
+    lowpass.frequency.exponentialRampToValueAtTime(320, time + 0.1);
+    var envelope = context.createGain();
+    var end = percussiveEnvelope(envelope.gain, time, 0.002, 0.13, peak);
+    [['sawtooth', -6], ['square', 7]].forEach(function (voiceInfo) {
+      var voice = oscillator(context, voiceInfo[0], frequency, voiceInfo[1]);
+      voice.connect(lowpass); voice.start(time); voice.stop(end);
+    });
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, 0.25, 0.08, pan);
+    var click = noiseSource(kit, time, 0.02), band = filter(context, 'highpass', 2500, 0.7), clickLevel = context.createGain();
+    percussiveEnvelope(clickLevel.gain, time, 0.001, 0.012, peak * 0.5);
+    click.connect(band); band.connect(clickLevel);
+    route(kit, clickLevel, 1, 0.1, 0, pan);
+  }
+  // рубленый аккорд: созвучие из пил, громкость открыта только на короткие доли — резкие «вспышки» по сетке
+  function chop(kit, notes, time, peak, length) {
+    if (muted(kit, 'pad')) return;
+    var context = kit.context;
+    var lowpass = filter(context, 'lowpass', 2600, 1.4);
+    lowpass.frequency.setValueAtTime(2600, time);
+    lowpass.frequency.exponentialRampToValueAtTime(700, time + (length || 0.12));
+    var envelope = context.createGain();
+    var end = percussiveEnvelope(envelope.gain, time, 0.003, length || 0.12, peak);
+    notes.forEach(function (note, index) {
+      [-9, 9].forEach(function (cents) {
+        var voice = oscillator(context, 'sawtooth', midiFrequency(note), cents + index * 2);
+        voice.connect(lowpass); voice.start(time); voice.stop(end);
+      });
+    });
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, 0.35, 0.12, 0);
+  }
+  // «плач»: голос, который скользит от ноты к ноте (портаменто), с широким вибрато — как скрипка или эрху на надрыве.
+  // phrase — [[доля от начала, нота, длительность в долях], ...]
+  function wail(kit, phrase, time, beat, options) {
+    if (muted(kit, 'lead')) return;
+    var context = kit.context;
+    var first = phrase[0], last = phrase[phrase.length - 1];
+    var start = time + first[0] * beat, finish = time + (last[0] + last[2]) * beat;
+    var lowpass = filter(context, 'lowpass', options.cutoff || 2800, 1.1);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(options.peak, start + 0.35);
+    phrase.forEach(function (entry) {                    // каждая нота чуть «вздыхает» громкостью
+      var at = time + entry[0] * beat;
+      if (at > start + 0.4) { envelope.gain.setTargetAtTime(options.peak * 0.7, at - 0.05, 0.03); envelope.gain.setTargetAtTime(options.peak, at + 0.05, 0.12); }
+    });
+    envelope.gain.setTargetAtTime(0, finish - 0.2, 0.5);
+    var end = finish + 2;
+    var vibrato = oscillator(context, 'sine', options.vibratoRate || 5.6), vibratoDepth = context.createGain();
+    vibratoDepth.gain.setValueAtTime(0, start);
+    vibratoDepth.gain.linearRampToValueAtTime(midiFrequency(first[1]) * (options.vibrato || 0.012), start + 0.8);
+    vibrato.connect(vibratoDepth);
+    [['sawtooth', -5, 1], ['sawtooth', 6, 0.6], ['triangle', 0, 0.5]].forEach(function (voiceInfo) {
+      var voice = oscillator(context, voiceInfo[0], midiFrequency(first[1]), voiceInfo[1]), level = context.createGain();
+      level.gain.value = voiceInfo[2];
+      phrase.forEach(function (entry, index) {
+        if (!index) return;
+        var at = time + entry[0] * beat;
+        voice.frequency.setValueAtTime(midiFrequency(phrase[index - 1][1]), at - 0.14);
+        voice.frequency.exponentialRampToValueAtTime(midiFrequency(entry[1]), at);       // скольжение к ноте
+      });
+      vibratoDepth.connect(voice.frequency);
+      voice.connect(level); level.connect(lowpass);
+      voice.start(start); voice.stop(end);
+    });
+    vibrato.start(start); vibrato.stop(end);
+    lowpass.connect(envelope);
+    route(kit, envelope, 1, options.reverb || 0.7, options.echo || 0.25, options.pan || 0);
+  }
+  // хор на «а»: пилы через две полосы (форманты гласной), медленный подъём
+  function choir(kit, notes, time, duration, peak) {
+    if (muted(kit, 'pad')) return;
+    var context = kit.context;
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, Math.min(2, duration * 0.4), Math.max(0, duration - 2), 2.5, peak);
+    [[750, 6, 1], [1150, 7, 0.6], [2600, 8, 0.25]].forEach(function (formant) {
+      var band = filter(context, 'bandpass', formant[0], formant[1]), level = context.createGain();
+      level.gain.value = formant[2] * 3;
+      notes.forEach(function (note, index) {
+        [-10, 10].forEach(function (cents) {
+          var voice = oscillator(context, 'sawtooth', midiFrequency(note), cents + index * 4);
+          voice.connect(band); voice.start(time); voice.stop(end);
+        });
+      });
+      band.connect(level); level.connect(envelope);
+    });
+    route(kit, envelope, 0.8, 0.8, 0.15, 0);
+  }
+
+  // ---------------- темы с резкими акцентами (амбиент, около 4 ударов в секунду) ----------------
+  // Сетка — восьмые при 120 ударах в минуту (или шестнадцатые при 60): удар каждые 0,25 с. Сильные удары в группах
+  // 3+3+2, слабые — тише; под сеткой — тёмный гул и созвучия, как в остальных фоновых темах.
+  // «Импульс»: ми фригийский, спиккато по сетке (основной тон, октава, малая секунда), удары по металлу на смене блока.
+  var IMPULSE_BLOCKS = [{ root: 28, notes: [52, 53, 59] }, { root: 28, notes: [52, 55, 58] }, { root: 24, notes: [51, 55, 60] }, { root: 29, notes: [53, 56, 60] }];
+  var IMPULSE_STEPS = [[0, 0, 1], [1, 12, 0.35], [2, 1, 0.45], [3, 0, 0.9], [4, 12, 0.35], [5, 7, 0.45], [6, 0, 0.85], [7, 13, 0.4]];
+  var IMPULSE = {
+    name: 'impulse', tempo: 120, bars: 32, echo: 0.375, level: 1.2,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4, block = IMPULSE_BLOCKS[Math.floor(bar / 8)];
+      if (bar % 8 === 0 || absoluteBar === 0) {
+        var length = (8 - bar % 8) * barLength + 2;
+        deepDrone(kit, block.root + 12, time, length, 0.15);
+        shade(kit, block.notes, time, length, 0.05);
+      }
+      var climb = bar % 8 >= 4 ? 1.25 : 1;                       // вторая половина блока — громче и ярче
+      IMPULSE_STEPS.forEach(function (step) {
+        snap(kit, block.root + 24 + step[1], time + step[0] * beat / 2, 0.11 * step[2] * climb, step[0] % 2 ? 0.3 : -0.3, step[2] > 0.8 ? 0.8 : 0.4);
+      });
+      if (bar % 8 === 0) metal(kit, block.root + 12, time, 0.4, -0.4);
+      if (bar % 4 === 3) metal(kit, block.root + 19, time + 3.5 * beat, 0.3, 0.5);
+      if (bar % 8 === 7) swell(kit, time, barLength, 0.08);
+    }
+  };
+  // «Тревога»: высокое диссонирующее созвучие рубится по сетке; низкие «вомы» на сильные доли, щелчки на акценты,
+  // раз в 8 тактов — вой сирены (скольжение голоса вверх и вниз).
+  var ALARM_BLOCKS = [{ root: 33, notes: [69, 70, 76] }, { root: 33, notes: [68, 71, 75] }, { root: 31, notes: [67, 70, 73] }, { root: 32, notes: [68, 71, 74] }];
+  var ALARM_ACCENTS = [1, 0.3, 0.5, 0.9, 0.3, 0.5, 0.85, 0.4];
+  var ALARM = {
+    name: 'alarm', tempo: 120, bars: 32, echo: 0.25, level: 1.15,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4, block = ALARM_BLOCKS[Math.floor(bar / 8)];
+      if (bar % 8 === 0 || absoluteBar === 0) {
+        var length = (8 - bar % 8) * barLength + 2;
+        deepDrone(kit, block.root, time, length, 0.14);
+        shade(kit, block.notes.map(function (note) { return note - 24; }), time, length, 0.05);
+      }
+      ALARM_ACCENTS.forEach(function (accent, step) {
+        chop(kit, block.notes, time + step * beat / 2, 0.035 * accent, accent > 0.8 ? 0.14 : 0.07);
+        if (accent > 0.8) clack(kit, time + step * beat / 2, 0.08, step % 2 ? 0.4 : -0.4, 3200);
+      });
+      throb(kit, block.root + 12, time, beat * 1.5, 0.12);
+      throb(kit, block.root + 12, time + 2 * beat, beat * 1.5, 0.1);
+      if (bar % 8 === 4) wail(kit, [[0, block.notes[0], 2], [2, block.notes[0] + 7, 2], [4, block.notes[0], 3]], time, beat, { peak: 0.035, cutoff: 1800, vibrato: 0.004, reverb: 0.6 });
+      if (bar % 8 === 7) swell(kit, time, barLength, 0.07);
+    }
+  };
+  // «Стук»: 60 ударов, шестнадцатые — низкие отрывистые удары баса (спиккато), сильные на 1 и «и» второй доли,
+  // высокий «пинг» на слабой доле, стеклянные призвуки над гулом.
+  var KNOCK_BLOCKS = [{ root: 26, notes: [50, 53, 57] }, { root: 26, notes: [50, 51, 57] }, { root: 22, notes: [49, 53, 58] }, { root: 24, notes: [51, 55, 58] }];
+  var KNOCK_STEPS = [1, 0.3, 0.45, 0.3, 0.5, 0.3, 0.9, 0.35, 0.45, 0.3, 0.8, 0.3, 0.5, 0.3, 0.45, 0.6];
+  var KNOCK = {
+    name: 'knock', tempo: 60, bars: 24, echo: 0.75, level: 1.2,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4, block = KNOCK_BLOCKS[Math.floor(bar / 6)];
+      if (bar % 6 === 0 || absoluteBar === 0) {
+        var length = (6 - bar % 6) * barLength + 2;
+        deepDrone(kit, block.root + 12, time, length, 0.15);
+        shade(kit, block.notes, time, length, 0.055);
+      }
+      KNOCK_STEPS.forEach(function (accent, step) {
+        var note = block.root + 12 + (step % 8 === 6 ? 12 : step % 4 === 2 ? 7 : 0);
+        snap(kit, note, time + step * beat / 4, 0.12 * accent, 0, accent > 0.7 ? 0.5 : 0.15);
+      });
+      ping(kit, 84 + (bar % 2 ? 3 : 0), time + 1.75 * beat, 0.06, 0.5);
+      if (bar % 3 === 1) glass(kit, block.notes[2] + 24, time + beat, barLength * 2, 0.02, -0.4);
+      if (bar % 6 === 5) swell(kit, time, barLength, 0.07);
+    }
+  };
+  // ---------------- душераздирающие темы ----------------
+  // «Утрата»: ре минор, 60 ударов; Dm — B♭ — Gm — A (с задержанием), тихое отрывистое остинато шестнадцатыми
+  // в высоком регистре, медленный хор, и над ними «плачущий» голос — нисходящие фразы с вздохами и скольжениями.
+  var LOSS_CHORDS = [
+    { bass: 38, notes: [62, 65, 69], arp: [74, 77, 81, 77] }, { bass: 34, notes: [62, 65, 70], arp: [74, 77, 82, 77] },
+    { bass: 31, notes: [62, 67, 70], arp: [74, 79, 82, 79] }, { bass: 33, notes: [61, 64, 69], arp: [73, 76, 81, 76] }
+  ];
+  var LOSS_PHRASES = [
+    [[0, 81, 1.5], [1.5, 79, 0.5], [2, 77, 1], [3, 76, 1], [4, 77, 3], [7, 74, 1]],
+    [[0, 82, 2], [2, 81, 1], [3, 79, 1], [4, 77, 1.5], [5.5, 76, 0.5], [6, 73, 2]],
+    [[0, 86, 1.5], [1.5, 84, 0.5], [2, 82, 1], [3, 81, 1], [4, 79, 2], [6, 77, 1], [7, 76, 1]],
+    [[0, 77, 1], [1, 79, 1], [2, 81, 2], [4, 74, 3.5]]
+  ];
+  var LOSS = {
+    name: 'loss', tempo: 60, bars: 16, echo: 0.75, level: 1.15,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4, chord = LOSS_CHORDS[bar % 4];
+      choir(kit, chord.notes, time, barLength + 0.2, 0.05);
+      drone(kit, chord.bass, time, barLength, 0.13);
+      // отрывистое остинато: 16 ударов в такте, сильные — на 1 и 3
+      for (var step = 0; step < 16; step++) {
+        var accent = step % 8 === 0 ? 1 : step % 4 === 0 ? 0.7 : 0.35;
+        snap(kit, chord.arp[step % 4], time + step * beat / 4, 0.05 * accent * (bar >= 8 ? 1.3 : 1), step % 2 ? 0.35 : -0.35, 0.3);
+      }
+      if (bar % 2 === 0) wail(kit, LOSS_PHRASES[(bar / 2) % 4], time, beat, { peak: bar >= 8 ? 0.075 : 0.06, cutoff: 3000, vibrato: 0.013, reverb: 0.75, echo: 0.3 });
+      if (bar % 4 === 3) swell(kit, time, barLength, 0.06);
+      if (bar === 8) drum(kit, time, 55, 0.35, 1.6, 0);
+    }
+  };
+  // «Плач»: до минор, 60 ударов; созвучия нарастают и сталкиваются (задержания, малые секунды), резкие отрывистые удары
+  // струнных шестнадцатыми нарастают к концу каждых четырёх тактов, высокий голос срывается вверх скольжениями,
+  // на сильных долях — глухой удар литавры.
+  var WEEP_CHORDS = [
+    { bass: 36, notes: [60, 63, 67, 74], hit: [48, 55] }, { bass: 32, notes: [60, 63, 68, 70], hit: [44, 51] },
+    { bass: 39, notes: [58, 63, 67, 70], hit: [51, 58] }, { bass: 31, notes: [59, 62, 65, 68], hit: [43, 50] }
+  ];
+  var WEEP_PHRASES = [
+    [[0, 79, 1], [1, 84, 2.5], [3.5, 82, 0.5], [4, 80, 1.5], [5.5, 79, 2.5]],
+    [[0, 80, 1], [1, 87, 2], [3, 86, 1], [4, 84, 2], [6, 80, 2]],
+    [[0, 82, 1.5], [1.5, 87, 1.5], [3, 91, 2], [5, 89, 1], [6, 87, 2]],
+    [[0, 86, 2], [2, 84, 1], [3, 83, 1], [4, 80, 1], [5, 79, 3]]
+  ];
+  var WEEP = {
+    name: 'weep', tempo: 60, bars: 16, echo: 0.5, level: 1.1,
+    scheduleBar: function (kit, bar, absoluteBar, time) {
+      var beat = 60 / this.tempo, barLength = beat * 4, chord = WEEP_CHORDS[bar % 4];
+      var rise = (bar % 4 + 1) / 4;                        // нарастание к концу четвёрки тактов
+      tremolo(kit, chord.notes, time, barLength + 0.3, 0.03 + 0.03 * rise, 7);
+      choir(kit, chord.notes.slice(0, 3).map(function (note) { return note - 12; }), time, barLength + 0.3, 0.04);
+      drone(kit, chord.bass, time, barLength, 0.14);
+      for (var step = 0; step < 16; step++) {
+        var accent = step % 4 === 0 ? 1 : step % 2 === 0 ? 0.55 : 0.3;
+        snap(kit, chord.hit[step % 2] + 12, time + step * beat / 4, 0.09 * accent * (0.6 + 0.6 * rise), 0, 0.35 + 0.4 * rise);
+      }
+      drum(kit, time, 52, 0.3 + 0.15 * rise, 1.4, 0);
+      if (bar % 2 === 0) wail(kit, WEEP_PHRASES[(bar / 2) % 4], time, beat, { peak: 0.07, cutoff: 3400, vibrato: 0.016, vibratoRate: 6.2, reverb: 0.8, echo: 0.3 });
+      if (bar % 4 === 3) { swell(kit, time, barLength, 0.08); metal(kit, chord.hit[0] + 24, time + 3.5 * beat, 0.25, 0.4); }
+    }
+  };
+
   var THEMES = {
     calm: CALM, dawn: DAWN, shade: SHADE, contact: SHADE_CONTACT, landing: LANDING, assault: ASSAULT, 'return': RETURN,
     gloom: GLOOM, gloomContact: GLOOM_CONTACT, probe: PROBE, probeContact: PROBE_CONTACT, hive: HIVE, hiveContact: HIVE_CONTACT,
-    mine: MINE, mineContact: MINE_CONTACT
+    mine: MINE, mineContact: MINE_CONTACT, impulse: IMPULSE, alarm: ALARM, knock: KNOCK, loss: LOSS, weep: WEEP
   };
 
 
@@ -988,16 +1219,19 @@ var Music = (function () {
 
   // Наборы тем по настроению и настройке «Фоновая музыка боя» (musicSet):
   //   0 — все по очереди; 1 — «Высадка» и «Штурм»; 2 — «Тень» (фон, как в UFO); 3 — «Зонд», «Улей», «Шахта»
-  //   (повторяющиеся звуки, как в UFO); 4 — «Мрак». Мирная обстановка — «Застава» и «Рассвет», конец задания — «Возвращение».
+  //   (повторяющиеся звуки, как в UFO); 4 — «Мрак»; 5 — «Импульс», «Тревога», «Стук» (резкие акценты, около 4 в секунду);
+  //   6 — «Утрата», «Плач» (душераздирающие). Мирная обстановка — «Застава» и «Рассвет», конец задания — «Возвращение»,
+  //   а если в задании погибли бойцы — «Утрата» и «Плач».
   var POOLS = {
-    tactical: [['landing', 'shade', 'gloom', 'probe', 'hive', 'mine'], ['landing'], ['shade'], ['probe', 'hive', 'mine'], ['gloom']],
-    battle: [['assault', 'contact', 'probeContact', 'hiveContact', 'gloomContact', 'mineContact'], ['assault'], ['contact'], ['probeContact', 'hiveContact', 'mineContact'], ['gloomContact']]
+    tactical: [['landing', 'shade', 'gloom', 'probe', 'hive', 'mine'], ['landing'], ['shade'], ['probe', 'hive', 'mine'], ['gloom'], ['probe', 'hive', 'mine'], ['gloom']],
+    battle: [['assault', 'impulse', 'contact', 'alarm', 'probeContact', 'knock', 'hiveContact', 'gloomContact', 'mineContact'], ['assault'], ['contact'],
+      ['probeContact', 'hiveContact', 'mineContact'], ['gloomContact'], ['impulse', 'alarm', 'knock'], ['loss', 'weep']]
   };
   var poolTurn = {};                              // какая тема набора звучит: сдвигается после каждой паузы
   function wantedMood() {
     var settings = window.Settings ? Settings.values : {};
     if (settings.musicVolume === 0) return null;
-    if (mood === 'debrief') return 'debrief';
+    if (mood === 'debrief' || mood === 'mourn') return mood;
     if (settings.musicTheme === 1) return 'calm';
     if (settings.musicTheme === 2) return mood === 'calm' ? 'tactical' : mood;
     return mood;
@@ -1006,6 +1240,7 @@ var Music = (function () {
     var settings = window.Settings ? Settings.values : {};
     var set = settings.musicSet || 0;
     if (moodName === 'debrief') return ['return'];
+    if (moodName === 'mourn') return ['loss', 'weep'];
     if (moodName === 'calm') return ['calm', 'dawn'];
     return (POOLS[moodName] || POOLS.tactical)[set] || POOLS[moodName][0];
   }
@@ -1081,7 +1316,7 @@ var Music = (function () {
   }
 
   function setMood(name) {
-    if (['calm', 'tactical', 'battle', 'debrief'].indexOf(name) < 0 || name === mood) return;
+    if (['calm', 'tactical', 'battle', 'debrief', 'mourn'].indexOf(name) < 0 || name === mood) return;
     mood = name;
     refresh();
   }
