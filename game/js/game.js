@@ -657,12 +657,15 @@
   // ---------------- туман войны ----------------
   // Видно то, что видят бойцы отряда: каждый боец смотрит во все стороны на VISION_CELLS клеток. Луч идёт по клеткам
   // своего уровня; стены, обшивка и закрытые двери его останавливают, окна, перила и парапеты — нет. Над проёмом
-  // без пола (с верхнего этажа через окно) луч отмечает видимой клетку ниже. Карта не затемняется: туман только
-  // скрывает пришельцев — пришелец виден, если его клетка видна сейчас или он стрелял (до конца следующего хода отряда).
+  // без пола (с верхнего этажа через окно) луч отмечает видимой клетку ниже. Пришелец виден, если его клетка видна
+  // сейчас или он стрелял (до конца следующего хода отряда).
+  // Как в UFO, карта разведывается: клетка, которую хоть раз видели, открыта навсегда (fog.explored), остальные
+  // закрыты туманом (рисуется ниже, «туман на карте»). Клетка за стеной, в которую упёрся луч, тоже считается
+  // разведанной — так видна сама стена (стена W/N принадлежит клетке за ней) и то, что у стены.
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
   var VISION_CELLS = 24, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
-  var fog = { visible: null, signature: '', checkAt: 0 };
+  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0 };
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
   function fogEnabled() {
@@ -687,7 +690,8 @@
       if (floorAt(col, row, below)) { grids[below][row * GRID + col] = 1; return; }
     }
   }
-  function castVision(unit, grids, cells, rays) {
+  // touched — сетки, куда отмечаются клетки за стеной, в которую упёрся луч (для разведки карты)
+  function castVision(unit, grids, cells, rays, touched) {
     var level = unit.level, count = rays || FOG_RAYS;
     for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) markSeen(grids, unit.col + deltaCol, unit.row + deltaRow, level);
     for (var ray = 0; ray < count; ray++) {
@@ -704,7 +708,7 @@
           open = (sightOpen(col, row, nextCol, row, level) && sightOpen(nextCol, row, nextCol, nextRow, level)) ||
             (sightOpen(col, row, col, nextRow, level) && sightOpen(col, nextRow, nextCol, nextRow, level));
         } else open = sightOpen(col, row, nextCol, nextRow, level);
-        if (!open) break;
+        if (!open) { if (touched) markSeen(touched, nextCol, nextRow, level); break; }
         col = nextCol; row = nextRow;
         markSeen(grids, col, row, level);
       }
@@ -747,9 +751,30 @@
   }
   function newFogGrids() { var grids = []; for (var level = 0; level < LEVELS; level++) grids.push(new Uint8Array(GRID * GRID)); return grids; }
   function computeFog() {
-    var next = newFogGrids();
-    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next); });
+    var next = newFogGrids(), touched = newFogGrids();
+    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next, null, null, touched); });
     fog.visible = next;
+    // разведка: новые клетки открываются навсегда; куски карты, которые они задевают, перерисовываются
+    if (!fog.explored) {
+      fog.explored = newFogGrids();
+      // место высадки открыто сразу: салон конвертоплана (MAP.extraction) и вокруг него на 4 клетки — корпус, винты
+      var cells = MAP.extraction || [];
+      if (cells.length) {
+        var minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+        cells.forEach(function (cell) { minCol = Math.min(minCol, cell[0]); maxCol = Math.max(maxCol, cell[0]); minRow = Math.min(minRow, cell[1]); maxRow = Math.max(maxRow, cell[1]); });
+        for (var padRow = minRow - 4; padRow <= maxRow + 4; padRow++) for (var padCol = minCol - 4; padCol <= maxCol + 4; padCol++) {
+          if (inside(padCol, padRow)) fog.explored[cells[0][2] || 0][padRow * GRID + padCol] = 1;
+        }
+      }
+    }
+    var opened = [];
+    for (var level = 0; level < LEVELS; level++) {
+      var explored = fog.explored[level], seen = next[level], near = touched[level];
+      for (var cell = 0; cell < GRID * GRID; cell++) {
+        if (!explored[cell] && (seen[cell] || near[cell])) { explored[cell] = 1; opened.push(cell); }
+      }
+    }
+    if (opened.length) { fog.version++; dropFogChunks(opened); }
   }
   // пересчёт, когда сменились клетки бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
   function updateFog(now) {
@@ -773,6 +798,148 @@
     }
     return false;
   }
+  // ---------------- туман на карте ----------------
+  // Неразведанная клетка закрыта столбом тумана: снизу — пол верхнего видимого уровня клетки, сверху — самое
+  // высокое в ней (стены её граней W/N, предметы по рамкам MAP.solids, у среза — срезанные стены), не ниже 0,35 м.
+  // Столбы встают в общий порядок отрисовки после всех частей своей клетки: ближние разведанные предметы и юниты
+  // рисуются поверх, дальние закрываются. Заливка — бесшовная текстура тумана, привязанная к карте; на гранях,
+  // где сосед разведан, — светлая кромка, поэтому граница тумана идёт по клеткам и читается чётко.
+  var FOG_FLOOR_TOP = 0.35;
+  var fogColumns = {};
+  function fogColumnTops(viewLevel, cut) {
+    var key = viewLevel + (cut ? 'c' : 'f');
+    if (fogColumns[key]) return fogColumns[key];
+    var bases = new Float32Array(GRID * GRID), tops = new Float32Array(GRID * GRID), floors = new Int8Array(GRID * GRID);
+    for (var cell = 0; cell < GRID * GRID; cell++) {
+      var col = cell % GRID, row = Math.floor(cell / GRID), floor = 0;
+      for (var level = viewLevel; level >= 0; level--) if (floorAt(col, row, level)) { floor = level; break; }
+      floors[cell] = floor;
+      bases[cell] = elevationOf(col, row, floor);
+      var top = bases[cell] + FOG_FLOOR_TOP;
+      for (level = 0; level <= viewLevel; level++) {
+        var wallTop = level * LEVEL_H + (cut && level === viewLevel ? 1.3 : LEVEL_H);
+        if (MAP.wallW[level][row * WALL_STRIDE + col] || MAP.wallN[level][row * WALL_STRIDE + col]) top = Math.max(top, wallTop);
+      }
+      tops[cell] = top;
+    }
+    // предметы срезом не укорачиваются (срезаются только стены) — столб по полной высоте рамки
+    (MAP.solids || []).forEach(function (box) {
+      if (box[0] > viewLevel) return;
+      var cell = box[2] * GRID + box[1];
+      tops[cell] = Math.max(tops[cell], box[8]);
+    });
+    fogColumns[key] = { bases: bases, tops: tops, floors: floors };
+    return fogColumns[key];
+  }
+  function cellExplored(col, row, level) { return !fog.explored || !!fog.explored[level][row * GRID + col]; }
+  var fogPatternCanvas = null;
+  function fogPattern() {
+    if (!fogPatternCanvas) {
+      // бесшовный шум из нескольких октав: тёмные клубы с более светлыми прядями
+      var size = 256, canvasFog = document.createElement('canvas');
+      canvasFog.width = canvasFog.height = size;
+      var fogContext = canvasFog.getContext('2d'), image = fogContext.createImageData(size, size);
+      var lattice = function (period, seed) {
+        var values = new Float32Array(period * period);
+        for (var index = 0; index < values.length; index++) values[index] = fountainHash(seed + index * 1.7);
+        return function (x, y) {
+          var gx = x * period, gy = y * period, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+          var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+          var at = function (ix, iy) { return values[((iy % period + period) % period) * period + ((ix % period + period) % period)]; };
+          return (at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy;
+        };
+      };
+      var octaves = [[lattice(4, 11), 0.5], [lattice(8, 23), 0.27], [lattice(16, 37), 0.15], [lattice(32, 51), 0.08]];
+      for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) {
+        var value = 0;
+        for (var octave = 0; octave < octaves.length; octave++) value += octaves[octave][0](x / size, y / size) * octaves[octave][1];
+        var wisp = Math.max(0, value - 0.5) * 2;
+        var offset = (y * size + x) * 4;
+        image.data[offset] = 10 + wisp * 46; image.data[offset + 1] = 13 + wisp * 50; image.data[offset + 2] = 18 + wisp * 56;
+        image.data[offset + 3] = 255;          // непрозрачно: столбы соседних клеток перекрываются без полос
+      }
+      fogContext.putImageData(image, 0, 0);
+      fogPatternCanvas = canvasFog;
+    }
+    if (!fogPatterns.has(context)) fogPatterns.set(context, context.createPattern(fogPatternCanvas, 'repeat'));
+    return fogPatterns.get(context);
+  }
+  var fogPatterns = new WeakMap();
+  var fogItemCache = { key: '', items: [] };
+  function fogItems(current) {
+    if (!fogEnabled() || !fog.explored) return [];
+    var key = current.key + ':' + fog.version + ':' + viewTurns;
+    if (fogItemCache.key === key) return fogItemCache.items;
+    var fogStart = performance.now();
+    var columns = fogColumnTops(view.level, view.cut), items = [];
+    for (var cell = 0; cell < GRID * GRID; cell++) {
+      var col = cell % GRID, row = Math.floor(cell / GRID), floor = columns.floors[cell];
+      if (cellExplored(col, row, floor)) continue;
+      (function (col, row, base, top) {
+        var low = Iso.tileCorners(col, row, base), high = Iso.tileCorners(col, row, top);
+        // соседи по сторонам вида: 0-1 — дальняя правая грань, 1-2 — ближняя правая, 2-3 — ближняя левая, 3-0 — дальняя левая
+        var rims = [];
+        [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]].forEach(function (side) {
+          var cellView = Iso.cellToView ? Iso.cellToView(col, row) : { col: col, row: row };
+          var neighbor = Iso.cellFromView ? Iso.cellFromView(cellView.col + side[0], cellView.row + side[1]) : { col: col + side[0], row: row + side[1] };
+          if (!inside(neighbor.col, neighbor.row)) return;
+          var neighborFloor = columns.floors[neighbor.row * GRID + neighbor.col];
+          if (cellExplored(neighbor.col, neighbor.row, neighborFloor)) rims.push([side[2], side[3]]);
+        });
+        items.push({ depth: depthKey(col, row, view.level, 9), rect: quadRect(low.concat(high), 3), draw: function () { drawFogColumn(low, high, rims); } });
+      })(col, row, columns.bases[cell], columns.tops[cell]);
+    }
+    fogItemCache = { key: key, items: items };
+    tileStats.fogMs += performance.now() - fogStart;
+    return items;
+  }
+  function drawFogColumn(low, high, rims) {
+    var offsetX = Math.round(camera.x), offsetY = Math.round(camera.y);
+    var pattern = fogPattern();
+    if (pattern.setTransform && window.DOMMatrix) pattern.setTransform(new DOMMatrix([1, 0, 0, 1, -offsetX, -offsetY]));
+    context.save();
+    context.fillStyle = pattern;
+    context.beginPath();
+    var outline = [high[0], high[1], low[1], low[2], low[3], high[3]];
+    // на пиксель шире: без щелей сглаживания между соседними столбами
+    var centerX = (high[0].x + low[2].x) / 2, centerY = (high[0].y + low[2].y) / 2;
+    outline.forEach(function (point, index) {
+      var dx = point.x - centerX, dy = point.y - centerY, length = Math.hypot(dx, dy) || 1;
+      var x = point.x + dx / length * 0.8 - offsetX, y = point.y + dy / length * 0.8 - offsetY;
+      if (index) context.lineTo(x, y); else context.moveTo(x, y);
+    });
+    context.closePath();
+    context.fill();
+    // перегородка между столбами одного тумана не нужна; кромка — только к разведанным соседям
+    if (rims.length) {
+      context.strokeStyle = 'rgba(150, 162, 176, 0.32)';
+      context.lineWidth = 2;
+      context.beginPath();
+      rims.forEach(function (rim) {
+        context.moveTo(high[rim[0]].x - offsetX, high[rim[0]].y - offsetY);
+        context.lineTo(high[rim[1]].x - offsetX, high[rim[1]].y - offsetY);
+      });
+      context.stroke();
+    }
+    context.restore();
+  }
+  // открылись клетки: куски карты (всех видов), которые задевают их столбы, собираются заново
+  function dropFogChunks(cells) {
+    if (!chunks.size) return;
+    var touchedChunks = {};
+    cells.forEach(function (cell) {
+      var col = cell % GRID, row = Math.floor(cell / GRID);
+      var corners = Iso.tileCorners(col, row, 0).concat(Iso.tileCorners(col, row, LEVELS * LEVEL_H + 4));
+      var rect = quadRect(corners, 4);
+      for (var chunkY = Math.floor(rect.y / CHUNK); chunkY <= Math.floor((rect.y + rect.height) / CHUNK); chunkY++)
+        for (var chunkX = Math.floor(rect.x / CHUNK); chunkX <= Math.floor((rect.x + rect.width) / CHUNK); chunkX++) touchedChunks[chunkX + ':' + chunkY] = true;
+    });
+    chunks.forEach(function (chunk, key) {
+      var parts = key.split(':');
+      if (touchedChunks[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunk.stale = true;
+    });
+  }
+
   // ---------------- уровни обзора и варианты картинки ----------------
   var view = { level: 0, cut: false };
   // Обстановка: мирная — бойцы на своей базе или на посту, стоящие юниты в стойке «вольно» (если у набора
@@ -860,7 +1027,7 @@
   var TILESET = MAP.tileset || null;
   // атлас может быть разбит на страницы (большие карты): TILESET.images, TILESET.shadowImages; номер страницы — в записи тайла
   var tileImage = null, shadowImage = null, tileImages = [], shadowImages = [], shadowCanvas = null, groundPieces = null, tileViews = {};
-  var tileStats = { ground: 0, shadows: 0, pieces: 0 };
+  var tileStats = { ground: 0, shadows: 0, pieces: 0, chunkMs: 0, fogMs: 0 };
   if (TILESET) {
     tileImages = (TILESET.images || [TILESET.image]).map(function (source) { return Assets.image(source, Assets.URGENT); });
     shadowImages = (TILESET.shadowImages || [TILESET.shadows]).map(function (source) { return Assets.image(source, Assets.URGENT); });
@@ -1003,12 +1170,15 @@
     var firstY = Math.floor(camera.y / CHUNK), lastY = Math.floor((camera.y + viewHeight - 1) / CHUNK);
     var viewKey = current.key + (showGrid ? 'g' : '');
     tileStats.chunksBuilt = 0;
+    // куски, устаревшие из-за разведки (stale), пересобираются постепенно: не больше ~5 мс за кадр, но хотя бы один
+    var frameStart = performance.now(), staleRebuilt = 0;
     for (var chunkY = firstY; chunkY <= lastY; chunkY++) {
       for (var chunkX = firstX; chunkX <= lastX; chunkX++) {
         var key = viewKey + ':' + chunkX + ':' + chunkY;
         var chunk = chunks.get(key);
         if (chunk) chunks.delete(key);                 // поднять в конец очереди (недавно использованный)
-        else { chunk = buildChunk(current, chunkX, chunkY); tileStats.chunksBuilt++; }
+        if (chunk && chunk.stale && (!staleRebuilt || performance.now() - frameStart < 5)) { chunk = null; staleRebuilt++; }
+        if (!chunk) { var buildStart = performance.now(); chunk = buildChunk(current, chunkX, chunkY); tileStats.chunksBuilt++; tileStats.chunkMs += performance.now() - buildStart; }
         chunks.set(key, chunk);
         context.drawImage(chunk, chunkX * CHUNK - Math.round(camera.x), chunkY * CHUNK - Math.round(camera.y));
       }
@@ -1026,6 +1196,7 @@
       var list = [];
       current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
       staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
+      fogItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
       list.sort(function (first, second) { return first.depth - second.depth; });
       list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
     });
@@ -4291,7 +4462,7 @@
       groups.push(group);
     });
     tileStats.pieces = 0;
-    var overlays = staticItems(current);
+    var overlays = staticItems(current).concat(fogItems(current));
     groups.forEach(function (group) {
       var threshold = Infinity;
       group.items.forEach(function (item) { threshold = Math.min(threshold, item.depth); });
@@ -4518,7 +4689,7 @@
       if (values.render3d !== false) startMap3D();
       updateRotateBar();
     }
-    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; }
+    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; chunks.clear(); fogItemCache.key = ''; }
   });
   resize();
   setView(selected.level, false);
@@ -4532,7 +4703,7 @@
     get domes() { return domes; }, startAlienPhase: function () { startAlienPhase(); }, rechargeShields: function () { rechargeShields(); }, ageDomes: function () { ageDomes(); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); }, explodeAt: function (col, row, level) { explode({ x: col + 0.5, y: row + 0.5, h: elevationOf(col, row, level || 0), level: level || 0 }, performance.now()); }, moveTo: function (col, row, level) { moveSelectedTo({ col: col, row: row, level: level || 0 }); }, selectedUnit: function () { return selected; },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); }, tileStats: tileStats, explodeAt: function (col, row, level) { explode({ x: col + 0.5, y: row + 0.5, h: elevationOf(col, row, level || 0), level: level || 0 }, performance.now()); }, moveTo: function (col, row, level) { moveSelectedTo({ col: col, row: row, level: level || 0 }); }, selectedUnit: function () { return selected; },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
