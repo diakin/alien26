@@ -665,18 +665,16 @@
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
   var VISION_CELLS = 24, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
-  // pending — открытые, но ещё не показанные клетки: картинка тумана обновляется не на каждом шаге (дорого: пересборка
-  // кусков карты), а когда бойцы остановились или раз в FOG_REDRAW_MS во время движения. Видимость пришельцев —
-  // по-прежнему на каждом шаге.
-  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0, pending: [], shownAt: 0 };
-  var FOG_REDRAW_MS = 1200;
-  function applyFogReveal(now) {
+  // pending — открытые, но ещё не показанные клетки. Граница разведанного (fog.explored) и видимость юнитов
+  // пересчитываются на каждом шаге бойца, а картинка тумана перерисовывается (дорого: пересборка кусков карты)
+  // только когда ни один боец не идёт: дошёл до цели, кончились ОД или остановился, заметив врага (sightCheck).
+  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0, pending: [] };
+  function applyFogReveal() {
     if (!fog.pending.length) return;
-    var moving = units.some(function (unit) { return unit.side === 'squad' && unit.path.length > 0; });
-    if (moving && now - fog.shownAt < FOG_REDRAW_MS) return;
+    if (units.some(function (unit) { return unit.side === 'squad' && !unit.dead && unit.path.length > 0; })) return;
     fog.version++;
     dropFogChunks(fog.pending);
-    fog.pending = []; fog.shownAt = now;
+    fog.pending = [];
   }
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
@@ -795,7 +793,7 @@
   }
   // пересчёт, когда сменились клетки бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
   function updateFog(now) {
-    if (fogEnabled()) applyFogReveal(now);
+    if (fogEnabled()) applyFogReveal();
     if (!fogEnabled() || now < fog.checkAt) return;
     fog.checkAt = now + 200;
     var parts = [];
