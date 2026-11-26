@@ -1013,7 +1013,9 @@
         context.drawImage(chunk, chunkX * CHUNK - Math.round(camera.x), chunkY * CHUNK - Math.round(camera.y));
       }
     }
-    while (chunks.size > CHUNK_LIMIT) chunks.delete(chunks.keys().next().value);
+    // при отдалении в окне больше кусков: храним не меньше полутора окон
+    var limit = Math.max(CHUNK_LIMIT, Math.ceil((lastX - firstX + 1) * (lastY - firstY + 1) * 1.5));
+    while (chunks.size > limit) chunks.delete(chunks.keys().next().value);
     tileStats.chunks = chunks.size;
   }
   function buildChunk(current, chunkX, chunkY) {
@@ -1128,19 +1130,43 @@
     camera.y = Math.max(-200, Math.min(FIELD.height - viewHeight + 200, camera.y));
   }
 
-  // Вид — в CSS-пикселях (viewWidth × viewHeight); холст — в renderScale раз меньше (настройка «разрешение отрисовки»):
-  // всё рисуется в координатах вида, масштаб задаётся преобразованием контекста в начале кадра.
+  // Вид — в пикселях карты (viewWidth × viewHeight): окно в CSS-пикселях (screenWidth × screenHeight), делённое на
+  // приближение zoom (колесо мыши). Холст — в renderScale раз меньше окна (настройка «разрешение отрисовки»).
+  // Всё рисуется в координатах вида, масштаб renderScale × zoom задаётся преобразованием контекста в начале кадра.
   var viewWidth = window.innerWidth, viewHeight = 600, renderScale = 1;
+  var screenWidth = viewWidth, screenHeight = viewHeight, zoom = 1;
+  var ZOOM_STEPS = [0.5, 0.63, 0.8, 1, 1.25, 1.6, 2];
   function resize() {
     if (window.Panel) window.Panel.layout();
-    viewWidth = window.innerWidth;
-    viewHeight = Math.max(200, window.innerHeight - (panelElement ? panelElement.offsetHeight : 0));
-    canvas.width = Math.round(viewWidth * renderScale);
-    canvas.height = Math.round(viewHeight * renderScale);
-    canvas.style.width = viewWidth + 'px';
-    canvas.style.height = viewHeight + 'px';
+    screenWidth = window.innerWidth;
+    screenHeight = Math.max(200, window.innerHeight - (panelElement ? panelElement.offsetHeight : 0));
+    viewWidth = screenWidth / zoom;
+    viewHeight = screenHeight / zoom;
+    canvas.width = Math.round(screenWidth * renderScale);
+    canvas.height = Math.round(screenHeight * renderScale);
+    canvas.style.width = screenWidth + 'px';
+    canvas.style.height = screenHeight + 'px';
     clampCamera();
   }
+  // приближение колесом: точка карты под курсором остаётся на месте
+  function setZoom(value, screenX, screenY) {
+    if (value === zoom) return;
+    var anchorX = camera.x + screenX / zoom, anchorY = camera.y + screenY / zoom;
+    zoom = value;
+    resize();
+    camera.x = anchorX - screenX / zoom; camera.y = anchorY - screenY / zoom;
+    clampCamera();
+    mouse.x = screenX / zoom; mouse.y = screenY / zoom;
+    updateHover();
+  }
+  canvas.addEventListener('wheel', function (event) {
+    event.preventDefault();
+    if (!event.deltaY) return;
+    var index = ZOOM_STEPS.indexOf(zoom);
+    if (index < 0) index = ZOOM_STEPS.indexOf(1);
+    index = Math.max(0, Math.min(ZOOM_STEPS.length - 1, index + (event.deltaY < 0 ? 1 : -1)));
+    setZoom(ZOOM_STEPS[index], event.clientX, event.clientY);
+  }, { passive: false });
   window.addEventListener('resize', resize);
 
   // ---------------- действия ----------------
@@ -3519,7 +3545,7 @@
 
   canvas.addEventListener('contextmenu', function (event) { event.preventDefault(); });
   canvas.addEventListener('mousedown', function (event) {
-    mouse.x = event.clientX; mouse.y = event.clientY; mouse.overView = true;
+    mouse.x = event.clientX / zoom; mouse.y = event.clientY / zoom; mouse.overView = true;
     if (event.button === 2 || event.button === 1) {
       mouse.dragging = true; mouse.moved = false;
       mouse.dragStartX = event.clientX; mouse.dragStartY = event.clientY;
@@ -3559,12 +3585,12 @@
     updateHover();
   });
   window.addEventListener('mousemove', function (event) {
-    mouse.x = event.clientX; mouse.y = event.clientY;
+    mouse.x = event.clientX / zoom; mouse.y = event.clientY / zoom;          // в пикселях карты
     mouse.overView = event.target === canvas;
     if (mouse.dragging) {
       if (Math.abs(event.clientX - mouse.dragStartX) + Math.abs(event.clientY - mouse.dragStartY) > 3) mouse.moved = true;
-      camera.x = mouse.cameraStartX - (event.clientX - mouse.dragStartX);
-      camera.y = mouse.cameraStartY - (event.clientY - mouse.dragStartY);
+      camera.x = mouse.cameraStartX - (event.clientX - mouse.dragStartX) / zoom;
+      camera.y = mouse.cameraStartY - (event.clientY - mouse.dragStartY) / zoom;
       clampCamera();
     }
     updateHover();
@@ -4077,8 +4103,8 @@
   }
 
   function render() {
-    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
-    context.imageSmoothingEnabled = renderScale < 1;
+    context.setTransform(renderScale * zoom, 0, 0, renderScale * zoom, 0, 0);
+    context.imageSmoothingEnabled = renderScale * zoom !== 1;
     if (glActive()) { renderGL(); return; }
     // тайлы старше разметки (tools/render/baselogic.mjs): пока строится WebGL-карта, старую картинку не показываем
     if (MAP.tilesStale && glStarting && !glFailed) { context.fillStyle = '#141210'; context.fillRect(0, 0, viewWidth, viewHeight); return; }
@@ -4158,7 +4184,7 @@
   function renderGL() {
     target = { x: camera.x, y: camera.y, width: viewWidth, height: viewHeight };
     context.clearRect(0, 0, viewWidth, viewHeight);
-    gl3d.setViewport(Math.round(camera.x), Math.round(camera.y), viewWidth, viewHeight, renderScale);
+    gl3d.setViewport(Math.round(camera.x), Math.round(camera.y), Math.round(viewWidth), Math.round(viewHeight), renderScale * zoom);
     gl3d.setLevel(view.level, view.cut);
     doors.forEach(function (door, index) { gl3d.setDoor(index, door.open, DOOR_WIDTH + 0.04); });
     gl3d.render();
@@ -4394,13 +4420,15 @@
   function drawFps() {
     if (!Settings.values.showFps || !fpsMeter.text) return;
     context.save();
+    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);          // в пикселях окна, без приближения
     context.font = 'bold 11px Consolas, monospace';
-    var width = context.measureText(fpsMeter.text).width + 16, x = viewWidth - width - 10, y = viewHeight - 30;
+    var text = fpsMeter.text + (zoom !== 1 ? '  ·  ×' + zoom : '');
+    var width = context.measureText(text).width + 16, x = screenWidth - width - 10, y = screenHeight - 30;
     context.fillStyle = 'rgba(10, 13, 15, 0.78)';
     context.fillRect(x, y, width, 20);
     context.fillStyle = '#bfe8c8';
     context.textBaseline = 'middle';
-    context.fillText(fpsMeter.text, x + 8, y + 10);
+    context.fillText(text, x + 8, y + 10);
     context.restore();
   }
   function frame(now) {
@@ -4408,7 +4436,7 @@
     var workStart = performance.now(), interval = now - lastTime;
     var seconds = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
-    var scroll = 700 * seconds;
+    var scroll = 700 * seconds / zoom;
     if (keys.ArrowLeft || keys.a || keys.ф) camera.x -= scroll;
     if (keys.ArrowRight || keys.d || keys.в) camera.x += scroll;
     if (keys.ArrowUp || keys.w || keys.ц) camera.y -= scroll;
@@ -4464,6 +4492,7 @@
     if (state.ready >= state.total) return;
     var text = 'ЗАГРУЗКА ГРАФИКИ  ' + state.ready + ' / ' + state.total + (state.waiting ? '   ·   ПОВТОР: ' + state.waiting : '');
     context.save();
+    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     context.font = 'bold 11px Arial, sans-serif';
     var width = context.measureText(text).width + 28, x = 16, y = 124;      // под кнопкой «НАСТРОЙКИ»
     context.fillStyle = 'rgba(10, 13, 15, 0.86)';
