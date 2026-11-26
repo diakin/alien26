@@ -271,12 +271,20 @@
       maxTimeUnits: 64, health: health, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] };
   }
-  // Золотистый страж — элита из портала: плазменная винтовка (урон в 1,5 раза больше), личный щит спереди (shield, %)
+  // Элита из портала — серебристый и золотистый стражи: плазменная винтовка (урон в 1,5 раза больше), личный щит спереди (shield, %)
   // и один купол-щит вокруг портала (domeCharges). Портрет — как у обычного стража.
-  function goldAlienProfile(number) {
-    var profile = alienProfile(number);
-    profile.name = 'Золотой страж, особь ' + number; profile.rank = 'золотой страж'; profile.camo = 'aliengold'; profile.portrait = 'alien';
-    profile.subtitle = 'ЭЛИТА · ЛИЧНЫЙ ЩИТ · УПРАВЛЯЕТ ИИ'; profile.accuracy += 6; profile.gold = true;
+  // Здоровье: у серебристого — вдвое больше, чем у зелёного, у золотистого — ещё вдвое (вчетверо больше зелёного).
+  // В спасении в городе из портала приходят серебристые (MAP.mission.portalElite), золотистые — для следующих заданий.
+  var ALIEN_MAX_HEALTH = 58;
+  var ELITE = {
+    silver: { name: 'Серебристый страж', rank: 'серебристый страж', camo: 'aliensilver', health: 2 },
+    gold: { name: 'Золотой страж', rank: 'золотой страж', camo: 'aliengold', health: 4 }
+  };
+  function eliteAlienProfile(number, metal) {
+    var profile = alienProfile(number), elite = ELITE[metal] || ELITE.silver;
+    profile.name = elite.name + ', особь ' + number; profile.rank = elite.rank; profile.camo = elite.camo; profile.portrait = 'alien';
+    profile.subtitle = 'ЭЛИТА · ЛИЧНЫЙ ЩИТ · УПРАВЛЯЕТ ИИ'; profile.accuracy += 6; profile.elite = metal;
+    profile.health *= elite.health; profile.maxHealth = ALIEN_MAX_HEALTH * elite.health;
     profile.shield = 100; profile.domeCharges = 1;
     profile.loadout = [['plasmaRifle', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']];
     return profile;
@@ -1234,7 +1242,18 @@
       ready: function () { if (!info.image) return true; var image = Items.imageOf(info.image); return image.complete && image.naturalWidth > 0; } };
   }
   function throwCost(unit) { return Math.round(unit.maxTimeUnits * 0.25); }
-  function throwRange(unit) { return 6 + (unit.strength || 30) / 3; }            // метры
+  function throwRange(unit) { return 6 + (unit.strength || 30) / 3; }            // метры, бросок на одном уровне
+  // Бросок сверху вниз (с крыши, с балкона) летит дальше: допустимое расстояние по горизонтали растёт на 1,5 м
+  // за каждый метр, на который точка падения ниже ног бросающего. Снизу вверх — прежняя дальность по прямой.
+  // С крыши школы или дома напротив граната долетает до портала на проспекте.
+  var THROW_DROP_BONUS = 1.5;
+  function throwReach(unit, point) {
+    var drop = unit.elevation - point.h, base = throwRange(unit);
+    if (drop <= 0.5) return { far: Combat.distanceMeters(combatWorld, { x: unit.x, y: unit.y, h: unit.elevation + 1.6 }, point) > base, range: base };
+    var range = base + THROW_DROP_BONUS * drop;
+    var horizontal = Math.hypot(point.x - unit.x, point.y - unit.y) * Iso.tileMeters;
+    return { far: horizontal > range, range: range };
+  }
   function throwChance(unit, distance) { return Math.max(5, Math.min(95, Math.round((unit.throwing || 50) - Math.max(0, distance - 8) * 1.5))); }
   // пункты меню для руки: режимы огня оружия (шанс — без учёта дальности) или бросок гранаты
   function handActions(unit, slot) {
@@ -1274,6 +1293,8 @@
   // ---------------- бросок гранаты ----------------
   // Граната летит по дуге в выбранную клетку; промах по броску точности — отклонение тем больше, чем дальше бросок.
   // Взрыв при падении: радиус 3 м, урон 60 в центре и до 30 на краю минус броня, стены и предметы закрывают.
+  // Граната упала в 1 клетке от пришельца или ближе (по горизонтали, без стены между ними): зелёного убивает
+  // наверняка, у стража-элиты снимает ALIEN_MAX_HEALTH — половину здоровья серебристого, четверть золотистого.
   var throwing = null;                // режим броска: { slot } — рука с гранатой
   var throws = [];                    // летящие гранаты
   var GRENADE = { radius: 3, damage: 60 };
@@ -1283,13 +1304,14 @@
     var point = { x: tile.col + 0.5, y: tile.row + 0.5, h: elevationOf(tile.col, tile.row, tile.level) };
     var from = { x: selected.x, y: selected.y, h: selected.elevation + 1.6 };
     var distance = Combat.distanceMeters(combatWorld, from, point);
-    return { tile: tile, point: point, distance: distance, chance: throwChance(selected, distance), cost: throwCost(selected) + turnCostTo(selected, point), far: distance > throwRange(selected) };
+    var reach = throwReach(selected, point);
+    return { tile: tile, point: point, distance: distance, chance: throwChance(selected, distance), cost: throwCost(selected) + turnCostTo(selected, point), far: reach.far, range: reach.range };
   }
   function throwGrenade(target) {
     if (mission.over) { say('Задание окончено'); throwing = null; return; }
     var entry = throwing && handEntry(selected, throwing.slot);
     if (!entry || entry.item.type !== 'grenade') { throwing = null; return; }
-    if (target.far) { say('Слишком далеко: бросок до ' + Math.round(throwRange(selected)) + ' м'); return; }
+    if (target.far) { say('Слишком далеко: бросок до ' + Math.round(target.range) + ' м'); return; }
     if (target.cost > selected.timeUnits) { say('Не хватает очков действия'); return; }
     selected.timeUnits -= target.cost;
     var direction = Iso.directionOf(target.point.x - selected.x, target.point.y - selected.y);
@@ -1333,6 +1355,8 @@
       if (line.kind !== 'unit' || line.unit !== unit) return;          // закрыт стеной или предметом
       var base = GRENADE.damage * (1 - 0.5 * Math.min(1, distance / GRENADE.radius));
       var amount = Combat.damage({ damage: base }, unit.armor, Math.random);
+      var close = Math.hypot(unit.x - point.x, unit.y - point.y) <= 1.001 && Math.abs(unit.elevation - point.h) < 1.2;
+      if (close && unit.kind === 'alien') amount = unit.elite ? Math.max(amount, ALIEN_MAX_HEALTH) : unit.health;
       unit.health = Math.max(0, unit.health - amount);
       flashes.push({ text: amount ? '−' + amount : 'БРОНЯ', point: { x: unit.x, y: unit.y, h: unit.elevation + unit.height + 0.2 }, start: now, until: now + 1300 });
       if (unit.health <= 0) kill(unit);
@@ -1486,7 +1510,7 @@
     soldier: { stand: [1.09, 0.16, 1.44], kneel: [1.05, 0.19, 1.14] }
   };
   function spriteMuzzleOf(unit, point) {
-    var table = unit.kind === 'mech' ? null : unit.gold ? SPRITE_MUZZLE.aliengold : unit.kind === 'alien' ? SPRITE_MUZZLE.alien : unit.kind === 'staff' ? SPRITE_MUZZLE.staff : SPRITE_MUZZLE.soldier;
+    var table = unit.kind === 'mech' ? null : unit.elite ? SPRITE_MUZZLE.aliengold : unit.kind === 'alien' ? SPRITE_MUZZLE.alien : unit.kind === 'staff' ? SPRITE_MUZZLE.staff : SPRITE_MUZZLE.soldier;
     if (!table) return muzzleOf(unit, point);
     var offset = unit.kneeling && table.kneel ? table.kneel : table.stand;
     var dx = point.x - unit.x, dy = point.y - unit.y, length = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1680,9 +1704,9 @@
         if (Math.max(Math.abs(deltaCol), Math.abs(deltaRow)) !== radius) continue;
         var col = portal.col + deltaCol, row = portal.row + deltaRow;
         if (!inside(col, row) || !isFreeFor(null)(col, row, portal.level)) continue;
-        // двое из волны — золотистые стражи (третий и шестой по порядку: у портала, но не в центре)
-        var gold = placed === 2 || placed === 5;
-        var alien = makeUnit(gold ? goldAlienProfile(++number) : alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
+        // двое из волны — элита (третий и шестой по порядку: у портала, но не в центре); в этом задании — серебристые
+        var elite = placed === 2 || placed === 5;
+        var alien = makeUnit(elite ? eliteAlienProfile(++number, (MISSION && MISSION.portalElite) || 'silver') : alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
         alien.timeUnits = 0;
         units.push(alien); startUnits.push(alien);
         placed++;
@@ -1690,8 +1714,8 @@
     }
     setCombat(true);
     say('Открылся портал: прибыли ' + placed + ' пришельцев');
-    // золотистый сразу ставит купол-щит вокруг портала
-    var keeper = units.filter(function (unit) { return unit.gold && unit.domeCharges > 0 && !unit.dead; })[0];
+    // страж-элита сразу ставит купол-щит вокруг портала
+    var keeper = units.filter(function (unit) { return unit.elite && unit.domeCharges > 0 && !unit.dead; })[0];
     if (keeper) raiseDome(keeper);
   }
   function timerText() {
@@ -2918,8 +2942,8 @@
     if (!alien) { finishAlienPhase(); return; }
     if (!approachField) buildApproachField();
     if (!rolesAssigned) assignAlienRoles();
-    // купол снят или истёк — другой золотистый у портала ставит свой (одноразовый), это действие на 20 ОД
-    if (alien.gold && alien.domeCharges > 0 && !domes.length && portal && portal.open && alien.timeUnits >= 20 &&
+    // купол снят или истёк — другой страж-элита у портала ставит свой (одноразовый), это действие на 20 ОД
+    if (alien.elite && alien.domeCharges > 0 && !domes.length && portal && portal.open && alien.timeUnits >= 20 &&
         Math.max(Math.abs(alien.col - portal.col), Math.abs(alien.row - portal.row)) <= 6 && alien.level === portal.level) {
       alien.timeUnits -= 20; raiseDome(alien); watchUnit(alien);
       aiWaitUntil = now + 700 / Settings.values.aiSpeed;
@@ -4344,7 +4368,7 @@
     get domes() { return domes; }, startAlienPhase: function () { startAlienPhase(); }, rechargeShields: function () { rechargeShields(); }, ageDomes: function () { ageDomes(); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); }, moveTo: function (col, row, level) { moveSelectedTo({ col: col, row: row, level: level || 0 }); }, selectedUnit: function () { return selected; },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); }, explodeAt: function (col, row, level) { explode({ x: col + 0.5, y: row + 0.5, h: elevationOf(col, row, level || 0), level: level || 0 }, performance.now()); }, moveTo: function (col, row, level) { moveSelectedTo({ col: col, row: row, level: level || 0 }); }, selectedUnit: function () { return selected; },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };

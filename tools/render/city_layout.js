@@ -325,7 +325,7 @@ export function buildCity(api) {
       // hidden — спрятались (стоят, не в позе заложников). shelters — укрытия, куда пришельцы не заходят:
       // хранилище и домик [col0, row0, col1, row1, level]
       civilians: [
-        { col: 47, row: 5, level: 0, dir: 1, kind: 'scientist', vip: true, name: 'Проф. Лебедев', hidden: true },
+        { col: 47, row: 5, level: 0, dir: 1, kind: 'scientist', vip: true, name: 'Проф. Лебединский', hidden: true },
         { col: 45, row: 6, level: 0, dir: 2, kind: 'man', name: 'Кассир', hidden: true },
         { col: 49, row: 6, level: 0, dir: 0, kind: 'woman', name: 'Посетительница', hidden: true },
         { col: 44, row: 8, level: 0, dir: 1, kind: 'engineer', name: 'Инкассатор', hidden: true },
@@ -337,6 +337,7 @@ export function buildCity(api) {
       // тактика пришельцев: attackers идут в атаку, остальные держат оборону у постов (зал банка, детская площадка)
       posts: [{ name: 'bank', col: 47, row: 15, level: 0, radius: 6 }, { name: 'playground', col: 9, row: 14, level: 0, radius: 5 }],
       attackers: 5,
+      portalElite: 'silver',                                 // двое из волны портала — серебристые стражи
     },
     name: 'Центр города',
     caption: 'ЦЕНТР ГОРОДА',

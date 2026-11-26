@@ -638,10 +638,11 @@ export function buildAlienGear(rig, spec, options = {}) {
   gear.add(strap(leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, 0.1), leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, -0.1), 0.03, thigh, materials.strap));
   // пистолет: в руке, в кобуре или выпал (погибший — пистолет кладёт рядом sprites.js)
   if (spec.pistol === 'none') return gear;
-  // у золотистого — плазменная винтовка (узел тоже называется 'pistol': по нему ищут оружие в руке)
-  const pistol = options.gold ? buildPlasmaRifle() : buildPlasmaPistol();
+  // у золотистого и серебристого — плазменная винтовка (узел тоже называется 'pistol': по нему ищут оружие в руке)
+  const elite = !!(options.gold || options.silver);
+  const pistol = elite ? buildPlasmaRifle() : buildPlasmaPistol();
   pistol.name = 'pistol';
-  if (spec.pistol === 'holster' && options.gold) {
+  if (spec.pistol === 'holster' && elite) {
     // винтовка за спиной наискось, поверх ранца
     orientPistol(pistol, torso.direction(0.55, 1, 0).normalize(), torso.direction(0, 0, -1));
     pistol.position.copy(torso.point(-0.08, 0.3, -0.27));
@@ -760,16 +761,17 @@ const SKIN_NORMAL = /* glsl */`
 }
 `;
 
-// gold — золотистый пришелец (элита из портала): та же чешуя, цвет золота, металлический блеск
+// gold — золотистый пришелец, silver — серебристый (элита из портала): та же чешуя, цвет металла, металлический блеск
 const materialSets = {};
-function getMaterials(gold) {
-  const variant = gold ? 'gold' : 'normal';
+const METAL_COLORS = { gold: { back: 0x8a6418, belly: 0xe0bc5c, horn: 0xffe6a0 }, silver: { back: 0x5c636c, belly: 0xd4dae0, horn: 0xeef2f8 } };
+function getMaterials(metal) {
+  const variant = metal || 'normal', gold = !!metal, colors = METAL_COLORS[metal];
   if (materialSets[variant]) return materialSets[variant];
   const skin = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: gold ? 0.55 : 0 });
   skin.onBeforeCompile = (shader) => {
     shader.uniforms.uForward = shading.uForward;
-    shader.uniforms.uBack = { value: new THREE.Color(gold ? 0x8a6418 : 0x323d34) };
-    shader.uniforms.uBelly = { value: new THREE.Color(gold ? 0xe0bc5c : 0x6e6e55) };
+    shader.uniforms.uBack = { value: new THREE.Color(gold ? colors.back : 0x323d34) };
+    shader.uniforms.uBelly = { value: new THREE.Color(gold ? colors.belly : 0x6e6e55) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\n' + SKIN_VERTEX_HEAD)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = aRest;\nvCell = aCell;')
@@ -781,7 +783,7 @@ function getMaterials(gold) {
       .replace('#include <normal_fragment_maps>', SKIN_NORMAL);
   };
   skin.customProgramCacheKey = () => 'alienReptileSkin' + variant;
-  const horn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0, color: gold ? 0xffe6a0 : 0xffffff });
+  const horn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0, color: gold ? colors.horn : 0xffffff });
   const eye = new THREE.MeshPhysicalMaterial({ color: 0x040404, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04 });
   materialSets[variant] = { skin, horn, eye };
   return materialSets[variant];
@@ -810,7 +812,7 @@ export function alienClimbCycle(phase) {
   };
 }
 
-// options.gold — золотистый пришелец с плазменной винтовкой
+// options.gold — золотистый пришелец с плазменной винтовкой, options.silver — серебристый (тоже с винтовкой)
 export function buildReptileAlien(pose = 'idle', options = {}) {
   const spec = typeof pose === 'string' ? ALIEN_POSES[pose] : pose;
   const key = JSON.stringify(spec);
@@ -819,7 +821,7 @@ export function buildReptileAlien(pose = 'idle', options = {}) {
     parts = buildParts(spec);
     partsCache.set(key, parts);
   }
-  const { skin, horn, eye } = getMaterials(!!options.gold);
+  const { skin, horn, eye } = getMaterials(options.silver ? 'silver' : options.gold ? 'gold' : null);
   const alien = new THREE.Group();
   alien.add(new THREE.Mesh(parts.body, skin));
   alien.add(new THREE.Mesh(parts.horn, horn));

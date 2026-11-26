@@ -99,7 +99,7 @@ const smoothstep = (edge0, edge1, value) => { const amount = Math.min(1, Math.ma
 function poseModel(options, progress) {
   const alien = !!options.alien;
   const { spec, angle } = sampleKeys(alien ? getAlienKeys() : getSoldierKeys(), progress);
-  const model = alien ? buildReptileAlien(spec, { gold: !!options.gold }) : buildStockySoldier({ ...options, pose: spec, pack: 'separate' });
+  const model = alien ? buildReptileAlien(spec, { gold: !!options.gold, silver: !!options.silver }) : buildStockySoldier({ ...options, pose: spec, pack: 'separate' });
   if (alien) model.rotation.z = angle;          // на левый бок: левая сторона (−x) внизу
   else model.rotation.x = -angle;               // на спину: спина (−z) внизу, голова в сторону −z
   model.updateMatrixWorld(true);
@@ -132,7 +132,7 @@ function placeAboveGround(object, transform) {
 // конечное положение: смещение тела к центру клетки, где лежат оружие и рюкзак
 const finals = new Map();
 function finalLayout(options) {
-  const key = JSON.stringify(['alien', 'gold', 'camo', 'nvg', 'scarf', 'goggles', 'tanRifle', 'suppressor'].map((name) => options[name]));
+  const key = JSON.stringify(['alien', 'gold', 'silver', 'camo', 'nvg', 'scarf', 'goggles', 'tanRifle', 'suppressor'].map((name) => options[name]));
   if (finals.has(key)) return finals.get(key);
   const alien = !!options.alien;
   const { model, box } = poseModel(options, 1);
@@ -156,11 +156,11 @@ function finalLayout(options) {
 // оружие в руках в стойке: положение в координатах стоящей модели
 const heldWeapons = new Map();
 function heldWeapon(options) {
-  const key = options.alien ? (options.gold ? 'aliengold' : 'alien') : 'soldier';
+  const key = options.alien ? (options.silver ? 'aliensilver' : options.gold ? 'aliengold' : 'alien') : 'soldier';
   if (heldWeapons.has(key)) return heldWeapons.get(key);
   let matrix;
   if (options.alien) {
-    const model = buildReptileAlien('idle', { gold: !!options.gold });
+    const model = buildReptileAlien('idle', { gold: !!options.gold, silver: !!options.silver });
     model.updateMatrixWorld(true);
     matrix = model.getObjectByName('pistol').matrixWorld.clone();
   } else {
@@ -184,7 +184,7 @@ export function buildFall(options, progress) {
   model.updateMatrixWorld(true);
 
   // оружие: держится в руках и поворачивается с телом, затем выпадает и ложится рядом
-  const weapon = alien ? (options.gold ? buildPlasmaRifle() : buildPlasmaPistol()) : buildRifle({ tanFurniture: !!options.tanRifle, suppressor: !!options.suppressor });
+  const weapon = alien ? (options.gold || options.silver ? buildPlasmaRifle() : buildPlasmaPistol()) : buildRifle({ tanFurniture: !!options.tanRifle, suppressor: !!options.suppressor });
   const held = transformOf(model.matrixWorld.clone().multiply(heldWeapon(options)));
   // noWeapon — тело без оружия (кадр *_deadbare: оружие с тела подобрали)
   if (!options.noWeapon) lying.add(weapon);
