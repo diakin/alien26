@@ -757,6 +757,11 @@
     // разведка: новые клетки открываются навсегда; куски карты, которые они задевают, перерисовываются
     if (!fog.explored) {
       fog.explored = newFogGrids();
+      // в начале задания открыто всё, что на экране: граница тумана — по краю экрана (клетки, центр которых в окне)
+      for (var screenRow = 0; screenRow < GRID; screenRow++) for (var screenCol = 0; screenCol < GRID; screenCol++) {
+        var point = Iso.toScreen(screenCol + 0.5, screenRow + 0.5, 0);
+        if (point.x >= camera.x && point.x <= camera.x + viewWidth && point.y >= camera.y && point.y <= camera.y + viewHeight) fog.explored[0][screenRow * GRID + screenCol] = 1;
+      }
       // место высадки открыто сразу: салон конвертоплана (MAP.extraction) и вокруг него на 4 клетки — корпус, винты
       var cells = MAP.extraction || [];
       if (cells.length) {
@@ -789,9 +794,10 @@
     computeFog();
   }
   function cellVisible(col, row, level) { return !fogEnabled() || !fog.visible || !!fog.visible[level][row * GRID + col]; }
-  // виден ли юнит игроку: свои всегда; пришелец — если видна его клетка или он недавно стрелял
+  // виден ли юнит игроку: отряд (и присоединившиеся гражданские) всегда; остальные — пришельцы, гражданские, учёный —
+  // если видна их клетка; пришелец ещё и если недавно стрелял. Невидимых нет на карте и на мини-карте.
   function isSeen(unit) {
-    if (!unit || unit.side !== 'aliens' || !fogEnabled() || !fog.visible) return true;
+    if (!unit || unit.side === 'squad' || !fogEnabled() || !fog.visible) return true;
     if (unit.revealedTurn === turn || (unit.revealedTurn === turn - 1 && phase !== 'aliens')) return true;
     for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
       if (cellVisible(unit.col + deltaCol, unit.row + deltaRow, unit.level)) return true;
