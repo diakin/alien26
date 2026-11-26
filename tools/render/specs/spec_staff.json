@@ -211,6 +211,15 @@
 "options": {
 "civilian": "commander",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffcommander_deadbare",
+"options": {
+"civilian": "commander",
+"armed": true,
 "dead": true
 }
 },
@@ -423,6 +432,15 @@
 },
 {
 "name": "staffofficer_dead",
+"options": {
+"civilian": "officer",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffofficer_deadbare",
 "options": {
 "civilian": "officer",
 "armed": true,
@@ -641,6 +659,15 @@
 "options": {
 "civilian": "doctor",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffdoctor_deadbare",
+"options": {
+"civilian": "doctor",
+"armed": true,
 "dead": true
 }
 },
@@ -853,6 +880,15 @@
 },
 {
 "name": "staffsurgeon_dead",
+"options": {
+"civilian": "surgeon",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffsurgeon_deadbare",
 "options": {
 "civilian": "surgeon",
 "armed": true,
@@ -1071,6 +1107,15 @@
 "options": {
 "civilian": "nurse",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffnurse_deadbare",
+"options": {
+"civilian": "nurse",
+"armed": true,
 "dead": true
 }
 },
@@ -1283,6 +1328,15 @@
 },
 {
 "name": "stafflabwoman_dead",
+"options": {
+"civilian": "labwoman",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "stafflabwoman_deadbare",
 "options": {
 "civilian": "labwoman",
 "armed": true,
@@ -1501,6 +1555,15 @@
 "options": {
 "civilian": "hazmat",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffhazmat_deadbare",
+"options": {
+"civilian": "hazmat",
+"armed": true,
 "dead": true
 }
 },
@@ -1713,6 +1776,15 @@
 },
 {
 "name": "staffengineerw_dead",
+"options": {
+"civilian": "engineerw",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffengineerw_deadbare",
 "options": {
 "civilian": "engineerw",
 "armed": true,
@@ -1931,6 +2003,15 @@
 "options": {
 "civilian": "electrician",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffelectrician_deadbare",
+"options": {
+"civilian": "electrician",
+"armed": true,
 "dead": true
 }
 },
@@ -2143,6 +2224,15 @@
 },
 {
 "name": "staffplumber_dead",
+"options": {
+"civilian": "plumber",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffplumber_deadbare",
 "options": {
 "civilian": "plumber",
 "armed": true,
@@ -2361,6 +2451,15 @@
 "options": {
 "civilian": "cook",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffcook_deadbare",
+"options": {
+"civilian": "cook",
+"armed": true,
 "dead": true
 }
 },
@@ -2573,6 +2672,15 @@
 },
 {
 "name": "staffcookw_dead",
+"options": {
+"civilian": "cookw",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffcookw_deadbare",
 "options": {
 "civilian": "cookw",
 "armed": true,
@@ -2791,6 +2899,15 @@
 "options": {
 "civilian": "cleaner",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffcleaner_deadbare",
+"options": {
+"civilian": "cleaner",
+"armed": true,
 "dead": true
 }
 },
@@ -3003,6 +3120,15 @@
 },
 {
 "name": "staffcleanerm_dead",
+"options": {
+"civilian": "cleanerm",
+"armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffcleanerm_deadbare",
 "options": {
 "civilian": "cleanerm",
 "armed": true,
@@ -3221,6 +3347,15 @@
 "options": {
 "civilian": "scientist",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffscientist_deadbare",
+"options": {
+"civilian": "scientist",
+"armed": true,
 "dead": true
 }
 },
@@ -3436,7 +3571,1808 @@
 "options": {
 "civilian": "engineer",
 "armed": true,
+"dead": true,
+"groundRifle": true
+}
+},
+{
+"name": "staffengineer_deadbare",
+"options": {
+"civilian": "engineer",
+"armed": true,
 "dead": true
+}
+},
+{
+"name": "staffcleaner_ewalk_f0",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffcleaner_ewalk_f1",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffcleaner_ewalk_f2",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffcleaner_ewalk_f3",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffcleaner_ewalk_f4",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffcleaner_ewalk_f5",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffcleaner_ewalk_f6",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffcleaner_ewalk_f7",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffcleaner_ewalk_f8",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffcleaner_ewalk_f9",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffcleaner_ewalk_f10",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffcleaner_ewalk_f11",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffcleaner_ewalk_f12",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffcleaner_ewalk_f13",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffcleaner_ewalk_f14",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffcleaner_ewalk_f15",
+"options": {
+"civilian": "cleaner",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffcleanerm_ewalk_f0",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffcleanerm_ewalk_f1",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffcleanerm_ewalk_f2",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffcleanerm_ewalk_f3",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffcleanerm_ewalk_f4",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffcleanerm_ewalk_f5",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffcleanerm_ewalk_f6",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffcleanerm_ewalk_f7",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffcleanerm_ewalk_f8",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffcleanerm_ewalk_f9",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffcleanerm_ewalk_f10",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffcleanerm_ewalk_f11",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffcleanerm_ewalk_f12",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffcleanerm_ewalk_f13",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffcleanerm_ewalk_f14",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffcleanerm_ewalk_f15",
+"options": {
+"civilian": "cleanerm",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffcommander_ewalk_f0",
+"options": {
+"civilian": "commander",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffcommander_ewalk_f1",
+"options": {
+"civilian": "commander",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffcommander_ewalk_f2",
+"options": {
+"civilian": "commander",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffcommander_ewalk_f3",
+"options": {
+"civilian": "commander",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffcommander_ewalk_f4",
+"options": {
+"civilian": "commander",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffcommander_ewalk_f5",
+"options": {
+"civilian": "commander",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffcommander_ewalk_f6",
+"options": {
+"civilian": "commander",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffcommander_ewalk_f7",
+"options": {
+"civilian": "commander",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffcommander_ewalk_f8",
+"options": {
+"civilian": "commander",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffcommander_ewalk_f9",
+"options": {
+"civilian": "commander",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffcommander_ewalk_f10",
+"options": {
+"civilian": "commander",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffcommander_ewalk_f11",
+"options": {
+"civilian": "commander",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffcommander_ewalk_f12",
+"options": {
+"civilian": "commander",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffcommander_ewalk_f13",
+"options": {
+"civilian": "commander",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffcommander_ewalk_f14",
+"options": {
+"civilian": "commander",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffcommander_ewalk_f15",
+"options": {
+"civilian": "commander",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffcook_ewalk_f0",
+"options": {
+"civilian": "cook",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffcook_ewalk_f1",
+"options": {
+"civilian": "cook",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffcook_ewalk_f2",
+"options": {
+"civilian": "cook",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffcook_ewalk_f3",
+"options": {
+"civilian": "cook",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffcook_ewalk_f4",
+"options": {
+"civilian": "cook",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffcook_ewalk_f5",
+"options": {
+"civilian": "cook",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffcook_ewalk_f6",
+"options": {
+"civilian": "cook",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffcook_ewalk_f7",
+"options": {
+"civilian": "cook",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffcook_ewalk_f8",
+"options": {
+"civilian": "cook",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffcook_ewalk_f9",
+"options": {
+"civilian": "cook",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffcook_ewalk_f10",
+"options": {
+"civilian": "cook",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffcook_ewalk_f11",
+"options": {
+"civilian": "cook",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffcook_ewalk_f12",
+"options": {
+"civilian": "cook",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffcook_ewalk_f13",
+"options": {
+"civilian": "cook",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffcook_ewalk_f14",
+"options": {
+"civilian": "cook",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffcook_ewalk_f15",
+"options": {
+"civilian": "cook",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffcookw_ewalk_f0",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffcookw_ewalk_f1",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffcookw_ewalk_f2",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffcookw_ewalk_f3",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffcookw_ewalk_f4",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffcookw_ewalk_f5",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffcookw_ewalk_f6",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffcookw_ewalk_f7",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffcookw_ewalk_f8",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffcookw_ewalk_f9",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffcookw_ewalk_f10",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffcookw_ewalk_f11",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffcookw_ewalk_f12",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffcookw_ewalk_f13",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffcookw_ewalk_f14",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffcookw_ewalk_f15",
+"options": {
+"civilian": "cookw",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffdoctor_ewalk_f0",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffdoctor_ewalk_f1",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffdoctor_ewalk_f2",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffdoctor_ewalk_f3",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffdoctor_ewalk_f4",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffdoctor_ewalk_f5",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffdoctor_ewalk_f6",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffdoctor_ewalk_f7",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffdoctor_ewalk_f8",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffdoctor_ewalk_f9",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffdoctor_ewalk_f10",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffdoctor_ewalk_f11",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffdoctor_ewalk_f12",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffdoctor_ewalk_f13",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffdoctor_ewalk_f14",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffdoctor_ewalk_f15",
+"options": {
+"civilian": "doctor",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffelectrician_ewalk_f0",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffelectrician_ewalk_f1",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffelectrician_ewalk_f2",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffelectrician_ewalk_f3",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffelectrician_ewalk_f4",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffelectrician_ewalk_f5",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffelectrician_ewalk_f6",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffelectrician_ewalk_f7",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffelectrician_ewalk_f8",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffelectrician_ewalk_f9",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffelectrician_ewalk_f10",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffelectrician_ewalk_f11",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffelectrician_ewalk_f12",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffelectrician_ewalk_f13",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffelectrician_ewalk_f14",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffelectrician_ewalk_f15",
+"options": {
+"civilian": "electrician",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffengineer_ewalk_f0",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffengineer_ewalk_f1",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffengineer_ewalk_f2",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffengineer_ewalk_f3",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffengineer_ewalk_f4",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffengineer_ewalk_f5",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffengineer_ewalk_f6",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffengineer_ewalk_f7",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffengineer_ewalk_f8",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffengineer_ewalk_f9",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffengineer_ewalk_f10",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffengineer_ewalk_f11",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffengineer_ewalk_f12",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffengineer_ewalk_f13",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffengineer_ewalk_f14",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffengineer_ewalk_f15",
+"options": {
+"civilian": "engineer",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffengineerw_ewalk_f0",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffengineerw_ewalk_f1",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffengineerw_ewalk_f2",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffengineerw_ewalk_f3",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffengineerw_ewalk_f4",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffengineerw_ewalk_f5",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffengineerw_ewalk_f6",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffengineerw_ewalk_f7",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffengineerw_ewalk_f8",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffengineerw_ewalk_f9",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffengineerw_ewalk_f10",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffengineerw_ewalk_f11",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffengineerw_ewalk_f12",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffengineerw_ewalk_f13",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffengineerw_ewalk_f14",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffengineerw_ewalk_f15",
+"options": {
+"civilian": "engineerw",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffhazmat_ewalk_f0",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffhazmat_ewalk_f1",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffhazmat_ewalk_f2",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffhazmat_ewalk_f3",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffhazmat_ewalk_f4",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffhazmat_ewalk_f5",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffhazmat_ewalk_f6",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffhazmat_ewalk_f7",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffhazmat_ewalk_f8",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffhazmat_ewalk_f9",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffhazmat_ewalk_f10",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffhazmat_ewalk_f11",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffhazmat_ewalk_f12",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffhazmat_ewalk_f13",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffhazmat_ewalk_f14",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffhazmat_ewalk_f15",
+"options": {
+"civilian": "hazmat",
+"easePhase": 0.9375
+}
+},
+{
+"name": "stafflabwoman_ewalk_f0",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.0
+}
+},
+{
+"name": "stafflabwoman_ewalk_f1",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.0625
+}
+},
+{
+"name": "stafflabwoman_ewalk_f2",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.125
+}
+},
+{
+"name": "stafflabwoman_ewalk_f3",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.1875
+}
+},
+{
+"name": "stafflabwoman_ewalk_f4",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.25
+}
+},
+{
+"name": "stafflabwoman_ewalk_f5",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.3125
+}
+},
+{
+"name": "stafflabwoman_ewalk_f6",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.375
+}
+},
+{
+"name": "stafflabwoman_ewalk_f7",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.4375
+}
+},
+{
+"name": "stafflabwoman_ewalk_f8",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.5
+}
+},
+{
+"name": "stafflabwoman_ewalk_f9",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.5625
+}
+},
+{
+"name": "stafflabwoman_ewalk_f10",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.625
+}
+},
+{
+"name": "stafflabwoman_ewalk_f11",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.6875
+}
+},
+{
+"name": "stafflabwoman_ewalk_f12",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.75
+}
+},
+{
+"name": "stafflabwoman_ewalk_f13",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.8125
+}
+},
+{
+"name": "stafflabwoman_ewalk_f14",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.875
+}
+},
+{
+"name": "stafflabwoman_ewalk_f15",
+"options": {
+"civilian": "labwoman",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffnurse_ewalk_f0",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffnurse_ewalk_f1",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffnurse_ewalk_f2",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffnurse_ewalk_f3",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffnurse_ewalk_f4",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffnurse_ewalk_f5",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffnurse_ewalk_f6",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffnurse_ewalk_f7",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffnurse_ewalk_f8",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffnurse_ewalk_f9",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffnurse_ewalk_f10",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffnurse_ewalk_f11",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffnurse_ewalk_f12",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffnurse_ewalk_f13",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffnurse_ewalk_f14",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffnurse_ewalk_f15",
+"options": {
+"civilian": "nurse",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffofficer_ewalk_f0",
+"options": {
+"civilian": "officer",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffofficer_ewalk_f1",
+"options": {
+"civilian": "officer",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffofficer_ewalk_f2",
+"options": {
+"civilian": "officer",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffofficer_ewalk_f3",
+"options": {
+"civilian": "officer",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffofficer_ewalk_f4",
+"options": {
+"civilian": "officer",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffofficer_ewalk_f5",
+"options": {
+"civilian": "officer",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffofficer_ewalk_f6",
+"options": {
+"civilian": "officer",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffofficer_ewalk_f7",
+"options": {
+"civilian": "officer",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffofficer_ewalk_f8",
+"options": {
+"civilian": "officer",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffofficer_ewalk_f9",
+"options": {
+"civilian": "officer",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffofficer_ewalk_f10",
+"options": {
+"civilian": "officer",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffofficer_ewalk_f11",
+"options": {
+"civilian": "officer",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffofficer_ewalk_f12",
+"options": {
+"civilian": "officer",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffofficer_ewalk_f13",
+"options": {
+"civilian": "officer",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffofficer_ewalk_f14",
+"options": {
+"civilian": "officer",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffofficer_ewalk_f15",
+"options": {
+"civilian": "officer",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffplumber_ewalk_f0",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffplumber_ewalk_f1",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffplumber_ewalk_f2",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffplumber_ewalk_f3",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffplumber_ewalk_f4",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffplumber_ewalk_f5",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffplumber_ewalk_f6",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffplumber_ewalk_f7",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffplumber_ewalk_f8",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffplumber_ewalk_f9",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffplumber_ewalk_f10",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffplumber_ewalk_f11",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffplumber_ewalk_f12",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffplumber_ewalk_f13",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffplumber_ewalk_f14",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffplumber_ewalk_f15",
+"options": {
+"civilian": "plumber",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffscientist_ewalk_f0",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffscientist_ewalk_f1",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffscientist_ewalk_f2",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffscientist_ewalk_f3",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffscientist_ewalk_f4",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffscientist_ewalk_f5",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffscientist_ewalk_f6",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffscientist_ewalk_f7",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffscientist_ewalk_f8",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffscientist_ewalk_f9",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffscientist_ewalk_f10",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffscientist_ewalk_f11",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffscientist_ewalk_f12",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffscientist_ewalk_f13",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffscientist_ewalk_f14",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffscientist_ewalk_f15",
+"options": {
+"civilian": "scientist",
+"easePhase": 0.9375
+}
+},
+{
+"name": "staffsurgeon_ewalk_f0",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffsurgeon_ewalk_f1",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffsurgeon_ewalk_f2",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffsurgeon_ewalk_f3",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffsurgeon_ewalk_f4",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffsurgeon_ewalk_f5",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffsurgeon_ewalk_f6",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffsurgeon_ewalk_f7",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffsurgeon_ewalk_f8",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffsurgeon_ewalk_f9",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffsurgeon_ewalk_f10",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffsurgeon_ewalk_f11",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffsurgeon_ewalk_f12",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffsurgeon_ewalk_f13",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffsurgeon_ewalk_f14",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffsurgeon_ewalk_f15",
+"options": {
+"civilian": "surgeon",
+"easePhase": 0.9375
 }
 }
 ]

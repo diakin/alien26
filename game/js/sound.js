@@ -118,6 +118,9 @@ var Sound = (function () {
   // Фраза из слогов: согласная (щелчок, шипение, хрип) и гласная — пила через три полосовых фильтра-форманты,
   // высота скользит вверх или вниз, у части слогов раскатистое «р» (дрожание громкости ~30 Гц). Половина сигнала
   // проходит через кольцевой модулятор (умножение на синус) — металлический, нечеловеческий призвук.
+  // Голос резкий и грубый: низкий тон, под ним рык на октаву ниже, у большинства слогов хрип (дрожание громкости
+  // 35–60 Гц), широкие форманты с подъёмом верхних (жёсткий «край»), короткие отрывистые слоги с резкой атакой,
+  // высота в слоге падает (лающая интонация), весь голос проходит через перегруз.
   // Тон голоса у каждого пришельца свой (options.pitch). Невидимые пришельцы слышны как перехват по рации:
   // полоса 350–3000 Гц, лёгкий перегруз, щелчки шумоподавителя в начале и в конце.
   var ALIEN_VOWELS = [[850, 1250, 2600], [520, 880, 2500], [380, 760, 2400], [480, 1950, 2700], [330, 2400, 3100], [400, 1500, 2500]];
@@ -132,27 +135,33 @@ var Sound = (function () {
     modulator.connect(ringGain.gain);
     var mix = audio.createGain(); mix.gain.value = 1;
     source.connect(mix); source.connect(ringGain); ringGain.connect(mix);
+    // рык: та же пила на октаву ниже, чуть расстроена
+    var growl = audio.createOscillator(), growlGain = audio.createGain();
+    growl.type = 'sawtooth'; growlGain.gain.value = 0.7;
+    growl.frequency.setValueAtTime(from * 0.5 * 1.012, time);
+    growl.frequency.exponentialRampToValueAtTime(to * 0.5 * 1.012, time + duration);
+    growl.connect(growlGain); growlGain.connect(mix);
     var envelope = audio.createGain();
     envelope.gain.setValueAtTime(0.0001, time);
-    envelope.gain.exponentialRampToValueAtTime(peak, time + Math.min(0.03, duration * 0.3));
-    envelope.gain.setValueAtTime(peak, time + duration * 0.6);
+    envelope.gain.exponentialRampToValueAtTime(peak, time + Math.min(0.008, duration * 0.2));
+    envelope.gain.setValueAtTime(peak, time + duration * 0.55);
     envelope.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     var tremble = null;
     if (trill) {
-      var shake = audio.createGain(); shake.gain.value = 0.5;
-      tremble = audio.createOscillator(); tremble.frequency.value = trill;
-      var depth = audio.createGain(); depth.gain.value = 0.5;
+      var shake = audio.createGain(); shake.gain.value = 0.45;
+      tremble = audio.createOscillator(); tremble.type = 'square'; tremble.frequency.value = trill;
+      var depth = audio.createGain(); depth.gain.value = 0.55;
       tremble.connect(depth); depth.connect(shake.gain);
       envelope.connect(shake); shake.connect(output);
     } else envelope.connect(output);
     vowel.forEach(function (frequency, index) {
       var filter = audio.createBiquadFilter();
-      filter.type = 'bandpass'; filter.frequency.value = frequency * 1.12; filter.Q.value = [7, 9, 11][index];
-      var level = audio.createGain(); level.gain.value = [1, 0.6, 0.25][index];
+      filter.type = 'bandpass'; filter.frequency.value = frequency * 1.05; filter.Q.value = [4, 5, 6][index];
+      var level = audio.createGain(); level.gain.value = [1, 0.75, 0.5][index];
       mix.connect(filter); filter.connect(level); level.connect(envelope);
     });
     var end = time + duration + 0.05;
-    source.start(time); modulator.start(time); source.stop(end); modulator.stop(end);
+    source.start(time); modulator.start(time); growl.start(time); source.stop(end); modulator.stop(end); growl.stop(end);
     if (tremble) { tremble.start(time); tremble.stop(end); }
   }
   function alienNoise(output, when, duration, type, frequency, quality, peak) {
@@ -188,6 +197,13 @@ var Sound = (function () {
       output.gain.value = far * 1.9;               // вблизи — как визг пришельца, чуть тише выстрела
       output.connect(effectsGain);
     }
+    // перегруз голоса (согласные идут мимо него)
+    var drive = audio.createWaveShaper(), driveCurve = new Float32Array(1024);
+    for (var point = 0; point < driveCurve.length; point++) { var level = point / (driveCurve.length - 1) * 2 - 1; driveCurve[point] = Math.tanh(level * 4) / Math.tanh(4); }
+    drive.curve = driveCurve;
+    var voiceBus = audio.createGain(); voiceBus.gain.value = 1.4;
+    var voiceOut = audio.createGain(); voiceOut.gain.value = 0.25;
+    voiceBus.connect(drive); drive.connect(voiceOut); voiceOut.connect(output);
     var counts = { call: [4, 7], reply: [2, 4], alert: [2, 4], grunt: [1, 2] }[mood];
     var syllables = counts[0] + Math.floor(Math.random() * (counts[1] - counts[0] + 1));
     var fast = mood === 'alert' ? 0.7 : 1, high = mood === 'alert' ? 1.35 : mood === 'grunt' ? 0.75 : 1;
@@ -195,18 +211,19 @@ var Sound = (function () {
     if (options.radio) alienNoise(output, 0, 0.07, 'highpass', 2500, 0.7, 0.3);
     at += options.radio ? 0.09 : 0;
     for (var syllable = 0; syllable < syllables; syllable++) {
-      var consonant = Math.floor(Math.random() * 5);
-      if (consonant === 0) { alienNoise(output, at, 0.02, 'bandpass', jitter(3000, 0.3), 3, 0.35); at += 0.03; }                       // «к», «т» — щелчок
+      var consonant = Math.floor(Math.random() * 6);
+      if (consonant === 5) { alienNoise(output, at, 0.08 * fast, 'bandpass', jitter(700, 0.2), 1.5, 0.3); alienNoise(output, at, 0.06, 'bandpass', jitter(2400, 0.2), 2, 0.2); at += 0.06 * fast; }   // «хр» — грубый хрип
+      if (consonant === 0) { alienNoise(output, at, 0.02, 'bandpass', jitter(3000, 0.3), 3, 0.45); at += 0.03; }                       // «к», «т» — щелчок
       else if (consonant === 1) { alienNoise(output, at, 0.11 * fast, 'bandpass', jitter(5200, 0.2), 2, 0.16); at += 0.09 * fast; }     // «с» — шипение
       else if (consonant === 2) { alienNoise(output, at, 0.09 * fast, 'bandpass', jitter(1300, 0.2), 1.2, 0.22); at += 0.07 * fast; }    // «х» — хрип
       else if (consonant === 3) { alienNoise(output, at, 0.015, 'bandpass', 2200, 4, 0.3); alienNoise(output, at + 0.04, 0.015, 'bandpass', 2600, 4, 0.25); at += 0.06; }   // «тк»
-      var length = jitter(mood === 'grunt' ? 0.22 : 0.15, 0.5) * fast;
-      var pitch = jitter(base * high, 0.18), last = syllable === syllables - 1;
-      // конец фразы: у вызова — подъём (вопрос), у остальных — спад
-      var target = last ? pitch * (mood === 'call' ? 1.35 : 0.7) : pitch * jitter(1, 0.35);
-      var trill = Math.random() < (mood === 'alert' ? 0.5 : 0.25) ? jitter(30, 0.2) : 0;
-      alienSyllable(output, at, pitch, target, last ? length * 1.6 : length, ALIEN_VOWELS[Math.floor(Math.random() * ALIEN_VOWELS.length)], 0.3, trill, pitch * jitter(1.47, 0.1));
-      at += (last ? length * 1.6 : length) + (Math.random() < 0.3 ? jitter(0.12, 0.4) : 0.02);
+      var length = jitter(mood === 'grunt' ? 0.2 : 0.12, 0.45) * fast;
+      var pitch = jitter(base * high, 0.15), last = syllable === syllables - 1;
+      // слоги отрывистые, высота в слоге падает (лай); конец фразы: у вызова — короткий подъём, у остальных — резкий спад
+      var target = last ? pitch * (mood === 'call' ? 1.2 : 0.6) : pitch * jitter(0.8, 0.2);
+      var trill = Math.random() < (mood === 'alert' ? 0.85 : 0.65) ? jitter(45, 0.3) : 0;
+      alienSyllable(voiceBus, at, pitch, target, last ? length * 1.5 : length, ALIEN_VOWELS[Math.floor(Math.random() * ALIEN_VOWELS.length)], 0.3, trill, pitch * jitter(1.47, 0.1));
+      at += (last ? length * 1.5 : length) + (Math.random() < 0.25 ? jitter(0.09, 0.4) : 0.015);
     }
     if (options.radio) alienNoise(output, at + 0.02, 0.09, 'highpass', 2200, 0.7, 0.28);
     void start;

@@ -1443,6 +1443,22 @@
     var height = unit.kind === 'mech' ? 2.15 : unit.kind === 'alien' ? 1.55 : unit.kneeling ? 1.0 : 1.45;
     return { x: unit.x + dx / length * reach, y: unit.y + dy / length * reach, h: unit.elevation + height };
   }
+  // дуло на спрайте (для рисования выстрела): положение дула в позе прицеливания, снято с 3D-моделей
+  // (tools/render: пистолет пришельца, автомат бойца и персонала). Вперёд, вбок (+ — вправо от направления на цель
+  // в координатах клеток), вверх, в метрах. Линия огня по-прежнему считается от muzzleOf.
+  var SPRITE_MUZZLE = {
+    alien: { stand: [0.91, -0.19, 1.73] },
+    staff: { stand: [1.07, 0.13, 1.5], kneel: [1.04, 0.17, 1.14] },
+    soldier: { stand: [1.09, 0.16, 1.44], kneel: [1.05, 0.19, 1.14] }
+  };
+  function spriteMuzzleOf(unit, point) {
+    var table = unit.kind === 'mech' ? null : unit.kind === 'alien' ? SPRITE_MUZZLE.alien : unit.kind === 'staff' ? SPRITE_MUZZLE.staff : SPRITE_MUZZLE.soldier;
+    if (!table) return muzzleOf(unit, point);
+    var offset = unit.kneeling && table.kneel ? table.kneel : table.stand;
+    var dx = point.x - unit.x, dy = point.y - unit.y, length = Math.sqrt(dx * dx + dy * dy) || 1;
+    var forwardX = dx / length, forwardY = dy / length, tile = Iso.tileMeters;
+    return { x: unit.x + (forwardX * offset[0] + forwardY * offset[1]) / tile, y: unit.y + (forwardY * offset[0] - forwardX * offset[1]) / tile, h: unit.elevation + offset[2] };
+  }
   function turnCostTo(unit, point) {
     var direction = Iso.directionOf(point.x - unit.x, point.y - unit.y);
     if (direction < 0) return 0;
@@ -1506,6 +1522,7 @@
     var radius = target.unit ? unitBody(target.unit).radius : 0.05;
     var aim = Combat.aimPoint(combatWorld, from, point, radius, chance, Math.random);
     shot.from = from;
+    shot.drawFrom = spriteMuzzleOf(shot.shooter, point);
     shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter);
     shot.duration = Math.max(60, Combat.distanceMeters(combatWorld, from, shot.result.point) / SHOT_SPEED[shot.weapon.projectile] * 1000);
     // показ выстрела пришельца: пуля долетает, когда камера уже перешла к месту попадания
@@ -1539,7 +1556,10 @@
     var deathDistance = screenDistance(unit);
     if (unit.kind !== 'mech') Sound.play(unit.side === 'aliens' ? 'deathAlien' : 'deathSoldier', deathDistance);   // крик сразу
     setTimeout(function () { Sound.play(unit.kind === 'mech' ? 'crash' : 'fall', deathDistance); }, unit.kind === 'mech' ? 500 : 420);
+    // оружие в руках: у бойцов и пришельцев оно нарисовано в спрайте тела рядом с ним, пока лежит на клетке
+    var weaponType = unit.weaponType, heldWeapon = null;
     if (unit.inventory) {
+      unit.inventory.forEach(function (entry) { if (!heldWeapon && weaponType && Items.info(entry.item).weapon === weaponType) heldWeapon = entry.item; });
       unit.inventory.forEach(function (entry) { dropOnGround(entry.item, unit.col, unit.row, unit.level); });
       unit.inventory = [];
     }
@@ -1550,8 +1570,12 @@
       // стоя в прицеле таз на той же высоте, что в обычной стойке, отличаются только руки — пропускаем один кадр
       var pose = spriteName(unit);
       var skip = pose.indexOf('_kneelAim_') >= 0 ? 2 : pose.indexOf('_standAim_') >= 0 ? 1 : 0;
+      // кадры падения и тела персонала и гражданских грузятся по запросу — запрашиваем сразу
+      var shownDirection = Iso.viewDirection(unit.direction);
+      for (var fallFrame = 0; fallFrame < FALL_FRAMES; fallFrame++) drawableSprite(unit.spriteSet + '_fall_f' + fallFrame + '_d' + shownDirection);
+      drawableSprite(unit.spriteSet + '_dead_d' + shownDirection);
       corpses.push({
-        fallSkip: skip,
+        fallSkip: skip, weapon: heldWeapon,
         name: unit.spriteSet + '_dead_d' + unit.direction, set: unit.spriteSet, direction: unit.direction,
         fallStart: performance.now(), fallFrames: SPRITE_ANCHORS[unit.spriteSet + '_fall_f0_d0'] ? FALL_FRAMES : 0,
         frameTime: wreck ? 120 : 85, wreck: wreck, size: unit.size, nextFlame: 0, nextSmoke: 0, nextArc: 0,
@@ -1983,7 +2007,7 @@
   var talk = { queue: [], freeAt: 0 };
   function alienVoice(alien) {
     var number = Number((/\d+/.exec(alien.callsign || '') || [1])[0]);
-    return 115 + (number * 37) % 95;
+    return 78 + (number * 29) % 45;              // низкие голоса: 78–122 Гц
   }
   function sayAlien(alien, mood, now) {
     if (!window.Sound || !Sound.alienTalk || !alien || alien.dead) return;
@@ -2560,7 +2584,16 @@
   function corpseSprite(corpse, now) {
     var frame = corpseFrame(corpse, now);
     var direction = Iso.viewDirection(corpse.direction);
-    return frame >= 0 ? corpse.set + '_fall_f' + frame + '_d' + direction : corpse.set + '_dead_d' + direction;
+    if (frame >= 0) return corpse.set + '_fall_f' + frame + '_d' + direction;
+    // оружие подобрали — тело без оружия рядом (кадр *_deadbare, если он есть у набора)
+    if (corpseDepictsWeapon(corpse) === false) return corpse.set + '_deadbare_d' + direction;
+    return corpse.set + '_dead_d' + direction;
+  }
+  // нарисовано ли оружие рядом с телом: true — да и оно лежит на клетке, false — у набора есть кадр без оружия,
+  // а оружие с клетки забрали, null — у набора нет такого различия (персонал, гражданские: оружие рисуется значком)
+  function corpseDepictsWeapon(corpse) {
+    if (!corpse.weapon || !SPRITE_ANCHORS[corpse.set + '_deadbare_d0']) return null;
+    return groundAt(corpse.col, corpse.row, corpse.level).some(function (entry) { return entry.item === corpse.weapon; });
   }
   // обломки робота на клетке: по ним нельзя пройти
   function wreckAt(col, row, level) {
@@ -2575,7 +2608,7 @@
   function corpseItems() {
     var now = performance.now();
     return corpses.filter(function (corpse) { return corpse.level <= view.level; }).map(function (corpse) {
-      var name = corpseSprite(corpse, now);
+      var name = drawableSprite(corpseSprite(corpse, now)) || corpseSprite(corpse, now);
       var image = images[name], anchor = SPRITE_ANCHORS[name];
       var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
       var rect = image && image.naturalWidth ? { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight }
@@ -2808,11 +2841,13 @@
     shots.forEach(function (shot) {
       if (!shot.result || now < shot.start) return;
       var progress = Math.min(1, (now - shot.start) / shot.duration);
-      var length = Combat.distanceMeters(combatWorld, shot.from, shot.result.point) || 1;
+      // рисуется от дула на спрайте (drawFrom), линия огня — от shot.from
+      var from = shot.drawFrom || shot.from;
+      var length = Combat.distanceMeters(combatWorld, from, shot.result.point) || 1;
       var tail = Math.max(0, progress - (shot.weapon.projectile === 'plasma' ? 0.6 : shot.weapon.projectile === 'shell' ? 2.4 : 1.6) / length);
-      var head = screenOf(lerpPoint(shot.from, shot.result.point, progress)), back = screenOf(lerpPoint(shot.from, shot.result.point, tail));
+      var head = screenOf(lerpPoint(from, shot.result.point, progress)), back = screenOf(lerpPoint(from, shot.result.point, tail));
       if (now - shot.start < 70) {                      // вспышка у ствола
-        var muzzle = screenOf(shot.from);
+        var muzzle = screenOf(from);
         context.fillStyle = shot.weapon.projectile === 'plasma' ? 'rgba(120, 220, 255, 0.9)' : 'rgba(255, 220, 120, 0.95)';
         context.beginPath(); context.arc(muzzle.x, muzzle.y, shot.weapon.projectile === 'shell' ? 11 : 6, 0, Math.PI * 2); context.fill();
       }
@@ -3174,7 +3209,9 @@
     var moving = unit.path.length && !unit.path[0].climb;
     if (moving) {
       var frame = Math.floor(unit.walked / unit.frameMeters) % WALK_FRAMES;
-      return unit.spriteSet + '_walk_f' + frame + '_d' + Iso.viewDirection(unit.direction);
+      // мирная обстановка: персонал идёт без оружия (кадры *_ewalk, шаг тот же)
+      var gait = !combat && SPRITE_ANCHORS[unit.spriteSet + '_ewalk_f0_d0'] ? '_ewalk_f' : '_walk_f';
+      return unit.spriteSet + gait + frame + '_d' + Iso.viewDirection(unit.direction);
     }
     // гражданский присел — испуганная поза (руки на голове)
     if (unit.kneeling && SPRITE_ANCHORS[unit.spriteSet + '_cower_d0']) return unit.spriteSet + '_cower_d' + Iso.viewDirection(unit.direction);
@@ -3293,10 +3330,12 @@
     var items = [];
     // предметы на земле (кроме клеток с телами — там видно, что лежит): значок первого предмета, рядом число предметов
     Object.keys(groundItems).forEach(function (key) {
-      var list = groundItems[key];
-      if (!list.length) return;
       var parts = key.split(':'), level = Number(parts[0]), col = Number(parts[1]), row = Number(parts[2]);
-      if (level > view.level || corpses.some(function (corpse) { return corpse.level === level && corpse.col === col && corpse.row === row; })) return;
+      // на клетке с телом не показываем оружие, нарисованное в спрайте тела; остальное — значками
+      var depicted = corpses.filter(function (corpse) { return corpse.level === level && corpse.col === col && corpse.row === row && corpseDepictsWeapon(corpse); })
+        .map(function (corpse) { return corpse.weapon; });
+      var list = groundItems[key].filter(function (entry) { return depicted.indexOf(entry.item) < 0; });
+      if (!list.length || level > view.level) return;
       var foot = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level));
       var rect = { x: foot.x - 22, y: foot.y - 16, width: 44, height: 26 };
       items.push({ depth: depthKey(col, row, level, 1.25), rect: rect, draw: function () {
@@ -3629,7 +3668,11 @@
     corpses.forEach(function (corpse) {
       if (corpse.level > view.level) return;
       var standing = corpse.wreck || corpseFrame(corpse, now) >= 0;
-      var name = corpseSprite(corpse, now), image = images[name], anchor = SPRITE_ANCHORS[name];
+      // кадры персонала и гражданских грузятся по запросу: drawableSprite ставит кадр в загрузку и до загрузки
+      // подставляет тело того же юнита (если оно уже загружено)
+      var name = drawableSprite(corpseSprite(corpse, now));
+      if (!name) return;
+      var image = images[name], anchor = SPRITE_ANCHORS[name];
       if (!image || !anchor || !image.naturalWidth) return;
       var foot = Iso.toScreen(corpse.x, corpse.y, corpse.elevation);
       var rect = { x: Math.round(foot.x - anchor[0]), y: Math.round(foot.y - anchor[1]), width: image.naturalWidth, height: image.naturalHeight };
