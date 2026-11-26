@@ -26,6 +26,7 @@ export const BASE_COL = 1, BASE_ROW = 6;
 export const WALL_TYPES = {
   wall: { blocks: true }, window: { blocks: true }, door: { blocks: false },
   rail: { blocks: true }, parapet: { blocks: true }, barrier: { blocks: true },
+  mesh: { blocks: true },          // сетка ограждения крыши: пройти нельзя, взгляд, пули и гранаты проходят
   hull: { blocks: true },          // обшивка конвертоплана: грань закрыта, тайла стены нет — рисует сама модель
 };
 

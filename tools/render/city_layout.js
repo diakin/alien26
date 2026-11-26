@@ -1,7 +1,9 @@
 // Центр города (MAP=city): поле 96×96 клеток (120 × 120 м), задание «Спасение в городе».
 // План — docs/city/city.md. Север (row 0) — квартал с банком, проспект посередине (row 31..48), юг — жилой квартал,
 // фонтан и площадка конвертоплана. Здания — классические: оштукатуренные или каменные этажи, карниз, крыша
-// (черепичная вальмовая у домов и полиции, мансарда со слуховыми окнами и фронтоном у банка) — крыша не проходима.
+// (черепичная вальмовая у домов и полиции, мансарда со слуховыми окнами и фронтоном у банка) — такая крыша не проходима.
+// У школы (к востоку от детской площадки) и у дома напротив неё через проспект — плоские крыши с выходом по лестнице:
+// у школы по краю — сетка в рост человека, у дома — парапет.
 //
 // Поверхности земли: SURFACE (код в layout.surface[row][col]); разметка проезжей части — layout.marking[row][col]
 // (строка: 'dash' — прерывистая осевая по северной грани клетки, 'zebra' — переход, 'stop' — стоп-линия по северной грани).
@@ -9,7 +11,7 @@
 export const SURFACE = { dirt: 0, asphalt: 1, sidewalk: 2, grass: 3, path: 4, paving: 5, sand: 6 };
 
 // стиль фасада: стена этажа получает стиль `<фасад>_<роль>`, роль — g (первый этаж), u (средний), t (верхний, под карнизом)
-export const FACADES = ['ochre', 'cream', 'green', 'pink', 'bank', 'police'];
+export const FACADES = ['ochre', 'cream', 'green', 'pink', 'bank', 'police', 'school'];
 
 export function buildCity(api) {
   const { TILES, LEVEL_H, FLOOR, setFloor, setIndoor, setW, setN, object, building, stairRun, tiltrotor, block, surface, marking, floorStyle } = api;
@@ -35,6 +37,8 @@ export function buildCity(api) {
 
   // ---------------- дом: этажи, фасад, лестница «ножницами», комнаты, крыша ----------------
   // door: 'S' — парадная на юг (к большим row), 'N' — на север. Возвращает описание дома.
+  // options.flatRoof: 'mesh' — плоская крыша с сеткой по краю (школа), 'parapet' — с парапетом; лестница выходит на крышу.
+  // options.furnish: false — без мебели, 'classroom' — классы (парты, доска), иначе — жилые комнаты.
   function house(name, col0, row0, col1, row1, levels, style, door, options = {}) {
     const placed = building({ name, col0, row0, col1, row1, levels, style });
     for (let level = 0; level < levels; level++) {
@@ -48,8 +52,17 @@ export function buildCity(api) {
       for (let col = col0 + 1; col < col1; col++) if ((col - col0) % 2 === 1) { setN(level, col, row0, 'window', walls); setN(level, col, row1 + 1, 'window', walls); }
       for (let row = row0 + 1; row < row1; row++) if ((row - row0) % 2 === 1) { setW(level, col0, row, 'window', walls); setW(level, col1 + 1, row, 'window', walls); }
     }
-    // крыша над верхним этажом: предмет на уровне levels (не проходима)
-    object('roof', levels, col0, row0, col1 - col0 + 1, row1 - row0 + 1, { blocks: false, type: options.roof || 'tile', facade: style });
+    if (options.flatRoof) {
+      // плоская крыша — пол уровня levels (рулонная кровля); по краю — сетка или парапет
+      setFloor(levels, col0, row0, col1, row1, FLOOR.roof);
+      for (let row = row0; row <= row1; row++) for (let col = col0; col <= col1; col++) floorStyle[levels][row][col] = 'roofing';
+      const edge = options.flatRoof === 'mesh' ? ['mesh', 'school'] : ['parapet', facade(style, levels - 1, levels)];
+      for (let row = row0; row <= row1; row++) { setW(levels, col0, row, ...edge); setW(levels, col1 + 1, row, ...edge); }
+      for (let col = col0; col <= col1; col++) { setN(levels, col, row0, ...edge); setN(levels, col, row1 + 1, ...edge); }
+    } else {
+      // крыша над верхним этажом: предмет на уровне levels (не проходима)
+      object('roof', levels, col0, row0, col1 - col0 + 1, row1 - row0 + 1, { blocks: false, type: options.roof || 'tile', facade: style });
+    }
     const midCol = Math.floor((col0 + col1) / 2);
     // парадная дверь в середине фасада, чёрный ход — с другой стороны
     const front = door === 'S' ? row1 + 1 : row0, back = door === 'S' ? row0 : row1 + 1;
@@ -58,7 +71,7 @@ export function buildCity(api) {
     if (options.backDoor !== false) setN(0, midCol + 1, back, 'door', groundWalls);
     // лестница: колонки midCol−1 и midCol, ряды stairRow..stairRow+4 (у дальней от парадной стены)
     const stairRow = door === 'S' ? row0 + 1 : row1 - 5;
-    stairWell(midCol - 1, stairRow, levels - 1, style);
+    stairWell(midCol - 1, stairRow, options.flatRoof ? levels : levels - 1, style);   // с плоской крышей — марш и на крышу
     // перегородки: коридор — колонки midCol−1..midCol+1, комнаты по сторонам, по две на сторону
     const midRow = Math.floor((row0 + row1) / 2) + 1;
     for (let level = 0; level < levels; level++) {
@@ -75,7 +88,9 @@ export function buildCity(api) {
         for (let row = room.row0 + 1; row < room.row1; row++) if (row < stairRow || row > stairRow + 4) rows.push(row);
         const doorRow = rows.length ? rows[Math.floor(rows.length / 2)] : room.row0;
         if (room.side === 'W') setW(level, midCol - 1, doorRow, 'door', 'inner'); else setW(level, midCol + 2, doorRow, 'door', 'inner');
-        if (options.furnish !== false) furnish(level, room, room.side === 'W' ? [room.col1, doorRow] : [room.col0, doorRow], (index + level + col0) % 4);
+        const doorCell = room.side === 'W' ? [room.col1, doorRow] : [room.col0, doorRow];
+        if (options.furnish === 'classroom') classroom(level, room, doorCell);
+        else if (options.furnish !== false) furnish(level, room, doorCell, (index + level + col0) % 4);
       });
     }
     return { ...placed, midCol, stairRow, front, back };
@@ -102,6 +117,22 @@ export function buildCity(api) {
         }
       }
     }
+  }
+
+  // класс: доска на северной стене, парты рядами лицом к доске, проход посередине; у двери парт нет
+  function classroom(level, room, doorCell) {
+    const width = room.col1 - room.col0 + 1;
+    if (width < 4 || room.row1 - room.row0 < 4) return;
+    object('blackboard', level, room.col0 + 1, room.row0, width - 2, 1, { blocks: false });
+    const aisle = room.col0 + Math.floor(width / 2);
+    for (let row = room.row0 + 2; row <= room.row1; row += 2) {
+      for (let col = room.col0; col <= room.col1; col++) {
+        if (col === aisle) continue;
+        if (Math.abs(col - doorCell[0]) <= 1 && Math.abs(row - doorCell[1]) <= 1) continue;
+        object('schoolDesk', level, col, row, 1, 1);
+      }
+    }
+    object('bookcase', level, room.side === 'W' ? room.col0 : room.col1, room.row0 + 1, 1, 1, { rotation: room.side === 'W' ? 3 : 1 });
   }
 
   // обстановка комнаты: до четырёх предметов по углам, не у двери
@@ -139,8 +170,8 @@ export function buildCity(api) {
   // ---------- деревья вдоль северного края ----------
   for (const col of [4, 9, 14, 20, 26, 32, 61, 67, 73, 80, 86, 92]) object('tree', 0, col, 1, 1, 1, { type: col % 3 ? 'linden' : 'chestnut' });
 
-  // ---------- дом на Банковской (3 этажа, охра) ----------
-  house('houseA', 19, 7, 31, 21, 3, 'ochre', 'S');
+  // ---------- школа (3 этажа, светлый кирпич): плоская крыша, выход по лестнице, по краю крыши — сетка ----------
+  house('school', 19, 7, 31, 21, 3, 'school', 'S', { flatRoof: 'mesh', furnish: 'classroom', floor: 'tiles' });
   fillSurface(25, 22, 27, 26, SURFACE.path);
 
   // ---------- банк: 2 каменных этажа и мансарда; хранилище у северной стены ----------
@@ -239,7 +270,7 @@ export function buildCity(api) {
   carAlong('suv', 'graphite', 81, 33); carAlong('van', 'white', 6, 45, true);
 
   // ================= южный квартал =================
-  house('houseB', 3, 55, 16, 69, 3, 'cream', 'N');
+  house('houseB', 3, 55, 16, 69, 3, 'cream', 'N', { flatRoof: 'parapet' });     // напротив детской площадки: выход на крышу
   house('houseC', 22, 56, 34, 70, 2, 'green', 'N');
   house('houseD', 51, 55, 63, 70, 3, 'pink', 'N');
   house('houseE', 72, 56, 86, 70, 3, 'ochre', 'N');

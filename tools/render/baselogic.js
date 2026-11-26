@@ -5,7 +5,7 @@ import { TILE, LEVELS, LEVEL_H } from './outpost_layout.js';
 import { layout, buildObject } from './outpost_scene.js';
 import { solidBoxes } from './solids.js';
 
-const WALL_CODES = { wall: 1, window: 2, door: 3, rail: 4, parapet: 5, barrier: 6, hull: 7 };
+const WALL_CODES = { wall: 1, window: 2, door: 3, rail: 4, parapet: 5, barrier: 6, hull: 7, mesh: 8 };
 
 function mapFromLayout() {
   const tiles = layout.TILES;

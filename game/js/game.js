@@ -15,7 +15,7 @@
   var CLIMB_STEP = 0.6, CLIMB_FRAMES = 8;     // цикл лазания: две перекладины, 8 кадров
   var CLIMB_SHIFT = 0.15;                     // на лестнице фигура ближе к стене, клеток (перекладины в 0.44 м от центра клетки)
   var DOOR_WIDTH = 0.92, DOOR_REACH = 1.3, DOOR_SPEED = 2.5;   // проём, м; кто ближе — дверь открыта; скорость открытия
-  var WALL_BLOCKS = [false, true, true, false, true, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка
+  var WALL_BLOCKS = [false, true, true, false, true, true, true, true, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
 
   // типы юнитов: шаг анимации (stride, м за 16 кадров) совпадает с рендером спрайтов
   var KINDS = {
@@ -653,7 +653,7 @@
   // скрывает пришельцев — пришелец виден, если его клетка видна сейчас или он стрелял (до конца следующего хода отряда).
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
   var VISION_CELLS = 24, FOG_RAYS = 360;
-  var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка
+  var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
   var fog = { visible: null, signature: '', checkAt: 0 };
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });

@@ -60,8 +60,9 @@ export const FACADE_COLORS = {
   pink: { wall: [222, 178, 166], trim: [244, 236, 226], plinth: [150, 128, 120] },
   bank: { wall: [206, 190, 156], trim: [222, 210, 182], plinth: [138, 128, 112] },
   police: { wall: [150, 70, 52], trim: [232, 226, 212], plinth: [118, 108, 100] },
+  school: { wall: [196, 184, 160], trim: [244, 242, 236], plinth: [120, 112, 104] },      // светлый силикатный кирпич
 };
-export const isCityFacade = (style) => typeof style === 'string' && /^(ochre|cream|green|pink|bank|police)_[gut]$/.test(style);
+export const isCityFacade = (style) => typeof style === 'string' && /^(ochre|cream|green|pink|bank|police|school)_[gut]$/.test(style);
 export const facadeParts = (style) => { const [base, role] = style.split('_'); return { base, role, colors: FACADE_COLORS[base] }; };
 
 // текстура стены 1,25 × 2,28 м: штукатурка, руст (горизонтальные швы), кирпич, камень банка
@@ -74,7 +75,7 @@ export function facadeTextures(style, variant) {
   noisyFill(context, width, height, colors.wall, { seed: 41 + variant * 5 + base.length * 3, grain: base === 'bank' ? 14 : 8, dirt: 0.08, scale: 3 });
   heightContext.fillStyle = '#808080'; heightContext.fillRect(0, 0, width, height);
   const rng = mulberry32(61 + variant * 11 + base.length);
-  if (base === 'police' && role !== 'g') {
+  if ((base === 'police' || base === 'school') && role !== 'g') {
     // кирпич 25 × 6,5 см, перевязка через ряд
     const brickHeight = 0.075 * meter, brickWidth = 0.26 * meter;
     for (let rowIndex = 0; rowIndex * brickHeight < height; rowIndex++) {
@@ -84,7 +85,7 @@ export function facadeTextures(style, variant) {
         context.fillStyle = rgb(colors.wall.map((channel) => clampByte(channel * tone)));
         context.fillRect(x + 2, y + 2, brickWidth - 4, brickHeight - 4);
       }
-      context.fillStyle = 'rgba(206,196,182,0.9)'; context.fillRect(0, y, width, 2.5);
+      context.fillStyle = base === 'school' ? 'rgba(150,144,134,0.9)' : 'rgba(206,196,182,0.9)'; context.fillRect(0, y, width, 2.5);
       heightContext.fillStyle = '#505050'; heightContext.fillRect(0, y, width, 3);
       for (let x = -shift; x < width; x += brickWidth) { context.fillRect(x, y, 2.5, brickHeight); heightContext.fillRect(x, y, 3, brickHeight); }
     }
@@ -92,7 +93,7 @@ export function facadeTextures(style, variant) {
   if (role === 'g' || base === 'bank') {
     // руст: швы через 0,32 м; у банка — ещё и вертикальные швы блоков вразбежку
     const course = 0.32;
-    const stone = base === 'police' ? [212, 204, 188] : null;
+    const stone = base === 'police' ? [212, 204, 188] : base === 'school' ? [178, 172, 162] : null;
     if (stone) noisyFill(context, width, height, stone, { seed: 71 + variant, grain: 10, dirt: 0.08, scale: 3 });
     for (let index = 1; index * course < 2.4; index++) {
       const y = yAt(index * course);
@@ -170,6 +171,8 @@ export const CITY_MAT = {
   greenDoor: () => standard('greenDoor', { color: 0x24402e, roughness: 0.55 }),
   iron: () => standard('iron', { color: 0x1c1d1e, roughness: 0.5, metalness: 0.6 }),
   fenceGreen: () => standard('fenceGreen', { color: 0x2e4a34, roughness: 0.5, metalness: 0.4 }),
+  galvanized: () => standard('galvanized', { color: 0x8c9296, roughness: 0.45, metalness: 0.7 }),
+  chalkboard: () => standard('chalkboard', { color: 0x1f3a2c, roughness: 0.9 }),
   brass: () => standard('brass', { color: 0xb08a3a, roughness: 0.35, metalness: 0.9 }),
   steel: () => standard('steel', { color: 0x9aa0a6, roughness: 0.3, metalness: 0.85 }),
   stone: () => standard('stone', { color: 0xc8c0b0, roughness: 0.85 }),
@@ -236,6 +239,20 @@ function floorCanvas(kind) {
     }
     heightContext.fillStyle = '#505050';
     for (let line = 0; line <= size; line += size / count) { heightContext.fillRect(line - 1, 0, 2, size); heightContext.fillRect(0, line - 1, size, 2); }
+  } else if (kind === 'roofing') {
+    // плоская крыша: наплавляемый рулонный материал с крупной посыпкой, полосы 1 м внахлёст
+    noisyFill(context, size, size, [74, 76, 78], { seed: 23, grain: 16, dirt: 0.1, scale: 2 });
+    for (let speck = 0; speck < 2600; speck++) {
+      const tone = 60 + rng() * 70;
+      context.fillStyle = `rgba(${clampByte(tone)},${clampByte(tone)},${clampByte(tone + 4)},0.8)`;
+      context.fillRect(rng() * size, rng() * size, 1.5 + rng() * 1.5, 1.5 + rng() * 1.5);
+    }
+    const strip = size / 1.25;
+    for (let line = 0; line < size; line += strip) {
+      context.fillStyle = 'rgba(30,30,32,0.6)'; context.fillRect(0, line, size, 4);
+      context.fillStyle = 'rgba(120,120,122,0.35)'; context.fillRect(0, line + 4, size, 3);
+      heightContext.fillStyle = '#a0a0a0'; heightContext.fillRect(0, line, size, 7);
+    }
   } else {
     // сталь хранилища: рифлёные листы
     noisyFill(context, size, size, [118, 124, 128], { seed: 19, grain: 10, dirt: 0.12, scale: 2 });
@@ -251,7 +268,7 @@ function floorCanvas(kind) {
 export function floorMaterial(kind) {
   return once('floor_' + kind, () => {
     const textures = floorCanvas(kind);
-    return new THREE.MeshStandardMaterial({ map: textures.map, normalMap: textures.normalMap, roughness: kind === 'marble' ? 0.25 : kind === 'steel' ? 0.45 : 0.6, metalness: kind === 'steel' ? 0.6 : 0 });
+    return new THREE.MeshStandardMaterial({ map: textures.map, normalMap: textures.normalMap, roughness: kind === 'marble' ? 0.25 : kind === 'steel' ? 0.45 : kind === 'roofing' ? 0.95 : 0.6, metalness: kind === 'steel' ? 0.6 : 0 });
   });
 }
 
@@ -349,6 +366,7 @@ const BALUSTER = [[0, 0], [0.06, 0], [0.06, 0.06], [0.035, 0.1], [0.05, 0.28], [
 // ================= стены города =================
 // ctx: { wallBox, isIndoor, THICK, PANEL_H, doorLeaves, buildDoorLeaf }
 // Наружная сторона стены — сторона, клетка которой не под крышей. Украшения строятся только с неё.
+export const MESH_FENCE_HEIGHT = 1.9;
 export function buildCityWall(orient, col, row, level, wall, cut, ctx) {
   const { wallBox, isIndoor, THICK, PANEL_H } = ctx;
   const group = new THREE.Group();
@@ -402,6 +420,26 @@ export function buildCityWall(orient, col, row, level, wall, cut, ctx) {
       solid(along - 0.009, along + 0.009, 0.1, height - (fence ? -0.06 : 0.02), 0.018);
       if (fence) solid(along - 0.02, along + 0.02, height + 0.02, height + 0.07, 0.025);
     }
+    return group;
+  }
+
+  if (type === 'mesh') {
+    // ограждение плоской крыши школы: сварная сетка в рост человека (ячейка 10 см) на стойках из трубы.
+    // Взгляд, пули и осколки проходят сквозь сетку (combat.js, код 8), пройти нельзя.
+    const height = MESH_FENCE_HEIGHT, frame = CITY_MAT.fenceGreen(), wire = CITY_MAT.galvanized();
+    const solid = (along0, along1, y0, y1, thickness, mat) => group.add(wallBox(orient, col, row, level, along0, along1, y0, y1, Array(6).fill(mat), thickness));
+    for (const along of [0, TILE]) solid(along - 0.03, along + 0.03, 0, height + 0.03, 0.06, frame);
+    solid(0, TILE, height - 0.04, height, 0.045, frame);
+    solid(0, TILE, 0.04, 0.08, 0.04, frame);
+    for (let along = 0.1; along < TILE - 0.03; along += 0.1) solid(along - 0.006, along + 0.006, 0.08, height - 0.04, 0.012, wire);
+    for (let y = 0.18; y < height - 0.06; y += 0.1) solid(0.03, TILE - 0.03, y - 0.006, y + 0.006, 0.012, wire);
+    return group;
+  }
+  if (type === 'parapet') {
+    // парапет плоской крыши жилого дома: кладка в цвет фасада и бетонная крышка-отлив (высота 0,56 м, как в combat.js)
+    const plaster = Array(6).fill(facade ? CITY_MAT.facade(style, variant % 3) : CITY_MAT.plaster(variant % 3));
+    group.add(wallBox(orient, col, row, level, -extend, TILE + extend, 0, 0.5, plaster, THICK));
+    group.add(wallBox(orient, col, row, level, -extend - 0.03, TILE + extend + 0.03, 0.5, 0.56, Array(6).fill(CITY_MAT.stone()), THICK + 0.08));
     return group;
   }
 
@@ -1078,6 +1116,30 @@ export function buildCityObject(item) {
         }
       }
       return group;
+    }
+    case 'schoolDesk': {
+      // парта на двоих и два стула; ученики сидят лицом к доске (к северу при rotation 0)
+      const local = new THREE.Group();
+      const top = CITY_MAT.lightWood(), metal = CITY_MAT.iron();
+      local.add(box(1.1, 0.04, 0.5, top, cx, 0.74, 0.4));
+      local.add(box(1.0, 0.3, 0.02, top, cx, 0.5, 0.17));
+      for (const x of [cx - 0.5, cx + 0.5]) for (const z of [0.2, 0.6]) local.add(box(0.03, 0.72, 0.03, metal, x, 0.36, z));
+      for (const x of [cx - 0.28, cx + 0.28]) {
+        local.add(box(0.38, 0.04, 0.36, top, x, 0.44, 0.9));
+        local.add(box(0.38, 0.3, 0.03, top, x, 0.72, 1.08));
+        for (const dx of [-0.16, 0.16]) for (const z of [0.75, 1.05]) local.add(box(0.025, 0.42, 0.025, metal, x + dx, 0.21, z));
+      }
+      return rotated(local, item, cx, cz);
+    }
+    case 'blackboard': {
+      // школьная доска на стене (северной при rotation 0), под ней полка для мела
+      const local = new THREE.Group();
+      local.add(box(width - 0.3, 1.1, 0.04, CITY_MAT.chalkboard(), cx, 1.45, 0.12));
+      for (const y of [0.88, 2.02]) local.add(box(width - 0.22, 0.05, 0.06, CITY_MAT.lightWood(), cx, y, 0.12));
+      for (const x of [0.13, width - 0.13]) local.add(box(0.05, 1.19, 0.06, CITY_MAT.lightWood(), x, 1.45, 0.12));
+      local.add(box(width - 0.4, 0.03, 0.1, CITY_MAT.lightWood(), cx, 0.86, 0.18));
+      for (let line = 0; line < 4; line++) local.add(box(0.3 + rng() * 0.5, 0.012, 0.005, CITY_MAT.paint(0xe8e8e0), 0.6 + rng() * (width - 1.6), 1.2 + line * 0.18, 0.143));
+      return rotated(local, item, cx, cz);
     }
     case 'sofa': {
       const local = new THREE.Group();

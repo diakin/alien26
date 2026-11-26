@@ -253,7 +253,7 @@ field = {
     'origin': list(origin), 'colStep': [origin[0] + STEP_X, origin[1] + STEP_Y], 'rowStep': [origin[0] - STEP_X, origin[1] + STEP_Y],
     'up': [origin[0], origin[1] - projection['upPixels']],
 }
-WALL_CODES = {None: 0, 'wall': 1, 'window': 2, 'door': 3, 'rail': 4, 'parapet': 5, 'barrier': 6, 'hull': 7}
+WALL_CODES = {None: 0, 'wall': 1, 'window': 2, 'door': 3, 'rail': 4, 'parapet': 5, 'barrier': 6, 'hull': 7, 'mesh': 8}
 
 
 def map_from_layout(layout):

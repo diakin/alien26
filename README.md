@@ -560,7 +560,7 @@ python tilesetbuild.py tiles_out ../../game 0.5        # атласы, game/js/m
 ./base_quick.sh                                       # правки базы без тайлов: план, данные карты, map3d.js, base3d.js
 MAP=big node tilesetrun.mjs render tiles_big          # большая карта: тайлы (два процесса: … 0 490 и … 490 2000)
 MAP=big python tilesetbuild.py tiles_big ../../game    # атлас game/assets/maps/outpost_big/, game/js/maps/outpost_tiles_big.js
-MAP=city node tilesetrun.mjs render tiles_city         # центр города: 3440 тайлов (два процесса: … 0 2000 и … 2000 100000)
+MAP=city node tilesetrun.mjs render tiles_city         # центр города: 3406 тайлов (два процесса: … 0 2000 и … 2000 100000)
 MAP=city python tilesetbuild.py tiles_city ../../game  # атлас страницами game/assets/maps/outpost_city/, outpost_tiles_city.js
 node cityviewrun.mjs out.png 34,0,62,30 3               # быстрый просмотр участка города (столбцы, ряды, уровень) без тайлов
 node ../city/dump_layout.mjs layout.json && python ../city/plan_image.py layout.json plan.png 0   # картинка плана города

@@ -349,7 +349,7 @@ for (let level = 0; level < LEVELS; level++) {
         if (!wall || !wall.type || wall.type === 'hull') continue;      // обшивку конвертоплана рисует его модель
         const backCol = orient === 'W' ? col - 1 : col, backRow = orient === 'W' ? row : row - 1;
         const front = wall.style === 'inner' || isIndoor(level, col, row), back = wall.style === 'inner' || isIndoor(level, backCol, backRow);
-        const simple = wall.type === 'rail' || wall.type === 'barrier';
+        const simple = wall.type === 'rail' || wall.type === 'barrier' || wall.type === 'mesh';
         const ids = [false, true].map((cut) => {
           const usesCut = wall.type === 'wall' || wall.type === 'door' || wall.type === 'window';
           const signature = simple ? `wall|${orient}|${level}|${wall.type}|${wall.style}`
