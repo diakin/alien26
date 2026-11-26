@@ -1150,6 +1150,7 @@
     selected.timeUnits -= pathCost(selected, path);
     selected.kneeling = false;
     selected.path = path;
+    rememberSighted(selected);
     if (steps < fullLength) say('ОД хватит только на часть пути');
   }
 
@@ -2080,6 +2081,7 @@
     unit.timeUnits -= pathCost(unit, path);
     unit.kneeling = false;
     unit.path = path;
+    rememberSighted(unit);
     unit.stoppedByFire = false;
     gather.current = unit;
     if (!best.whole) gather.short.push(unit);
@@ -2225,6 +2227,37 @@
       mover.stoppedByFire = true;          // для «Перевести в зону эвакуации»: под огнём дальше не идёт
       if (mover === selected) viewFollow(mover);
     }
+  }
+  // Боец в свой ход заметил нового врага (у него загорелась бы красная метка) — останавливается на клетке,
+  // ОД за непройденную часть пути возвращаются. Враги, видимые уже в начале перехода, не останавливают.
+  function visibleEnemiesOf(viewer) {
+    var list = [];
+    units.forEach(function (unit) {
+      if (unit.side !== 'aliens' || unit.dead || !isSeen(unit)) return;
+      if (canSee(viewer, unit) !== null) list.push(unit);
+    });
+    return list;
+  }
+  function rememberSighted(unit) {
+    unit.sightedOnMove = unit.side === 'squad' && combat ? visibleEnemiesOf(unit) : [];
+  }
+  function sightCheck(mover) {
+    if (!combat || mover.dead || mover.side !== 'squad' || phase !== 'squad' || mission.over) return;
+    // туман пересчитывается по таймеру; здесь — сразу, чтобы новый враг был учтён на этой же клетке
+    fog.checkAt = 0;
+    updateFog(performance.now());
+    var known = mover.sightedOnMove || [];
+    var fresh = visibleEnemiesOf(mover).filter(function (unit) { return known.indexOf(unit) < 0; });
+    if (!fresh.length) return;
+    var refund = 0;
+    mover.path.forEach(function (step) { refund += step.cost; });
+    mover.timeUnits += refund;
+    mover.path = [];
+    mover.walked = 0;
+    mover.sightedOnMove = known.concat(fresh);
+    spotted.at = 0;
+    say(mover.callsign + ': замечен противник' + (fresh.length > 1 ? ' (' + fresh.length + ')' : ''));
+    if (mover === selected) viewFollow(mover);
   }
   // идёт ли юнит в свой ход (тогда по нему возможен ответный огонь)
   function ownPhase(unit) { return (unit.side === 'aliens') === (phase === 'aliens'); }
@@ -3521,6 +3554,7 @@
       if (!unit.path.length) { unit.walked = 0; if (unit === selected) viewFollow(unit); }
       rescueNear(unit);
       if (ownPhase(unit)) reactionCheck(unit);
+      if (unit.path.length) sightCheck(unit);
     } else {
       unit.x += deltaX / distanceTiles * stepTiles;
       unit.y += deltaY / distanceTiles * stepTiles;
@@ -4310,7 +4344,7 @@
     get domes() { return domes; }, startAlienPhase: function () { startAlienPhase(); }, rechargeShields: function () { rechargeShields(); }, ageDomes: function () { ageDomes(); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
-    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },
+    get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); }, moveTo: function (col, row, level) { moveSelectedTo({ col: col, row: row, level: level || 0 }); }, selectedUnit: function () { return selected; },
     clickTile: function (col, row, level) {
       var point = Iso.toScreen(col + 0.5, row + 0.5, elevationOf(col, row, level || 0));
       return { x: point.x - camera.x, y: point.y - camera.y };
