@@ -20,15 +20,19 @@ window.renderViews = async (kind, pose = 'idle', mode = 'head') => {
     : buildCivilian({ kind, armed, pose: name === 'walk' ? (armed ? armedWalk(0.25) : civilianWalk(0.25)) : name });
   if (!model.userData.head) model.userData.head = new THREE.Vector3(0, 0.3, 0);
   scene.add(model);
+  // отладка: показать только сетки с указанным именем (garment, hair, body)
+  if (window.debugOnly) model.traverse((node) => { if (node.isMesh) node.visible = node.name === window.debugOnly || node.userData.layer === window.debugOnly; });
   model.updateMatrixWorld(true);
   const head = model.userData.head.clone();
-  const size = mode === 'head' ? 360 : 300, views = mode === 'head' ? [0, Math.PI / 2, Math.PI, -0.6] : [0, 0.8, Math.PI / 2, Math.PI];
+  // torso — корпус крупно: спина, бок, перед
+  const big = mode === 'head' || mode === 'torso';
+  const size = big ? 360 : 300, views = mode === 'head' ? [0, Math.PI / 2, Math.PI, -0.6] : mode === 'torso' ? [Math.PI, Math.PI * 0.75, Math.PI / 2, 0] : [0, 0.8, Math.PI / 2, Math.PI];
   renderer.setSize(size * views.length, mode === 'head' ? size : size * 2);
   renderer.setScissorTest(true);
   views.forEach((angle, index) => {
-    const camera = new THREE.PerspectiveCamera(mode === 'head' ? 18 : 30, mode === 'head' ? 1 : 0.5, 0.05, 30);
-    const target = mode === 'head' ? head : new THREE.Vector3(0, pose.includes('fall') ? 0.25 : 0.9, 0);
-    const distance = mode === 'head' ? 1.0 : 4.2;
+    const camera = new THREE.PerspectiveCamera(mode === 'head' ? 18 : mode === 'torso' ? 22 : 30, mode === 'head' ? 1 : 0.5, 0.05, 30);
+    const target = mode === 'head' ? head : new THREE.Vector3(0, pose.includes('fall') ? 0.25 : mode === 'torso' ? 1.1 : 0.9, 0);
+    const distance = mode === 'head' ? 1.0 : mode === 'torso' ? 2.6 : 4.2;
     const lift = index === 3 && mode === 'head' ? 0.6 : 0.05;
     camera.position.set(target.x + Math.sin(angle) * distance, target.y + lift, target.z + Math.cos(angle) * distance);
     camera.lookAt(target);

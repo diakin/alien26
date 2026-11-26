@@ -1,0 +1,14 @@
+# Aliens26: начальные параметры вида doctor (mhbuild.py)
+version v1.2
+name doctor
+modifier macrodetails/Gender 1.000000
+modifier macrodetails/Age 0.620000
+modifier macrodetails/African 0.000000
+modifier macrodetails/Asian 0.000000
+modifier macrodetails/Caucasian 1.000000
+modifier macrodetails-universal/Muscle 0.350000
+modifier macrodetails-universal/Weight 0.120000
+modifier macrodetails-height/Height 0.500000
+modifier macrodetails-proportions/BodyProportions 0.500000
+skeleton game_engine.mhskel
+subdivide False

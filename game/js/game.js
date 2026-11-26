@@ -26,7 +26,7 @@
     civilian: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true },
     child: { size: 1, speed: 1.1, stride: 0.92, height: 1.2, pickWidth: 18, canKneel: true },
     // персонал базы при обороне: военнослужащие по контракту, модель гражданского с бронежилетом, каской и автоматом
-    staff: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true }
+    staff: { size: 1, speed: 1.4, stride: 1.32, height: 1.78, pickWidth: 24, canKneel: true }
   };
   // боец или машина отряда (не гражданский)
   function isFighter(unit) { return unit.side === 'squad' && unit.kind !== 'civilian' && unit.kind !== 'child'; }
@@ -657,11 +657,11 @@
       if (floorAt(col, row, below)) { grids[below][row * GRID + col] = 1; return; }
     }
   }
-  function castVision(unit, grids) {
-    var level = unit.level;
+  function castVision(unit, grids, cells, rays) {
+    var level = unit.level, count = rays || FOG_RAYS;
     for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) markSeen(grids, unit.col + deltaCol, unit.row + deltaRow, level);
-    for (var ray = 0; ray < FOG_RAYS; ray++) {
-      var angle = ray / FOG_RAYS * Math.PI * 2, range = VISION_CELLS;
+    for (var ray = 0; ray < count; ray++) {
+      var angle = ray / count * Math.PI * 2, range = cells || VISION_CELLS;
       var stepX = Math.cos(angle) * 0.3, stepY = Math.sin(angle) * 0.3;
       var x = unit.x, y = unit.y, col = Math.floor(x), row = Math.floor(y);
       for (var travelled = 0; travelled < range; travelled += 0.3) {
@@ -679,6 +679,41 @@
         markSeen(grids, col, row, level);
       }
     }
+  }
+  // ---- линии взгляда юнитов для ИИ и ответного огня ----
+  // Клетки, которые юнит может видеть на дальность оружия (те же лучи, что у тумана, без ограничения 24 клетками).
+  // Нужны как быстрый предварительный отсев перед точной трассировкой Combat.trace: если на том же уровне клетка
+  // юниту не видна (стены, закрытые двери), трассировку не делаем. Пересчёт — когда юнит сменил клетку или двери.
+  // С большим числом юнитов (персонал базы) без отсева ход пришельцев тормозил: тысячи трассировок на решение.
+  var LOS_CELLS = 0, losCache = new Map(), losDoors = { key: '', at: -1 };
+  function losDoorKey() {
+    var now = performance.now();
+    if (now - losDoors.at > 50) { losDoors.key = doors.map(function (door) { return door.open < 0.5 ? 0 : 1; }).join(''); losDoors.at = now; }
+    return losDoors.key;
+  }
+  function losGrids(unit) {
+    if (!MAP.wallW || !MAP.wallN) return null;
+    if (!LOS_CELLS) LOS_CELLS = Math.ceil(70 / combatWorld.tile) + 1;
+    var key = unit.col + ',' + unit.row + ',' + unit.level + ',' + losDoorKey();
+    var cached = losCache.get(unit);
+    if (cached && cached.key === key) return cached.grids;
+    var grids = newFogGrids();
+    castVision(unit, grids, LOS_CELLS, 720);
+    losCache.set(unit, { key: key, grids: grids });
+    return grids;
+  }
+  // может ли viewer видеть клетку (false — точно нет: тот же уровень и клетка закрыта; true — проверять трассировкой)
+  function mayHaveSight(viewer, col, row, level) {
+    if (viewer.level !== level) return true;
+    var grids = losGrids(viewer);
+    if (!grids) return true;
+    return !!grids[level][Math.floor(row) * GRID + Math.floor(col)];
+  }
+  function mayHaveSightOf(viewer, target) {
+    for (var deltaRow = 0; deltaRow < target.size; deltaRow++) for (var deltaCol = 0; deltaCol < target.size; deltaCol++) {
+      if (mayHaveSight(viewer, target.col + deltaCol, target.row + deltaRow, target.level)) return true;
+    }
+    return false;
   }
   function newFogGrids() { var grids = []; for (var level = 0; level < LEVELS; level++) grids.push(new Uint8Array(GRID * GRID)); return grids; }
   function computeFog() {
@@ -1900,10 +1935,14 @@
       if (!weapon) return;
       var modeIndex = 0;
       weapon.modes.forEach(function (mode, index) { if (mode.cost < weapon.modes[modeIndex].cost) modeIndex = index; });
+      // дешёвые проверки до трассировки: готовность, ОД на выстрел, дальность, линия взгляда по клеткам
+      var score = readiness(unit, unit.timeUnits);
+      if (score <= moverScore || weapon.modes[modeIndex].cost > unit.timeUnits) return;
+      if (Combat.distanceMeters(combatWorld, targetPointOf(unit), target.point) > weapon.range + 2) return;
+      if (!mayHaveSightOf(unit, mover)) return;
       var preview = shotPreview(unit, target, modeIndex);
       if (!preview.clear || preview.distance > weapon.range || preview.cost > unit.timeUnits) return;
-      var score = readiness(unit, unit.timeUnits);
-      if (score > moverScore) ready.push({ unit: unit, score: score, modeIndex: modeIndex });
+      ready.push({ unit: unit, score: score, modeIndex: modeIndex });
     });
     ready.sort(function (first, second) { return second.score - first.score; });
     var fired = false;
@@ -2092,6 +2131,7 @@
       if (alien.side !== 'aliens' || alien.dead || !isSeen(alien)) return false;
       return units.some(function (unit) {
         if (unit.side !== 'squad' || unit.dead) return false;
+        if (!mayHaveSightOf(unit, alien)) return false;
         var point = targetPointOf(unit), from = muzzleOf(alien, point);
         var distance = Combat.distanceMeters(combatWorld, from, point);
         if (distance > CONTACT_METERS) return false;
@@ -2124,6 +2164,7 @@
     var result = [];
     units.forEach(function (unit) {
       if (!isEnemyOf(alien, unit)) return;
+      if (!mayHaveSightOf(unit, alien)) return;                 // взгляд взаимный: цель не видит клетку стрелка — и он её
       var point = targetPointOf(unit), from = muzzleOf(alien, point);
       var distance = Combat.distanceMeters(combatWorld, from, point);
       if (distance > weapon.range) return;
@@ -2206,6 +2247,7 @@
     var ownWeapon = weaponOf(alien);
     units.forEach(function (unit) {
       if (!isEnemyOf(alien, unit)) return;
+      if (!mayHaveSight(unit, node.col, node.row, node.level)) return;
       var weapon = weaponOf(unit);
       var from = muzzleOf(unit, body);
       var distance = Combat.distanceMeters(combatWorld, from, body);
