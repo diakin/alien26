@@ -288,6 +288,18 @@ var Panel = (function () {
   function drawMinimap() {
     if (!mapBackground) return;
     minimapContext.drawImage(mapBackground, 0, 0);
+    // туман войны: картинка плотности (в координатах клеток) переводится в вид мини-карты
+    var fogLayer = Game.fogLayer ? Game.fogLayer() : null;
+    if (fogLayer) {
+      var zero = Iso.toScreen(0, 0), alongCol = Iso.toScreen(1, 0), alongRow = Iso.toScreen(0, 1);
+      minimapContext.save();
+      minimapContext.imageSmoothingEnabled = true;
+      minimapContext.setTransform((alongCol.x - zero.x) * mapScale, (alongCol.y - zero.y) * mapScale, (alongRow.x - zero.x) * mapScale, (alongRow.y - zero.y) * mapScale,
+        mapOffsetX + zero.x * mapScale, mapOffsetY + zero.y * mapScale);
+      var cells = fogLayer.width / Game.fogPixels;
+      minimapContext.drawImage(fogLayer, 0, 0, cells, cells);
+      minimapContext.restore();
+    }
     Game.obstacles.forEach(function (rock) {
       var point = mapPoint(rock.col + 0.5, rock.row + 0.5);
       minimapContext.fillStyle = '#8f938a';

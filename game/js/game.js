@@ -802,8 +802,12 @@
   // Неразведанная клетка закрыта столбом тумана: снизу — пол верхнего видимого уровня клетки, сверху — самое
   // высокое в ней (стены её граней W/N, предметы по рамкам MAP.solids, у среза — срезанные стены), не ниже 0,35 м.
   // Столбы встают в общий порядок отрисовки после всех частей своей клетки: ближние разведанные предметы и юниты
-  // рисуются поверх, дальние закрываются. Заливка — бесшовная текстура тумана, привязанная к карте; на гранях,
-  // где сосед разведан, — светлая кромка, поэтому граница тумана идёт по клеткам и читается чётко.
+  // рисуются поверх, дальние закрываются.
+  // Плотность тумана — картинка в координатах клеток (FOG_PX пикселей на клетку, fogLayer): цвет — бесшовные клубы,
+  // прозрачность растёт от 0 на границе с разведанными клетками до полной на расстоянии FOG_BAND клеток (по
+  // карте расстояний). Верх столба — кусок этой картинки под своей клеткой, переведённый в вид преобразованием
+  // клетки -> экран; видимые боковые грани — полоска картинки у грани, растянутая по высоте. Та же картинка
+  // накладывается на мини-карту.
   var FOG_FLOOR_TOP = 0.35;
   var fogColumns = {};
   function fogColumnTops(viewLevel, cut) {
@@ -832,39 +836,82 @@
     return fogColumns[key];
   }
   function cellExplored(col, row, level) { return !fog.explored || !!fog.explored[level][row * GRID + col]; }
-  var fogPatternCanvas = null;
-  function fogPattern() {
-    if (!fogPatternCanvas) {
-      // бесшовный шум из нескольких октав: тёмные клубы с более светлыми прядями
-      var size = 256, canvasFog = document.createElement('canvas');
-      canvasFog.width = canvasFog.height = size;
-      var fogContext = canvasFog.getContext('2d'), image = fogContext.createImageData(size, size);
-      var lattice = function (period, seed) {
-        var values = new Float32Array(period * period);
-        for (var index = 0; index < values.length; index++) values[index] = fountainHash(seed + index * 1.7);
-        return function (x, y) {
-          var gx = x * period, gy = y * period, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
-          var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-          var at = function (ix, iy) { return values[((iy % period + period) % period) * period + ((ix % period + period) % period)]; };
-          return (at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy;
-        };
+  var FOG_PX = 6, FOG_BAND = 1.6;
+  var fogCloud = null, fogLayerCache = { key: '', canvas: null };
+  function fogCloudColors() {
+    if (fogCloud) return fogCloud;
+    // бесшовные клубы в координатах клеток: периоды 16, 8, 4 и 2 клетки
+    var size = GRID * FOG_PX, colors = new Uint8ClampedArray(size * size * 3);
+    var lattice = function (cells, seed) {
+      var period = Math.max(1, Math.round(GRID / cells)), values = new Float32Array(period * period);
+      for (var index = 0; index < values.length; index++) values[index] = fountainHash(seed + index * 1.7);
+      return function (x, y) {
+        var gx = x * period, gy = y * period, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+        var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+        var at = function (ix, iy) { return values[((iy % period + period) % period) * period + ((ix % period + period) % period)]; };
+        return (at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy;
       };
-      var octaves = [[lattice(4, 11), 0.5], [lattice(8, 23), 0.27], [lattice(16, 37), 0.15], [lattice(32, 51), 0.08]];
-      for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) {
-        var value = 0;
-        for (var octave = 0; octave < octaves.length; octave++) value += octaves[octave][0](x / size, y / size) * octaves[octave][1];
-        var wisp = Math.max(0, value - 0.5) * 2;
-        var offset = (y * size + x) * 4;
-        image.data[offset] = 10 + wisp * 46; image.data[offset + 1] = 13 + wisp * 50; image.data[offset + 2] = 18 + wisp * 56;
-        image.data[offset + 3] = 255;          // непрозрачно: столбы соседних клеток перекрываются без полос
-      }
-      fogContext.putImageData(image, 0, 0);
-      fogPatternCanvas = canvasFog;
+    };
+    var octaves = [[lattice(16, 11), 0.5], [lattice(8, 23), 0.27], [lattice(4, 37), 0.15], [lattice(2, 51), 0.08]];
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) {
+      var value = 0;
+      for (var octave = 0; octave < octaves.length; octave++) value += octaves[octave][0](x / size, y / size) * octaves[octave][1];
+      var wisp = Math.max(0, value - 0.48) * 2.2, offset = (y * size + x) * 3;
+      colors[offset] = 12 + wisp * 52; colors[offset + 1] = 15 + wisp * 56; colors[offset + 2] = 21 + wisp * 62;
     }
-    if (!fogPatterns.has(context)) fogPatterns.set(context, context.createPattern(fogPatternCanvas, 'repeat'));
-    return fogPatterns.get(context);
+    fogCloud = colors;
+    return colors;
   }
-  var fogPatterns = new WeakMap();
+  // картинка плотности тумана для уровня обзора: расстояние до ближайшей разведанной клетки (фаска 3-4 в пикселях)
+  function fogLayer(viewLevel, cut) {
+    if (!fogEnabled() || !fog.explored) return null;
+    var key = fog.version + ':' + viewLevel + (cut ? 'c' : 'f');
+    if (fogLayerCache.key === key) return fogLayerCache.canvas;
+    var size = GRID * FOG_PX, columns = fogColumnTops(viewLevel, cut), far = 1e9;
+    var distance = new Float32Array(size * size);
+    for (var y = 0; y < size; y++) {
+      var row = Math.floor(y / FOG_PX);
+      for (var x = 0; x < size; x++) {
+        var col = Math.floor(x / FOG_PX), cell = row * GRID + col;
+        distance[y * size + x] = cellExplored(col, row, columns.floors[cell]) ? 0 : far;
+      }
+    }
+    var straight = 1, diagonal = 1.414;
+    for (y = 0; y < size; y++) for (x = 0; x < size; x++) {
+      var index = y * size + x, best = distance[index];
+      if (!best) continue;
+      if (x > 0) best = Math.min(best, distance[index - 1] + straight);
+      if (y > 0) {
+        best = Math.min(best, distance[index - size] + straight);
+        if (x > 0) best = Math.min(best, distance[index - size - 1] + diagonal);
+        if (x < size - 1) best = Math.min(best, distance[index - size + 1] + diagonal);
+      }
+      distance[index] = best;
+    }
+    for (y = size - 1; y >= 0; y--) for (x = size - 1; x >= 0; x--) {
+      index = y * size + x; best = distance[index];
+      if (!best) continue;
+      if (x < size - 1) best = Math.min(best, distance[index + 1] + straight);
+      if (y < size - 1) {
+        best = Math.min(best, distance[index + size] + straight);
+        if (x < size - 1) best = Math.min(best, distance[index + size + 1] + diagonal);
+        if (x > 0) best = Math.min(best, distance[index + size - 1] + diagonal);
+      }
+      distance[index] = best;
+    }
+    var canvasLayer = fogLayerCache.canvas || document.createElement('canvas');
+    canvasLayer.width = canvasLayer.height = size;
+    var layerContext = canvasLayer.getContext('2d'), image = layerContext.createImageData(size, size), colors = fogCloudColors();
+    var band = FOG_BAND * FOG_PX;
+    for (index = 0; index < size * size; index++) {
+      var ramp = Math.min(1, distance[index] / band), alpha = ramp * ramp * (3 - 2 * ramp);
+      image.data[index * 4] = colors[index * 3]; image.data[index * 4 + 1] = colors[index * 3 + 1]; image.data[index * 4 + 2] = colors[index * 3 + 2];
+      image.data[index * 4 + 3] = Math.round(alpha * 255);
+    }
+    layerContext.putImageData(image, 0, 0);
+    fogLayerCache = { key: key, canvas: canvasLayer };
+    return canvasLayer;
+  }
   var fogItemCache = { key: '', items: [] };
   function fogItems(current) {
     if (!fogEnabled() || !fog.explored) return [];
@@ -872,54 +919,53 @@
     if (fogItemCache.key === key) return fogItemCache.items;
     var fogStart = performance.now();
     var columns = fogColumnTops(view.level, view.cut), items = [];
+    var hidden = function (col, row, top) {
+      if (!inside(col, row)) return false;
+      var cell = row * GRID + col;
+      return !cellExplored(col, row, columns.floors[cell]) && columns.tops[cell] >= top;
+    };
     for (var cell = 0; cell < GRID * GRID; cell++) {
       var col = cell % GRID, row = Math.floor(cell / GRID), floor = columns.floors[cell];
       if (cellExplored(col, row, floor)) continue;
-      (function (col, row, base, top) {
-        var low = Iso.tileCorners(col, row, base), high = Iso.tileCorners(col, row, top);
-        // соседи по сторонам вида: 0-1 — дальняя правая грань, 1-2 — ближняя правая, 2-3 — ближняя левая, 3-0 — дальняя левая
-        var rims = [];
-        [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]].forEach(function (side) {
-          var cellView = Iso.cellToView ? Iso.cellToView(col, row) : { col: col, row: row };
-          var neighbor = Iso.cellFromView ? Iso.cellFromView(cellView.col + side[0], cellView.row + side[1]) : { col: col + side[0], row: row + side[1] };
-          if (!inside(neighbor.col, neighbor.row)) return;
-          var neighborFloor = columns.floors[neighbor.row * GRID + neighbor.col];
-          if (cellExplored(neighbor.col, neighbor.row, neighborFloor)) rims.push([side[2], side[3]]);
-        });
-        items.push({ depth: depthKey(col, row, view.level, 9), rect: quadRect(low.concat(high), 3), draw: function () { drawFogColumn(low, high, rims); } });
-      })(col, row, columns.bases[cell], columns.tops[cell]);
+      var base = columns.bases[cell], top = columns.tops[cell];
+      // ближние грани (к большим row и col): не рисуются, если их целиком закрывает соседний столб тумана
+      var column = { col: col, row: row, base: base, top: top, south: !hidden(col, row + 1, top), east: !hidden(col + 1, row, top) };
+      var corners = Iso.tileCorners(col, row, base).concat(Iso.tileCorners(col, row, top));
+      items.push({ depth: depthKey(col, row, view.level, 9), rect: quadRect(corners, 3), column: column, draw: drawFogItem });
     }
     fogItemCache = { key: key, items: items };
     tileStats.fogMs += performance.now() - fogStart;
     return items;
   }
-  function drawFogColumn(low, high, rims) {
-    var offsetX = Math.round(camera.x), offsetY = Math.round(camera.y);
-    var pattern = fogPattern();
-    if (pattern.setTransform && window.DOMMatrix) pattern.setTransform(new DOMMatrix([1, 0, 0, 1, -offsetX, -offsetY]));
+  function drawFogItem() { drawFogColumn(this.column); }
+  function drawFogColumn(column) {
+    var layer = fogLayer(view.level, view.cut);
+    if (!layer) return;
+    var zero = Iso.toScreen(0, 0, 0), alongCol = Iso.toScreen(1, 0, 0), alongRow = Iso.toScreen(0, 1, 0);
+    var colX = alongCol.x - zero.x, colY = alongCol.y - zero.y, rowX = alongRow.x - zero.x, rowY = alongRow.y - zero.y;
+    var rise = (column.top - column.base) * Iso.pixelsPerMeterUp, camX = Math.round(camera.x), camY = Math.round(camera.y);
+    var col = column.col, row = column.row, pixels = FOG_PX;
     context.save();
-    context.fillStyle = pattern;
-    context.beginPath();
-    var outline = [high[0], high[1], low[1], low[2], low[3], high[3]];
-    // на пиксель шире: без щелей сглаживания между соседними столбами
-    var centerX = (high[0].x + low[2].x) / 2, centerY = (high[0].y + low[2].y) / 2;
-    outline.forEach(function (point, index) {
-      var dx = point.x - centerX, dy = point.y - centerY, length = Math.hypot(dx, dy) || 1;
-      var x = point.x + dx / length * 0.8 - offsetX, y = point.y + dy / length * 0.8 - offsetY;
-      if (index) context.lineTo(x, y); else context.moveTo(x, y);
-    });
-    context.closePath();
-    context.fill();
-    // перегородка между столбами одного тумана не нужна; кромка — только к разведанным соседям
-    if (rims.length) {
-      context.strokeStyle = 'rgba(150, 162, 176, 0.32)';
-      context.lineWidth = 2;
-      context.beginPath();
-      rims.forEach(function (rim) {
-        context.moveTo(high[rim[0]].x - offsetX, high[rim[0]].y - offsetY);
-        context.lineTo(high[rim[1]].x - offsetX, high[rim[1]].y - offsetY);
-      });
-      context.stroke();
+    context.imageSmoothingEnabled = true;
+    var topOrigin = Iso.toScreen(0, 0, column.top);
+    // верх: кусок картинки под клеткой, клетки -> экран на высоте верха
+    context.save();
+    context.transform(colX, colY, rowX, rowY, topOrigin.x - camX, topOrigin.y - camY);
+    context.drawImage(layer, col * pixels, row * pixels, pixels, pixels, col, row, 1, 1);
+    context.restore();
+    if (column.south && rise > 0.5) {
+      var south = Iso.toScreen(0, row + 1, column.top);
+      context.save();
+      context.transform(colX, colY, 0, rise, south.x - camX, south.y - camY);
+      context.drawImage(layer, col * pixels, (row + 1) * pixels - 1, pixels, 1, col, 0, 1, 1);
+      context.restore();
+    }
+    if (column.east && rise > 0.5) {
+      var east = Iso.toScreen(col + 1, 0, column.top);
+      context.save();
+      context.transform(0, rise, rowX, rowY, east.x - camX, east.y - camY);
+      context.drawImage(layer, (col + 1) * pixels - 1, row * pixels, 1, pixels, 0, row, 1, 1);
+      context.restore();
     }
     context.restore();
   }
@@ -4548,6 +4594,8 @@
     inventoryCost: function (unit, itemId, toSlot) { var found = findItem(unit, itemId); return found ? Items.moveCost(found.entry.slot, toSlot) : null; },
     inventoryMove: function (unit, itemId, toSlot, x, y) { return moveItem(unit, itemId, toSlot, x, y); },
     viewSize: function () { return { width: viewWidth, height: viewHeight }; },
+    // туман для мини-карты: картинка плотности в координатах клеток (FOG_PX пикселей на клетку) или null
+    fogLayer: function () { return fogLayer(view.level, view.cut); }, fogPixels: FOG_PX,
     // замер отрисовки: средняя длительность кадра и число нарисованных кусков (для проверки карты из тайлов)
     benchmark: function (frames) {
       var started = performance.now();
@@ -4689,7 +4737,7 @@
       if (values.render3d !== false) startMap3D();
       updateRotateBar();
     }
-    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; chunks.clear(); fogItemCache.key = ''; }
+    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; chunks.clear(); fogItemCache.key = ''; fogLayerCache.key = ''; }
   });
   resize();
   setView(selected.level, false);
