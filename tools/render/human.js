@@ -228,6 +228,120 @@ function boxUV(geometry, density = 2.4) {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 // сгладить слой одежды (Таубин: без усадки) — у ткани нет рельефа мышц; кромка остаётся на месте
+// ровное освещение ткани: нормали усредняются по соседям (вершины склеены по положению) — рельеф тела под тканью не виден
+function blurNormals(geometry, passes, skipArms = false) {
+  const position = geometry.attributes.position, normal = geometry.attributes.normal, index = geometry.index.array;
+  const keyOf = (vertex) => `${Math.round(position.getX(vertex) * 1e4)},${Math.round(position.getY(vertex) * 1e4)},${Math.round(position.getZ(vertex) * 1e4)}`;
+  const weld = new Map(), welded = new Int32Array(position.count);
+  for (let vertex = 0; vertex < position.count; vertex++) { const key = keyOf(vertex); if (!weld.has(key)) weld.set(key, weld.size); welded[vertex] = weld.get(key); }
+  const neighbours = Array.from({ length: weld.size }, () => new Set());
+  for (let triangle = 0; triangle < index.length; triangle += 3) for (let corner = 0; corner < 3; corner++) {
+    const a = welded[index[triangle + corner]], b = welded[index[triangle + (corner + 1) % 3]];
+    neighbours[a].add(b); neighbours[b].add(a);
+  }
+  let values = new Float32Array(weld.size * 3);
+  for (let vertex = 0; vertex < position.count; vertex++) { const at = welded[vertex] * 3; values[at] += normal.getX(vertex); values[at + 1] += normal.getY(vertex); values[at + 2] += normal.getZ(vertex); }
+  for (let pass = 0; pass < passes; pass++) {
+    const next = new Float32Array(values);
+    for (let vertex = 0; vertex < weld.size; vertex++) for (const other of neighbours[vertex]) for (let axis = 0; axis < 3; axis++) next[vertex * 3 + axis] += values[other * 3 + axis];
+    for (let vertex = 0; vertex < weld.size; vertex++) { const length = Math.hypot(next[vertex * 3], next[vertex * 3 + 1], next[vertex * 3 + 2]) || 1; for (let axis = 0; axis < 3; axis++) next[vertex * 3 + axis] /= length; }
+    values = next;
+  }
+  // рукава со складками — свои нормали (складки видны), плавный переход по весу рук
+  const skinIndex = geometry.attributes.skinIndex, skinWeight = geometry.attributes.skinWeight;
+  for (let vertex = 0; vertex < position.count; vertex++) {
+    let arm = 0;
+    if (skipArms && skinIndex) for (let slot = 0; slot < 4; slot++) {
+      const name = BONES[skinIndex.getComponent(vertex, slot)].name;
+      if (UPPER_ARM.has(name) || LOWER_ARM.has(name) || HAND.has(name)) arm += skinWeight.getComponent(vertex, slot);
+    }
+    const keep = smooth(0.3, 0.7, arm), at = welded[vertex] * 3;
+    const x = values[at] * (1 - keep) + normal.getX(vertex) * keep, y = values[at + 1] * (1 - keep) + normal.getY(vertex) * keep, z = values[at + 2] * (1 - keep) + normal.getZ(vertex) * keep;
+    const length = Math.hypot(x, y, z) || 1;
+    normal.setXYZ(vertex, x / length, y / length, z / length);
+  }
+  normal.needsUpdate = true;
+}
+
+// ниже груди нормали ткани — горизонтально от оси корпуса: висящая ткань освещена ровно по высоте,
+// у верха халата и у пол на стыке одинаковые нормали — без полосы на поясе
+function hangingNormals(geometry, kind) {
+  const shape = bagFrame(kind), frame = restOf(kind).frame, position = geometry.attributes.position, normal = geometry.attributes.normal;
+  for (let vertex = 0; vertex < position.count; vertex++) {
+    const x = position.getX(vertex), y = position.getY(vertex), z = position.getZ(vertex);
+    const amount = smooth(shape.chestY - 0.02, shape.chestY - 0.16, y) * (1 - smooth(frame.waist + 0.3, frame.waist + 0.4, y));
+    if (amount <= 0) continue;
+    const dx = x, dz = z - shape.chestZ, length = Math.hypot(dx, dz);
+    if (length < 0.05) continue;
+    const radial = V(dx / length, 0, dz / length), current = V(normal.getX(vertex), normal.getY(vertex), normal.getZ(vertex));
+    // рукава — как есть (плавно по весу рук), на корпусе — к горизонтали, сильнее где нормаль уже наружу
+    let arm = 0;
+    const skinIndex = geometry.attributes.skinIndex, skinWeight = geometry.attributes.skinWeight;
+    if (skinIndex) for (let slot = 0; slot < 4; slot++) {
+      const name = BONES[skinIndex.getComponent(vertex, slot)].name;
+      if (UPPER_ARM.has(name) || LOWER_ARM.has(name) || HAND.has(name)) arm += skinWeight.getComponent(vertex, slot);
+    }
+    const weight = amount * (1 - smooth(0.15, 0.5, arm)) * smooth(-0.2, 0.4, current.dot(radial));
+    if (weight <= 0) continue;
+    current.lerp(radial, weight).normalize();
+    normal.setXYZ(vertex, current.x, current.y, current.z);
+  }
+  normal.needsUpdate = true;
+}
+
+// спина халата: рельефа тела нет — нормаль считается от оси трапециевидного силуэта (горизонтально наружу,
+// чуть вверх по расширению книзу), поверх — продольные складки (только освещение, без сдвига вершин).
+// Складки — узкие гребни с плоскими промежутками, от лопаток до подола, полосами разной длины, книзу расходятся веером.
+function backFoldNormals(geometry, kind, options) {
+  const shape = trapezoidFrame(kind), frame = restOf(kind).frame;
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  const skinIndex = geometry.attributes.skinIndex, skinWeight = geometry.attributes.skinWeight;
+  const count = options.count ?? 11, depth = options.depth ?? 0.009, flare = options.flare ?? 0.065;
+  const top = frame.shoulderY - 0.03, hem = restOf(kind).joints.calf_l[0].y - 0.1;
+  const ridge = (phase) => (0.5 + 0.5 * Math.cos(phase * Math.PI * 2)) ** 2.5;
+  // высота складки в точке (угол вокруг оси, высота)
+  const height = (angle, y) => {
+    const turn = angle / (Math.PI * 2);
+    const warp = (noise3(turn * 4 + 2.3, 0.7, 4.1) - 0.5) * 1.2;
+    const wobble = (noise3(turn * 6, y * 3, 8.2) - 0.5) * 0.35;
+    const phase = turn * count + warp + wobble;
+    // полоса: складка начинается и гаснет на разной высоте
+    const streak = smooth(0.38, 0.6, noise3(Math.round(phase) * 5.3 + 11, y * 1.8, 2.9));
+    // от лопаток вниз нарастает, у подола чуть слабее
+    const along = smooth(shape.armpitY + 0.06, shape.armpitY - 0.08, y) * (1 - 0.3 * smooth(hem + 0.25, hem, y));
+    return depth * ridge(phase) * streak * along;
+  };
+  const step = 0.004;
+  for (let vertex = 0; vertex < position.count; vertex++) {
+    const x = position.getX(vertex), y = position.getY(vertex), z = position.getZ(vertex);
+    if (y > top) continue;
+    const dx = x, dz = z - shape.centerZ, radius = Math.hypot(dx, dz);
+    if (radius < 0.04) continue;
+    const angle = Math.atan2(dx, dz);
+    // спина и бока сзади; перед не трогаем
+    const back = smooth(0.25, -0.3, Math.cos(angle));
+    let arm = 0;
+    if (skinIndex) for (let slot = 0; slot < 4; slot++) {
+      const name = BONES[skinIndex.getComponent(vertex, slot)].name;
+      if (UPPER_ARM.has(name) || LOWER_ARM.has(name) || HAND.has(name)) arm += skinWeight.getComponent(vertex, slot);
+    }
+    // к плечам нормаль плавно возвращается к своей (наклон плеч), на рукавах — своя
+    const weight = back * (1 - smooth(0.15, 0.45, arm)) * smooth(top, top - 0.08, y);
+    if (weight <= 0) continue;
+    const tilt = flare + 0.9 * smooth(shape.armpitY - 0.02, top, y);
+    const flat = V(dx / radius, tilt, dz / radius).normalize();
+    // наклон гребня: производные высоты по дуге и по вертикали
+    const arc = step / radius;
+    const slopeAround = (height(angle + arc, y) - height(angle - arc, y)) / (2 * step);
+    const slopeDown = (height(angle, y + step) - height(angle, y - step)) / (2 * step);
+    const tangent = V(Math.cos(angle), 0, -Math.sin(angle));
+    flat.addScaledVector(tangent, -slopeAround).addScaledVector(V(0, 1, 0), -slopeDown).normalize();
+    const current = V(normal.getX(vertex), normal.getY(vertex), normal.getZ(vertex)).lerp(flat, weight).normalize();
+    normal.setXYZ(vertex, current.x, current.y, current.z);
+  }
+  normal.needsUpdate = true;
+}
+
 function relax(geometry, iterations = 6) {
   const position = geometry.attributes.position, index = geometry.index.array;
   const keyOf = (vertex) => `${Math.round(position.getX(vertex) * 1e4)},${Math.round(position.getY(vertex) * 1e4)},${Math.round(position.getZ(vertex) * 1e4)}`;
@@ -331,6 +445,8 @@ export const REGIONS = {
   // рубашка, китель, куртка: корпус и рукава до запястья, низ — до верха бёдер
   top: (frame) => (source, point) => boneWeight(source, HEAD) < 0.05 && boneWeight(source, FOOT) === 0 && neckCut(frame, point) && beforeWrist(frame, point, 0.015, source)
     && point.y > frame.waist - 0.11,
+  // верх без рукавов (под халатом: рукава халата со складками не должны пропускать рукав нижней одежды)
+  sleeveless: (frame) => (source, point) => REGIONS.top(frame)(source, point) && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) < 0.3,
   // короткий рукав: до середины плеча
   shortTop: (frame) => (source, point) => REGIONS.top(frame)(source, point) && shortSleeve(frame, point),
   // брюки: от пояса до щиколоток
@@ -548,7 +664,7 @@ function bagDisplace(kind, point, source, bag) {
     const near = shape.arms[point.x > 0 ? 'l' : 'r'](point);
     const radial = point.clone().sub(near.axis), radius = radial.length() || 1e-4;
     radial.divideScalar(radius);
-    let push = Math.max(0, shape.armRadius * (1.12 - 0.38 * near.t) - radius) * bag.arms * Math.min(1, armWeight);
+    let push = Math.max(0, shape.armRadius * (1.12 - 0.38 * near.t) + (bag.armsExtra || 0) * smooth(0.12, 0.38, near.t) * (1 - 0.4 * near.t) - radius) * bag.arms * Math.min(1, armWeight);
     // манжета собрана у запястья
     push *= 1 - 0.75 * smooth(0.82, 0.97, near.t);
     // к корпусу (подмышка) — меньше
@@ -585,6 +701,7 @@ function foldDisplace(kind, point, legWeight, armWeight, folds) {
   const amount = folds.amount ?? 1, scale = folds.scale ?? 1;
   const jitter = noise3(point.x * 9 + 3.1, point.y * 9, point.z * 9) * 2 - 1;
   let total = 0;
+  if (folds.armsOnly && armWeight <= 0.3) return 0;
   if (legWeight > 0.3 && point.y < shape.hipY + 0.03) {
     const side = point.x > 0 ? 1 : -1;
     const near = shape.legs[side > 0 ? 'l' : 'r'](point);
@@ -603,6 +720,33 @@ function foldDisplace(kind, point, legWeight, armWeight, folds) {
     // от промежности по внутренней стороне бедра — косые
     const inner = Math.max(0, -Math.sin(angle));
     total += 0.004 * gauss(near.t - 0.12, 0.07) * inner * crease((along * 0.8 - Math.abs(point.x) * 0.9) / (0.04 * scale) + jitter);
+  } else if (armWeight > 0.3 && folds.sleeve) {
+    // складки рукава — узкие гребни ткани (не бугры): профиль гребня острый, впадины между ними плоские.
+    // Продольные: 5 по окружности, тянутся вдоль рукава полосами разной длины, слегка извиваются;
+    // на сгибе локтя — косые с внутренней стороны; на предплечье закручиваются к манжете; у манжеты — сборка.
+    const side = point.x > 0 ? 1 : -1;
+    const near = shape.arms[side > 0 ? 'l' : 'r'](point);
+    const radial = point.clone().sub(near.axis);
+    const angle = Math.atan2(radial.x * side, radial.z), turn = angle / (Math.PI * 2) + 0.5;
+    const tt = near.t, front = (1 + Math.cos(angle)) / 2, body = Math.max(0, -Math.sin(angle));
+    const ridge = (phase, sharp = 6) => (0.5 + 0.5 * Math.cos(phase * Math.PI * 2)) ** sharp;
+    // полоса: складка есть не по всей длине — включается и гаснет по шуму вдоль рукава
+    const streak = (phase, along, seed) => smooth(0.42, 0.62, noise3(Math.round(phase) * 3.7 + seed, along * 2.4, side * 5));
+    const wobble = (noise3(turn * 4, tt * 3, side) - 0.5) * 0.5;
+    const upper = smooth(0.05, 0.15, tt) * (1 - smooth(0.4, 0.48, tt));
+    // неравный шаг складок по окружности
+    const warp = (noise3(turn * 3 + side, 0.3, 1.7) - 0.5) * 1.6;
+    const longPhase = turn * 5 + warp + wobble;
+    total += 0.015 * upper * ridge(longPhase, 2.5) * streak(longPhase, tt, 1);
+    const forearm = smooth(0.56, 0.64, tt) * (1 - smooth(0.82, 0.88, tt));
+    const twistPhase = turn * 4 + warp * 0.8 - tt * 2.2 + wobble;
+    total += 0.013 * forearm * ridge(twistPhase, 2.5) * streak(twistPhase, tt, 7);
+    const elbowPhase = (tt - 0.5) / 0.045 + turn * 2.2;
+    total += 0.012 * gauss(tt - 0.5, 0.06) * (0.2 + 0.8 * Math.max(front, body)) * ridge(elbowPhase, 3);
+    total += 0.006 * smooth(0.86, 0.94, tt) * ridge(tt / 0.02 + turn * 0.6 + wobble, 2);
+    return total * amount;
+  } else if (folds.armsOnly) {
+    total = 0;
   } else if (armWeight > 0.3) {
     const side = point.x > 0 ? 1 : -1;
     const near = shape.arms[side > 0 ? 'l' : 'r'](point);
@@ -686,7 +830,8 @@ function subdivide(geometry) {
 
 // складки на слое: поделить сетку, сместить по нормали (точка покоя и доли ног/рук — из атрибутов)
 function addFolds(geometry, kind, folds) {
-  const refined = subdivide(geometry);
+  // узкие складки рукава — сетка делится дважды (шаг около 6 мм)
+  const refined = folds.sleeve ? subdivide(subdivide(geometry)) : subdivide(geometry);
   refined.computeVertexNormals();
   smoothNormals(refined);
   const position = refined.attributes.position, normal = refined.attributes.normal, rest = refined.attributes.rest, limb = refined.attributes.limb;
@@ -714,6 +859,90 @@ function tagRest(geometry, part, rest) {
   }
   geometry.setAttribute('rest', new THREE.BufferAttribute(points, 3));
   geometry.setAttribute('limb', new THREE.BufferAttribute(limbs, 3));
+}
+
+// ---------------- трапециевидный силуэт (халат) ----------------
+// Ниже подмышек ткань не уже, чем выше: на высоте y радиус по каждому направлению — наибольший радиус тела
+// от подмышек до y плюс запас и расширение книзу. Силуэт расширяется от плеч непрерывно до подола, у талии не сужается.
+const SHELL_COLUMNS = 72;
+const shellCache = new Map();
+// выпуклая оболочка среза тела на высоте y (полоса ±band); withArms — с плечами (для кокетки)
+function bodySlice(kind, y, band, withArms) {
+  const rest = restOf(kind), points = [];
+  for (const source of PARTS.tights.source) {
+    if (boneWeight(source, HEAD) > 0) continue;
+    const arm = boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND);
+    if (arm > (withArms ? 0.99 : 0.2) || boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) > 0.2) continue;
+    const point = rest.point(source);
+    if (Math.abs(point.y - y) < band) points.push([point.x, point.z]);
+  }
+  if (points.length < 6) return null;
+  points.sort((first, second) => first[0] - second[0] || first[1] - second[1]);
+  const cross = (origin, first, second) => (first[0] - origin[0]) * (second[1] - origin[1]) - (first[1] - origin[1]) * (second[0] - origin[0]);
+  const lower = [], upper = [];
+  for (const point of points) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop(); lower.push(point); }
+  for (let index = points.length - 1; index >= 0; index--) { const point = points[index]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop(); upper.push(point); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+// радиусы многоугольника по направлениям вокруг (0, centerZ): 0 — вперёд (+z), π/2 — влево (+x)
+function hullRadii(hull, centerZ) {
+  const radii = new Float32Array(SHELL_COLUMNS);
+  for (let column = 0; column < SHELL_COLUMNS; column++) {
+    const angle = column / SHELL_COLUMNS * Math.PI * 2, directionX = Math.sin(angle), directionZ = Math.cos(angle);
+    let best = 0;
+    for (let edge = 0; edge < hull.length; edge++) {
+      const [ax, az] = hull[edge], [bx, bz] = hull[(edge + 1) % hull.length];
+      const ex = bx - ax, ez = bz - az, ox = ax, oz = az - centerZ, denominator = directionX * ez - directionZ * ex;
+      if (Math.abs(denominator) < 1e-9) continue;
+      const distance = (ox * ez - oz * ex) / denominator, along = (ox * directionZ - oz * directionX) / denominator;
+      if (distance > 0 && along >= -1e-6 && along <= 1 + 1e-6) best = Math.max(best, distance);
+    }
+    radii[column] = best;
+  }
+  return radii;
+}
+const trapezoidCache = new Map();
+function trapezoidFrame(kind) {
+  if (trapezoidCache.has(kind)) return trapezoidCache.get(kind);
+  const rest = restOf(kind), frame = rest.frame, joints = rest.joints;
+  const armpitY = frame.shoulderY - 0.11, hipY = joints.thigh_l[0].y, lowest = joints.calf_l[0].y - 0.1;
+  const chest = bodySlice(kind, frame.shoulderY - 0.14, 0.03, false);
+  const centerZ = chest.reduce((sum, point) => sum + point[1], 0) / chest.length;
+  const STEP = 0.02, rows = [];
+  let running = new Float32Array(SHELL_COLUMNS);
+  for (let y = armpitY; y >= lowest - 1e-6; y -= STEP) {
+    if (y >= hipY - 0.12) {
+      const hull = bodySlice(kind, y, 0.03, false);
+      if (hull) { const radii = hullRadii(hull, centerZ); running = running.map((value, column) => Math.max(value, radii[column])); }
+    }
+    // по кругу — сглаживание без уменьшения
+    let smoothed = running;
+    for (let pass = 0; pass < 3; pass++) smoothed = smoothed.map((value, column) => (smoothed[(column + SHELL_COLUMNS - 1) % SHELL_COLUMNS] + value * 2 + smoothed[(column + 1) % SHELL_COLUMNS]) / 4);
+    rows.push({ y, radii: smoothed.map((value, column) => Math.max(value, running[column])) });
+  }
+  const at = (x, y, z, ease, flare) => {
+    const dx = x, dz = z - centerZ;
+    const angle = (Math.atan2(dx, dz) + Math.PI * 2) % (Math.PI * 2);
+    const position = angle / (Math.PI * 2) * SHELL_COLUMNS, column = Math.floor(position) % SHELL_COLUMNS, mix = position - Math.floor(position);
+    const index = Math.min(rows.length - 1, Math.max(0, Math.round((armpitY - y) / STEP)));
+    const radii = rows[index].radii;
+    const radius = radii[column] * (1 - mix) + radii[(column + 1) % SHELL_COLUMNS] * mix;
+    return { target: radius + ease + flare * Math.max(0, armpitY - y), radius: Math.hypot(dx, dz), dx, dz };
+  };
+  const result = { centerZ, armpitY, at };
+  trapezoidCache.set(kind, result);
+  return result;
+}
+// сдвинуть точку ткани наружу до трапециевидного силуэта (в покое); у подмышек — плавно к одежде по телу
+function trapezoidPush(kind, point, source, options) {
+  const shape = trapezoidFrame(kind);
+  if (source !== null && boneWeight(source, UPPER_ARM) + boneWeight(source, LOWER_ARM) + boneWeight(source, HAND) > 0.35) return point;
+  const amount = smooth(shape.armpitY + 0.03, shape.armpitY - 0.05, point.y);
+  if (amount <= 0) return point;
+  const { target, radius, dx, dz } = shape.at(point.x, point.y, point.z, options.ease ?? 0.02, options.flare ?? 0.06);
+  if (radius < 1e-4 || radius >= target) return point;
+  const scale = (radius + (target - radius) * amount) / radius;
+  return V(dx * scale, point.y, shape.centerZ + dz * scale);
 }
 
 // ---------------- воротник и лацканы ----------------
@@ -881,13 +1110,23 @@ export function buildHumanBody(options, pose) {
         const point = rest.point(source);
         if (Math.abs(point.x) < 0.035 && point.z > 0) return 0;
       }
+      // застёгнутый халат: подол ровно по высоте и шлица спереди внизу — доля линейна по координате,
+      // изолиния 0,5 проходит точно по линии кроя (сетка пол крупная)
+      if (garment.part === 'skirt' && garment.slit) {
+        const point = rest.point(source), clamp = (value) => Math.min(1, Math.max(0, value));
+        const hem = 0.5 + (point.y - (frame0.joints.calf_l[0].y + 0.02)) * 7;
+        const slit = point.z > 0 ? Math.max(0.5 + (Math.abs(point.x) - (garment.slitWidth ?? 0.006)) * 12, 0.5 + (point.y - garment.slit) * 7)
+          // шлица сзади до середины пол
+          : garment.vent ? Math.max(0.5 + (Math.abs(point.x) - 0.005) * 12, 0.5 + (point.y - garment.vent) * 7) : 1;
+        return clamp(Math.min(hem, slit));
+      }
       // полы до колена (халат): ниже колена отрезаны
       if (garment.part === 'skirt' && garment.toKnee && rest.point(source).y < frame0.joints.calf_l[0].y + 0.02) return 0;
       const inside = region(source, rest.point(source));
       return typeof inside === 'number' ? inside : inside ? 1 : 0;
     };
     // кромка по изолинии сглаженной маски
-    const mask = softMask(part, restPoint(part), inside, garment.maskSmooth ?? (garment.part === 'skirt' ? 1 : 2));
+    const mask = softMask(part, restPoint(part), inside, garment.maskSmooth ?? (garment.slit ? 0 : garment.part === 'skirt' ? 1 : 2));
     const looseness = garment.loose ?? 0.006;
     // вырез у шеи прилегает к коже: иначе в зазор между тканью и телом видно тёмную щель
     const tuck = garment.offset <= 0.012;
@@ -912,12 +1151,15 @@ export function buildHumanBody(options, pose) {
           const edge = smooth(0.5, 0.97, mask[index]);
           point.lerp(raw.addScaledVector(V(base.normal[index * 3], base.normal[index * 3 + 1], base.normal[index * 3 + 2]), offset), 1 - edge);
         }
-        return baggy ? point.add(bagDisplace(kind, rest.point(part.source[index]), part.source[index], bag)) : point;
+        if (baggy) point.add(bagDisplace(kind, rest.point(part.source[index]), part.source[index], bag));
+        return garment.trapezoid ? trapezoidPush(kind, point, part.source[index], garment.trapezoid) : point;
       }, { uvMode: 'none', keepAny: true, keep: (index) => mask[index] > 0.5 });
       applyMask(geometry, mask);
       let layered = geometry;
       if (garment.folds) { tagRest(geometry, part, rest); layered = addFolds(geometry, kind, garment.folds); }
       else smoothNormals(layered);
+      if (garment.flat) { blurNormals(layered, garment.flat, !!garment.folds); hangingNormals(layered, kind); }
+      if (garment.backFolds) backFoldNormals(layered, kind, garment.backFolds);
       boxUV(layered, garment.density || 2.4);
       addSkinned(layered, maskedMaterial(garment.material), 'garment');
       continue;
@@ -954,8 +1196,20 @@ export function buildHumanBody(options, pose) {
       }
       geometry.computeVertexNormals();
     }
+    if (garment.trapezoid) {
+      const position = geometry.attributes.position;
+      for (let index = 0; index < position.count; index++) {
+        const pushed = trapezoidPush(kind, V(position.getX(index), position.getY(index), position.getZ(index)), null, garment.trapezoid);
+        position.setXYZ(index, pushed.x, pushed.y, pushed.z);
+      }
+      geometry.computeVertexNormals();
+    }
     let layered = geometry;
     if (garment.folds) { tagRest(geometry, part, rest); layered = addFolds(geometry, kind, garment.folds); }
+    // складки спины — только освещение: нужна мелкая сетка, иначе нормали размываются по крупным треугольникам
+    else if (garment.backFolds) { layered = subdivide(subdivide(geometry)); layered.computeVertexNormals(); smoothNormals(layered); }
+    if (garment.flat) { blurNormals(layered, garment.flat); hangingNormals(layered, kind); }
+    if (garment.backFolds) backFoldNormals(layered, kind, garment.backFolds);
     boxUV(layered, garment.density || 2.4);
     addSkinned(layered, maskedMaterial(garment.material), 'garment');
   }
@@ -1007,7 +1261,10 @@ export function buildHumanBody(options, pose) {
   // поверхность спереди с учётом свободного кроя (для пуговиц, галстука, лацканов)
   const garmentFront = (x, y, spread) => {
     const z = frontOf(kind, x, y, spread);
-    return z + bagDisplace(kind, V(x, y, z), null, bag).z;
+    const shifted = z + bagDisplace(kind, V(x, y, z), null, bag).z;
+    // халат-трапеция: перед — по его поверхности (слой на 1,7 см над телом)
+    if (options.trapezoid) return trapezoidPush(kind, V(x, y, shifted + 0.017), null, options.trapezoid).z - 0.017;
+    return shifted;
   };
   // воротник и лацканы — в покое, с весами костей ближайшей вершины одежды: гнутся вместе с шеей и плечами
   const tightsPoints = Array.from(PARTS.tights.source, (source) => [rest.point(source), source]);
@@ -1112,5 +1369,15 @@ export function buildHumanBody(options, pose) {
     }, shirt));
     return group;
   };
-  return { group, skeleton, bones, joints, headCenter, headLocal, torsoPoint, hipPoint, rest, bodyMesh, front: garmentFront, headMatrix, collar, lapels };
+  // точка на передней поверхности пол (застёгнутый халат) на высоте y: по профилю бёдер и расширению книзу, в позе — с тазом
+  const skirtGarment = garments.find((garment) => garment.part === 'skirt');
+  const skirtPoint = (x, y, lift = 0) => {
+    const shape = bagFrame(kind);
+    const hang = skirtGarment ? skirtGarment.hang || 0 : 0, offset = skirtGarment ? skirtGarment.offset : 0.02;
+    const z = shape.hipZ + shape.hipProfileAt(0) + offset + 0.012 + hang * Math.max(0, shape.hipTop - y) + lift;
+    let surface = Math.max(z - lift, frontOf(kind, x, y) + offset);
+    if (options.trapezoid) surface = trapezoidPush(kind, V(x, y, surface), null, options.trapezoid).z;
+    return hipPoint(x, y, surface + lift);
+  };
+  return { group, skeleton, bones, joints, headCenter, headLocal, torsoPoint, hipPoint, rest, bodyMesh, front: garmentFront, headMatrix, collar, lapels, skirtPoint };
 }

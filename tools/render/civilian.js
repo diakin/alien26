@@ -78,7 +78,7 @@ function materialsFor(kind) {
     boot: new THREE.MeshStandardMaterial({ color: 0x3a3026, roughness: 0.85 }),
     lace: new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.9 }),
   };
-  if (look.coat) materials.coat = cloth(look.coat, 0.9, 'plain');
+  if (look.coat) { materials.coat = cloth(look.coat, 0.9, 'plain'); materials.coat.normalScale.set(0.15, 0.15); materials.coatButton = new THREE.MeshStandardMaterial({ color: 0x8a8c90, roughness: 0.4 }); }
   if (look.vest) {
     materials.vest = new THREE.MeshStandardMaterial({ color: look.vest, roughness: 0.6, emissive: look.vest, emissiveIntensity: 0.08 });
     materials.stripe = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, roughness: 0.25, metalness: 0.4 });
@@ -221,6 +221,7 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   const headQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.head[0], 0, spec.head[2])).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, spec.head[1], 0)));
   const footQuats = [0, 1].map((side) => new THREE.Quaternion().setFromEuler(new THREE.Euler(spec.footPitch[side], spec.footYaw ? spec.footYaw[side] : 0, 0, 'YXZ')));
 
+  const rest0 = { joints: Object.fromEntries(Object.entries(restJoints(kind)).map(([name, point]) => [name, [point]])) };
   // ---- одежда слоями (human.js): брюки, верх, халат или комбинезон, жилет, фартук, перчатки ----
   const garments = [];
   const layer = (region, material, offset, extra = {}) => garments.push({ region, material, offset, ...extra });
@@ -236,11 +237,19 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
     layer('coverall', materials.top, 0.009, folds(foldAmount));
   } else {
     layer('legs', materials.legs, 0.005, folds(foldAmount));
-    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008, ...folds(foldAmount * (look.coat ? 0.5 : 1)) });
+    layer(look.coat ? 'sleeveless' : look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008, ...folds(foldAmount * (look.coat ? 0.5 : 1)) });
   }
+  // трапеция: запас 2 см у подмышек, к подолу (около 0,8 м ниже) — ещё 5 см на сторону
+  const coatShape = { ease: 0.02, flare: 0.065 };
+  const coatBackFolds = { count: 9, depth: 0.024, flare: coatShape.flare };
   if (look.coat) {
-    layer('top', materials.coat, 0.017, { flare: 0.024, ...folds(0.9) });
-    if (!spec.handsOnHead) garments.push({ part: 'skirt', open: true, toKnee: true, hang: 0.16, material: materials.coat, offset: 0.02, ...folds(0.9) });
+    // халат без складок, застёгнут до низа, слегка расширяется книзу; внизу спереди — короткая шлица
+    // ткань ровная: сильное сглаживание основы и нормалей — лопатки, позвоночник, ягодицы не проступают
+    layer('top', materials.coat, 0.017, { flare: 0.01, relax: 40, flat: 12, trapezoid: coatShape, backFolds: coatBackFolds, folds: { amount: 1, sleeve: true, armsOnly: true } });
+    // с колена — расстёгнут ниже пояса (ноги выходят из-под пол), стоя и при ходьбе — застёгнут до шлицы
+    const kneeling = spec.pelvis.y < 0.75;
+    if (!spec.handsOnHead) garments.push({ part: 'skirt', slit: kneeling ? 1 : rest0.joints.calf_l[0].y + 0.17, slitWidth: kneeling ? 0.04 : 0.006, toKnee: true, hang: 0.06, material: materials.coat, offset: 0.02, relax: 20, flat: 12, trapezoid: coatShape, backFolds: coatBackFolds,
+      vent: rest0.joints.calf_l[0].y + 0.26 });
   }
   if (look.vest) {
     layer('vest', materials.vest, 0.022);
@@ -256,13 +265,13 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   const baggy = look.uniform ? { torso: 0.85, legs: 1, arms: 0.65 }
     : look.hazmat ? { torso: 0.6, legs: 0.7, arms: 0.5, tucked: true }
     : coverall ? { torso: 1, legs: 1, arms: 0.8, tucked: !!look.boots }
-    : look.coat ? { torso: 1, legs: 0.45, arms: 0.95 }
+    : look.coat ? { torso: 0.75, legs: 0.45, arms: 0.8, armsExtra: 0.016 }
     : { torso: 0.45, legs: 0.4, arms: 0.3 };
   // бронежилет поверх верхнего слоя одежды
   const armorOffset = look.coat || look.hazmat ? 0.044 : 0.035;
-  if (armed) layer('vest', materials.armor, armorOffset, { relax: 12, loose: 0 });
+  if (armed) layer('vest', materials.armor, armorOffset, { relax: look.coat ? 40 : 12, loose: 0, trapezoid: look.coat ? { ease: coatShape.ease + 0.016, flare: coatShape.flare } : null });
   const weapon = armed && spec.ready && !spec.limp ? placeRifle(kind, spec, pelvis, torsoQuat) : null;
-  const human = buildHumanBody({ kind, look, garments, baggy, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
+  const human = buildHumanBody({ kind, look, garments, baggy, trapezoid: look.coat ? coatShape : null, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
     pelvis, pelvisQuat, torsoQuat, headQuat, hands: weapon ? weapon.hands : spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead, grip: !!weapon,
     elbowPoles: weapon ? weapon.elbowPoles : spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
   });
@@ -433,7 +442,14 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   }
   if (look.coat) {
     // халат: лацканы, три пуговицы, нагрудный карман с ручкой, боковые карманы
-    for (let button = 0; button < 3; button++) placed(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.005, 12), materials.button), front(0.012, chestY - 0.1 - button * 0.08, 0.024), torsoQuat).rotateX(Math.PI / 2);
+    // пуговицы от выреза до шлицы: выше пояса — по корпусу, ниже — по полам
+    const buttonTop = chestY - 0.1, buttonBottom = rest.joints.calf_l[0].y + 0.22;
+    for (let button = 0; button < 6; button++) {
+      const y = buttonTop + (buttonBottom - buttonTop) * button / 5;
+      if (spec.pelvis.y < 0.75 && y < waistY - 0.06) continue;
+      const position = y > waistY - 0.06 ? front(0.012, y, 0.026) : human.skirtPoint(0.012, y, 0.01);
+      placed(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.006, 14), materials.coatButton), position, y > waistY - 0.06 ? torsoQuat : pelvisQuat).rotateX(Math.PI / 2);
+    }
     placed(box(0.07, 0.09, 0.006, materials.coat, 0.004), front(0.105, chestY - 0.04, 0.024), torsoQuat);
     placed(box(0.009, 0.08, 0.009, materials.dark, 0.003), front(0.115, chestY - 0.01, 0.03), torsoQuat);
   }

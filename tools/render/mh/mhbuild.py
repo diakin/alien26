@@ -28,7 +28,7 @@ KINDS = {
     'girl':        dict(gender=0, age=0.14, muscle=0.5, weight=0.5, seed=17, skin=(232, 192, 166), hair=(154, 106, 58), stubble=0, lips=(196, 110, 110)),
     'commander':   dict(gender=1, age=0.72, muscle=0.6, weight=0.56, seed=21, skin=(212, 160, 128), hair=(118, 116, 110), stubble=0.25),
     'officer':     dict(gender=1, age=0.54, muscle=0.62, weight=0.5, seed=22, skin=(208, 158, 126), hair=(44, 34, 26), stubble=0.3),
-    'doctor':      dict(gender=1, age=0.62, muscle=0.5, weight=0.54, seed=23, skin=(216, 168, 138), hair=(64, 48, 34), stubble=0.3),
+    'doctor':      dict(gender=1, age=0.62, muscle=0.35, weight=0.12, seed=23, skin=(216, 168, 138), hair=(64, 48, 34), stubble=0.3),
     'surgeon':     dict(gender=1, age=0.56, muscle=0.55, weight=0.5, seed=24, skin=(210, 164, 134), hair=(46, 34, 26), stubble=0.4),
     'nurse':       dict(gender=0, age=0.5, muscle=0.45, weight=0.52, seed=25, skin=(230, 186, 160), hair=(126, 76, 44), stubble=0, lips=(178, 84, 88)),
     'labwoman':    dict(gender=0, age=0.56, muscle=0.45, weight=0.5, seed=26, skin=(224, 180, 152), hair=(76, 46, 28), stubble=0, lips=(160, 78, 82)),
@@ -356,7 +356,10 @@ def skin_image(kind, positions):
 
 # ---------------- запись ----------------
 json.dump(topology, open(os.path.join(OUT, 'topology.json'), 'w'))
+# ONLY=doctor,nurse — собрать только эти виды (общая топология пишется всё равно)
+ONLY = [name for name in os.environ.get('ONLY', '').split(',') if name]
 for kind in KINDS:
+    if ONLY and kind not in ONLY: continue
     positions = build_positions(kind)
     joints = {name: [joint_position(positions, rig[name]['head']).tolist(), joint_position(positions, rig[name]['tail']).tolist()] for name in bone_names}
     eyes = fit_proxy(positions, eye_scales, eye_refs)
