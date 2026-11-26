@@ -290,16 +290,22 @@ export function buildCity(api) {
       title: 'Спасение в центре города',
       timeLimit: 1800,                                       // секунд реального времени до открытия портала
       portal: [10, 39, 0],
-      // в хранилище банка — пятеро, среди них учёный; двое детей — в домике на детской площадке
+      // в хранилище банка спрятались пятеро, среди них учёный; двое детей — внутри домика на детской площадке.
+      // hidden — спрятались (стоят, не в позе заложников). shelters — укрытия, куда пришельцы не заходят:
+      // хранилище и домик [col0, row0, col1, row1, level]
       civilians: [
-        { col: 47, row: 5, level: 0, dir: 1, kind: 'scientist', vip: true, name: 'Проф. Лебедев' },
-        { col: 45, row: 6, level: 0, dir: 2, kind: 'man', name: 'Кассир' },
-        { col: 49, row: 6, level: 0, dir: 0, kind: 'woman', name: 'Посетительница' },
-        { col: 44, row: 8, level: 0, dir: 1, kind: 'engineer', name: 'Инкассатор' },
-        { col: 50, row: 8, level: 0, dir: 1, kind: 'worker', name: 'Охранник' },
-        { col: 5, row: 8, level: 0, dir: 3, kind: 'boy', child: true, name: 'Мальчик' },
-        { col: 5, row: 9, level: 0, dir: 3, kind: 'girl', child: true, name: 'Девочка' },
+        { col: 47, row: 5, level: 0, dir: 1, kind: 'scientist', vip: true, name: 'Проф. Лебедев', hidden: true },
+        { col: 45, row: 6, level: 0, dir: 2, kind: 'man', name: 'Кассир', hidden: true },
+        { col: 49, row: 6, level: 0, dir: 0, kind: 'woman', name: 'Посетительница', hidden: true },
+        { col: 44, row: 8, level: 0, dir: 1, kind: 'engineer', name: 'Инкассатор', hidden: true },
+        { col: 50, row: 8, level: 0, dir: 1, kind: 'worker', name: 'Охранник', hidden: true },
+        { col: 3, row: 8, level: 0, dir: 3, kind: 'boy', child: true, name: 'Мальчик', hidden: true },
+        { col: 4, row: 9, level: 0, dir: 3, kind: 'girl', child: true, name: 'Девочка', hidden: true },
       ],
+      shelters: [[43, 4, 51, 9, 0], [3, 8, 4, 9, 0]],
+      // тактика пришельцев: attackers идут в атаку, остальные держат оборону у постов (зал банка, детская площадка)
+      posts: [{ name: 'bank', col: 47, row: 15, level: 0, radius: 6 }, { name: 'playground', col: 9, row: 14, level: 0, radius: 5 }],
+      attackers: 5,
     },
     name: 'Центр города',
     caption: 'ЦЕНТР ГОРОДА',
