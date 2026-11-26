@@ -11,8 +11,9 @@ import { rockMaterial } from './world.js';
 import { buildReptileAlien, alienWalkCycle, alienClimbCycle, setAlienFacing } from './alien3.js';
 import { buildMechPosed, buildMechFall } from './mechpose.js';
 import { buildDead, buildFall } from './dead.js';
+import { buildRifle } from './weapons.js';
 import { rockGeometry } from './lib.js';
-import { buildCivilian, civilianWalk, civilianFall, armedWalk, prepareHuman } from './civilian.js';
+import { buildCivilian, civilianWalk, civilianFall, armedWalk, easeWalk, prepareHuman } from './civilian.js';
 import { setEnvIntensity } from './lib.js';
 
 // масштаб как у сцены: 18.5 м на 1280 px, рендер в 2 раза крупнее
@@ -160,7 +161,19 @@ const renderSpriteNow = (options, direction) => {
   else if (options.civilian) {
     // armed — персонал базы в бою: бронежилет, каска, автомат (позы ARMED_POSES, ходьба armedWalk)
     const armed = !!options.armed;
-    if (options.dead || options.fall !== undefined) soldier = civilianFall(options.civilian, options.dead ? 1 : options.fall, armed);
+    if (options.dead || options.fall !== undefined) {
+      soldier = civilianFall(options.civilian, options.dead ? 1 : options.fall, armed);
+      // groundRifle — автомат лежит на полу рядом с телом (сбоку от ног); без него — кадр *_deadbare (оружие подобрали)
+      if (options.groundRifle) {
+        const rifle = buildRifle();
+        rifle.position.set(0.74, 0.035, -0.12);
+        rifle.quaternion.setFromEuler(new THREE.Euler(0, 0.12, Math.PI / 2));
+        rifle.traverse((node) => { if (node.isMesh) node.castShadow = node.receiveShadow = true; });
+        const holder = new THREE.Group(); holder.add(soldier); holder.add(rifle); soldier = holder;
+      }
+    }
+    // easePhase — мирная ходьба персонала без оружия (easeWalk: таз ниже, шаг совпадает с перемещением)
+    else if (options.easePhase !== undefined) soldier = buildCivilian({ kind: options.civilian, armed: false, pose: easeWalk(options.easePhase) });
     else soldier = buildCivilian({ kind: options.civilian, armed, pose: options.walkPhase !== undefined ? (armed ? armedWalk(options.walkPhase) : civilianWalk(options.walkPhase)) : options.pose || 'idle' });
   }
   // падение (fall 0..1) и лежащие (dead): бойцы и пришельцы — dead.js, робот — обломки из mechpose.js

@@ -185,7 +185,8 @@ export function buildFall(options, progress) {
   // оружие: держится в руках и поворачивается с телом, затем выпадает и ложится рядом
   const weapon = alien ? buildPlasmaPistol() : buildRifle({ tanFurniture: !!options.tanRifle, suppressor: !!options.suppressor });
   const held = transformOf(model.matrixWorld.clone().multiply(heldWeapon(options)));
-  lying.add(weapon);
+  // noWeapon — тело без оружия (кадр *_deadbare: оружие с тела подобрали)
+  if (!options.noWeapon) lying.add(weapon);
   placeAboveGround(weapon, mixTransform(held, layout.weapon, smoothstep(0.15, 0.9, progress)));
 
   // рюкзак: на спине, в конце падения соскальзывает на землю

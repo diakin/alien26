@@ -1,0 +1,46 @@
+[
+ {
+  "name": "black_deadbare",
+  "options": {
+   "camo": "black",
+   "nvg": true,
+   "scarf": true,
+   "suppressor": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ],
+   "noWeapon": true
+  }
+ },
+ {
+  "name": "green_deadbare",
+  "options": {
+   "camo": "green",
+   "goggles": true,
+   "tanRifle": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ],
+   "noWeapon": true
+  }
+ },
+ {
+  "name": "alien_deadbare",
+  "options": {
+   "alien": true,
+   "dead": true,
+   "frame": [
+    4.2,
+    2.8,
+    0.5
+   ],
+   "noWeapon": true
+  }
+ }
+]
