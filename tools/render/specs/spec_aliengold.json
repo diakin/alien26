@@ -1,0 +1,370 @@
+[
+{
+"name": "aliengold_idle",
+"options": {
+"alien": true,
+"gold": true
+}
+},
+{
+"name": "aliengold_ease",
+"options": {
+"alien": true,
+"pose": "ease",
+"gold": true
+}
+},
+{
+"name": "aliengold_standAim",
+"options": {
+"alien": true,
+"pose": "aim",
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f0",
+"options": {
+"alien": true,
+"walkPhase": 0.0,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f1",
+"options": {
+"alien": true,
+"walkPhase": 0.0625,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f2",
+"options": {
+"alien": true,
+"walkPhase": 0.125,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f3",
+"options": {
+"alien": true,
+"walkPhase": 0.1875,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f4",
+"options": {
+"alien": true,
+"walkPhase": 0.25,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f5",
+"options": {
+"alien": true,
+"walkPhase": 0.3125,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f6",
+"options": {
+"alien": true,
+"walkPhase": 0.375,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f7",
+"options": {
+"alien": true,
+"walkPhase": 0.4375,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f8",
+"options": {
+"alien": true,
+"walkPhase": 0.5,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f9",
+"options": {
+"alien": true,
+"walkPhase": 0.5625,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f10",
+"options": {
+"alien": true,
+"walkPhase": 0.625,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f11",
+"options": {
+"alien": true,
+"walkPhase": 0.6875,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f12",
+"options": {
+"alien": true,
+"walkPhase": 0.75,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f13",
+"options": {
+"alien": true,
+"walkPhase": 0.8125,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f14",
+"options": {
+"alien": true,
+"walkPhase": 0.875,
+"gold": true
+}
+},
+{
+"name": "aliengold_walk_f15",
+"options": {
+"alien": true,
+"walkPhase": 0.9375,
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f0",
+"options": {
+"alien": true,
+"fall": 0.1429,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f1",
+"options": {
+"alien": true,
+"fall": 0.2857,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f2",
+"options": {
+"alien": true,
+"fall": 0.4286,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f3",
+"options": {
+"alien": true,
+"fall": 0.5714,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f4",
+"options": {
+"alien": true,
+"fall": 0.7143,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_fall_f5",
+"options": {
+"alien": true,
+"fall": 0.8571,
+"frame": [
+4.2,
+2.8,
+0.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_dead",
+"options": {
+"alien": true,
+"dead": true,
+"frame": [
+4.2,
+2.8,
+0.5
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_deadbare",
+"options": {
+"alien": true,
+"dead": true,
+"frame": [
+4.2,
+2.8,
+0.5
+],
+"noWeapon": true,
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f0",
+"options": {
+"alien": true,
+"climbPhase": 0.0,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f1",
+"options": {
+"alien": true,
+"climbPhase": 0.125,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f2",
+"options": {
+"alien": true,
+"climbPhase": 0.25,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f3",
+"options": {
+"alien": true,
+"climbPhase": 0.375,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f4",
+"options": {
+"alien": true,
+"climbPhase": 0.5,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f5",
+"options": {
+"alien": true,
+"climbPhase": 0.625,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f6",
+"options": {
+"alien": true,
+"climbPhase": 0.75,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+},
+{
+"name": "aliengold_climb_f7",
+"options": {
+"alien": true,
+"climbPhase": 0.875,
+"noShadow": true,
+"frame": [
+2.8,
+4.0,
+1.8
+],
+"gold": true
+}
+}
+]

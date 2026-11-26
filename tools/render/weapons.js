@@ -156,6 +156,61 @@ export function buildRifle({ tanFurniture = false, suppressor = false } = {}) {
 // Футуристический: обтекаемый корпус, изогнутая рукоять из костяной пластины, светящиеся кольца ускорителя,
 // излучатель с тремя «лепестками», прозрачная энергоячейка вдоль корпуса, рёбра охлаждения.
 // Начало координат — хват (кисть), дуло — вперёд по +z.
+// Плазменная винтовка золотистого пришельца: тот же стиль, что у пистолета, но длиннее — рукоять у начала координат,
+// длинный корпус-веретено с гребнем, две энергоячейки, длинный ускоритель с кольцами, костяной приклад назад.
+export function buildPlasmaRifle() {
+  const material = getMaterials();
+  const rifle = new THREE.Group();
+  // рукоять — как у пистолета
+  const grip = [];
+  for (let step = 0; step <= 10; step++) {
+    const t = step / 10;
+    grip.push([0.016 - t * 0.022 - t * t * 0.012, 0.05 - t * 0.12]);
+  }
+  const gripBack = grip.map(([z, y], index) => [z - 0.034 + (index / 10) * 0.008, y]).reverse();
+  side(rifle, grip.concat(gripBack), 0.028, material.shell, 0, 0.007);
+  const guard = shadowed(new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0045, 6, 16, Math.PI * 1.1), material.shellLight));
+  guard.rotation.set(0, Math.PI / 2, -0.3); guard.position.set(0, 0.022, 0.048); rifle.add(guard);
+  rounded(rifle, 0.006, 0.02, 0.006, material.glow, 0, 0.025, 0.042, 0.002);
+  // корпус: длинное веретено и гребень по верху
+  const body = shadowed(new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), material.shell));
+  body.scale.set(0.036, 0.04, 0.26); body.position.set(0, 0.072, 0.1); rifle.add(body);
+  side(rifle, [[-0.12, 0.095], [0.22, 0.1], [0.28, 0.115], [0.12, 0.13], [-0.1, 0.118]], 0.014, material.shellLight, 0, 0.003);
+  // рёбра охлаждения
+  for (let fin = 0; fin < 7; fin++) for (const sideX of [-1, 1]) {
+    const plate = rounded(rifle, 0.006, 0.03, 0.014, material.core, sideX * 0.038, 0.072, -0.02 + fin * 0.03, 0.002);
+    plate.rotation.y = sideX * 0.25;
+  }
+  // две энергоячейки по бокам
+  for (const sideX of [-1, 1]) {
+    tube(rifle, 0.012, 0.13, material.glowSoft, sideX * 0.041, 0.06, 0.1, 14);
+    for (const z of [0.035, 0.165]) tube(rifle, 0.014, 0.009, material.core, sideX * 0.041, 0.06, z, 14);
+  }
+  // приклад: костяная дуга назад
+  side(rifle, [[-0.1, 0.09], [-0.3, 0.075], [-0.36, 0.03], [-0.34, -0.03], [-0.3, -0.035], [-0.24, 0.035], [-0.12, 0.055]], 0.022, material.bone, 0, 0.004);
+  // ускоритель: длинный ствол с кольцами
+  tube(rifle, 0.018, 0.26, material.core, 0, 0.072, 0.43, 18, 0.014);
+  for (let ring = 0; ring < 5; ring++) {
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.023 - ring * 0.0012, 0.005, 8, 20), material.glow);
+    coil.position.set(0, 0.072, 0.35 + ring * 0.036); rifle.add(coil);
+  }
+  // излучатель: три лепестка и ядро
+  for (let petal = 0; petal < 3; petal++) {
+    const angle = petal / 3 * Math.PI * 2 + Math.PI / 2;
+    const prong = rounded(rifle, 0.009, 0.009, 0.06, material.shellLight, Math.cos(angle) * 0.025, 0.072 + Math.sin(angle) * 0.025, 0.58, 0.003);
+    prong.rotation.set(-Math.sin(angle) * 0.25, Math.cos(angle) * 0.25, 0);
+  }
+  const emitter = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 8), material.glow);
+  emitter.position.set(0, 0.072, 0.58); rifle.add(emitter);
+  // прицел сверху
+  tube(rifle, 0.01, 0.07, material.core, 0, 0.128, 0.12, 12);
+  const sight = new THREE.Mesh(new THREE.SphereGeometry(0.008, 10, 8), material.glow);
+  sight.position.set(0, 0.128, 0.16); rifle.add(sight);
+  rifle.userData.muzzle = V(0, 0.072, 0.6);
+  rifle.scale.setScalar(1.2);
+  return rifle;
+}
+
 export function buildPlasmaPistol() {
   const material = getMaterials();
   const pistol = new THREE.Group();

@@ -180,7 +180,7 @@ const renderSpriteNow = (options, direction) => {
   else if (options.mech && (options.dead || options.fall !== undefined)) soldier = buildMechFall(options.dead ? 1 : options.fall);
   else if (options.dead) soldier = buildDead(options);
   else if (options.fall !== undefined) soldier = buildFall(options, options.fall);
-  else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : options.pose || 'idle');
+  else if (options.alien) soldier = buildReptileAlien(options.climbPhase !== undefined ? alienClimbCycle(options.climbPhase) : options.walkPhase !== undefined ? alienWalkCycle(options.walkPhase) : options.pose || 'idle', { gold: !!options.gold });
   else if (options.mech) soldier = buildMechPosed(options.walkPhase !== undefined ? options.walkPhase : null);
   else {
     const spriteOptions = { ...options };
