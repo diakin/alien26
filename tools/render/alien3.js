@@ -2,7 +2,7 @@
 // (конусы со скруглёнными концами и эллипсоиды), объединены со сглаживанием (поле расстояний),
 // поверхность извлекается сеткой Surface Nets. Суставы получаются плавными, без шаров.
 // Чешуя — рельеф в шейдере (ячейки Вороного в координатах кости, поэтому не «плывёт» при ходьбе).
-import { buildPlasmaPistol } from './weapons.js';
+import { buildPlasmaPistol, buildPlasmaRifle } from './weapons.js';
 export { buildPlasmaPistol };
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -596,7 +596,7 @@ function orientPistol(pistol, barrel, upHint) {
   const up = new THREE.Vector3().crossVectors(forward, side).normalize();
   pistol.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, forward));
 }
-export function buildAlienGear(rig, spec) {
+export function buildAlienGear(rig, spec, options = {}) {
   const materials = getGearMaterials();
   const gear = new THREE.Group();
   const { torso } = rig;
@@ -638,9 +638,14 @@ export function buildAlienGear(rig, spec) {
   gear.add(strap(leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, 0.1), leg.hip.clone().lerp(leg.knee, 0.45).addScaledVector(outward, 0.02).addScaledVector(rig.forward, -0.1), 0.03, thigh, materials.strap));
   // пистолет: в руке, в кобуре или выпал (погибший — пистолет кладёт рядом sprites.js)
   if (spec.pistol === 'none') return gear;
-  const pistol = buildPlasmaPistol();
+  // у золотистого — плазменная винтовка (узел тоже называется 'pistol': по нему ищут оружие в руке)
+  const pistol = options.gold ? buildPlasmaRifle() : buildPlasmaPistol();
   pistol.name = 'pistol';
-  if (spec.pistol === 'holster') {
+  if (spec.pistol === 'holster' && options.gold) {
+    // винтовка за спиной наискось, поверх ранца
+    orientPistol(pistol, torso.direction(0.55, 1, 0).normalize(), torso.direction(0, 0, -1));
+    pistol.position.copy(torso.point(-0.08, 0.3, -0.27));
+  } else if (spec.pistol === 'holster') {
     orientPistol(pistol, thigh, rig.forward);
     pistol.position.copy(holsterCenter).addScaledVector(thigh, -0.05).addScaledVector(outward, 0.035);
   } else {
@@ -755,14 +760,16 @@ const SKIN_NORMAL = /* glsl */`
 }
 `;
 
-let materials = null;
-function getMaterials() {
-  if (materials) return materials;
-  const skin = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: 0 });
+// gold — золотистый пришелец (элита из портала): та же чешуя, цвет золота, металлический блеск
+const materialSets = {};
+function getMaterials(gold) {
+  const variant = gold ? 'gold' : 'normal';
+  if (materialSets[variant]) return materialSets[variant];
+  const skin = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: gold ? 0.55 : 0 });
   skin.onBeforeCompile = (shader) => {
     shader.uniforms.uForward = shading.uForward;
-    shader.uniforms.uBack = { value: new THREE.Color(0x323d34) };
-    shader.uniforms.uBelly = { value: new THREE.Color(0x6e6e55) };
+    shader.uniforms.uBack = { value: new THREE.Color(gold ? 0x8a6418 : 0x323d34) };
+    shader.uniforms.uBelly = { value: new THREE.Color(gold ? 0xe0bc5c : 0x6e6e55) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\n' + SKIN_VERTEX_HEAD)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = aRest;\nvCell = aCell;')
@@ -770,14 +777,14 @@ function getMaterials() {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\n' + SKIN_FRAGMENT_HEAD)
       .replace('#include <map_fragment>', SKIN_COLOR)
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(0.5, 0.95, alienGroove);')
+      .replace('#include <roughnessmap_fragment>', gold ? 'float roughnessFactor = mix(0.28, 0.7, alienGroove);' : 'float roughnessFactor = mix(0.5, 0.95, alienGroove);')
       .replace('#include <normal_fragment_maps>', SKIN_NORMAL);
   };
-  skin.customProgramCacheKey = () => 'alienReptileSkin';
-  const horn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0 });
+  skin.customProgramCacheKey = () => 'alienReptileSkin' + variant;
+  const horn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0, color: gold ? 0xffe6a0 : 0xffffff });
   const eye = new THREE.MeshPhysicalMaterial({ color: 0x040404, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04 });
-  materials = { skin, horn, eye };
-  return materials;
+  materialSets[variant] = { skin, horn, eye };
+  return materialSets[variant];
 }
 
 const partsCache = new Map();
@@ -803,7 +810,8 @@ export function alienClimbCycle(phase) {
   };
 }
 
-export function buildReptileAlien(pose = 'idle') {
+// options.gold — золотистый пришелец с плазменной винтовкой
+export function buildReptileAlien(pose = 'idle', options = {}) {
   const spec = typeof pose === 'string' ? ALIEN_POSES[pose] : pose;
   const key = JSON.stringify(spec);
   let parts = partsCache.get(key);
@@ -811,12 +819,12 @@ export function buildReptileAlien(pose = 'idle') {
     parts = buildParts(spec);
     partsCache.set(key, parts);
   }
-  const { skin, horn, eye } = getMaterials();
+  const { skin, horn, eye } = getMaterials(!!options.gold);
   const alien = new THREE.Group();
   alien.add(new THREE.Mesh(parts.body, skin));
   alien.add(new THREE.Mesh(parts.horn, horn));
   alien.add(new THREE.Mesh(parts.eyes, eye));
-  if (spec.gear !== false) alien.add(buildAlienGear(parts.rig, spec));
+  if (spec.gear !== false) alien.add(buildAlienGear(parts.rig, spec, options));
   setShadows(alien);
   alien.userData.head = parts.head.clone();
   alien.userData.rig = parts.rig;

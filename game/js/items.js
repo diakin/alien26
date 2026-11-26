@@ -9,6 +9,7 @@ var Items = (function () {
   var TYPES = {
     carbine: { name: 'КАРАБИН КС-9', note: 'ПБС · КОЛЛИМАТОР', w: 1, h: 3, weight: 8, weapon: 'carbine', ammo: 'carbineMag', crop: [31, 84, 334, 147], image: 'assets/ui/weapon_black.png' },
     carbineM: { name: 'КАРАБИН КС-9М', note: 'КОЛЛИМАТОР · ФОНАРЬ', w: 1, h: 3, weight: 8, weapon: 'carbine', ammo: 'carbineMag', crop: [31, 96, 300, 135], image: 'assets/ui/weapon_green.png' },
+    plasmaRifle: { alien: true, name: 'ПЛАЗМЕННАЯ ВИНТОВКА', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 3, weight: 7, weapon: 'plasmaRifle', ammo: 'energyCell', crop: [24, 110, 332, 80], image: 'assets/ui/weapon_aliengold.png' },
     plasmaPistol: { alien: true, name: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 2, weight: 4, weapon: 'plasmaPistol', ammo: 'energyCell', crop: [32, 60, 299, 185], image: 'assets/ui/weapon_alien.png' },
     carbineMag: { name: 'МАГАЗИН КС-9', note: 'ПАТРОНЫ 5,45', w: 1, h: 1, weight: 2, rounds: 30, draw: drawMagazine },
     energyCell: { alien: true, name: 'ЭНЕРГОЯЧЕЙКА', note: 'К ПЛАЗМЕННОМУ ОРУЖИЮ', w: 1, h: 1, weight: 2, rounds: 20, draw: drawCell },

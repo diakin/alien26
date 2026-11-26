@@ -271,6 +271,16 @@
       maxTimeUnits: 64, health: health, maxHealth: 58, stamina: 90, maxStamina: 90, morale: 100, optics: 'РАЗГРУЗКА',
       loadout: [['plasmaPistol', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']] };
   }
+  // Золотистый страж — элита из портала: плазменная винтовка (урон в 1,5 раза больше), личный щит спереди (shield, %)
+  // и один купол-щит вокруг портала (domeCharges). Портрет — как у обычного стража.
+  function goldAlienProfile(number) {
+    var profile = alienProfile(number);
+    profile.name = 'Золотой страж, особь ' + number; profile.rank = 'золотой страж'; profile.camo = 'aliengold'; profile.portrait = 'alien';
+    profile.subtitle = 'ЭЛИТА · ЛИЧНЫЙ ЩИТ · УПРАВЛЯЕТ ИИ'; profile.accuracy += 6; profile.gold = true;
+    profile.shield = 100; profile.domeCharges = 1;
+    profile.loadout = [['plasmaRifle', 'rightHand', 20], ['energyCell', 'belt'], ['energyCell', 'belt']];
+    return profile;
+  }
   // Состав по карте: spawns-массив — прежний порядок PROFILES (4 бойца, 2 пришельца, K7);
   // spawns-объект { squad, mech, aliens } — столько бойцов, роботов и пришельцев, сколько точек высадки
   // режим страницы (?mode=manage): мирная база — без пришельцев, обстановка мирная, меню базы (js/basemenu.js)
@@ -1440,6 +1450,8 @@
   var corpses = [];                   // тела погибших: остаются на клетке, проходу и пулям не мешают
   var combatWorld = Combat.createWorld({
     map: MAP, units: units, unitBody: unitBody,
+    domes: function () { return domes; },
+    frontShield: function (unit, from) { return unit.shield > 0 && facesPoint(unit, from); },
     doorOpen: function (col, row, level, orient) {
       for (var index = 0; index < doors.length; index++) {
         var door = doors[index];
@@ -1468,11 +1480,12 @@
   // в координатах клеток), вверх, в метрах. Линия огня по-прежнему считается от muzzleOf.
   var SPRITE_MUZZLE = {
     alien: { stand: [0.91, -0.19, 1.73] },
+    aliengold: { stand: [1.23, -0.42, 1.76] },
     staff: { stand: [1.07, 0.13, 1.5], kneel: [1.04, 0.17, 1.14] },
     soldier: { stand: [1.09, 0.16, 1.44], kneel: [1.05, 0.19, 1.14] }
   };
   function spriteMuzzleOf(unit, point) {
-    var table = unit.kind === 'mech' ? null : unit.kind === 'alien' ? SPRITE_MUZZLE.alien : unit.kind === 'staff' ? SPRITE_MUZZLE.staff : SPRITE_MUZZLE.soldier;
+    var table = unit.kind === 'mech' ? null : unit.gold ? SPRITE_MUZZLE.aliengold : unit.kind === 'alien' ? SPRITE_MUZZLE.alien : unit.kind === 'staff' ? SPRITE_MUZZLE.staff : SPRITE_MUZZLE.soldier;
     if (!table) return muzzleOf(unit, point);
     var offset = unit.kneeling && table.kneel ? table.kneel : table.stand;
     var dx = point.x - unit.x, dy = point.y - unit.y, length = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1544,7 +1557,7 @@
     var aim = Combat.aimPoint(combatWorld, from, point, radius, chance, Math.random);
     shot.from = from;
     shot.drawFrom = spriteMuzzleOf(shot.shooter, point);
-    shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter);
+    shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter, true);
     shot.duration = Math.max(60, Combat.distanceMeters(combatWorld, from, shot.result.point) / SHOT_SPEED[shot.weapon.projectile] * 1000);
     // показ выстрела пришельца: пуля долетает, когда камера уже перешла к месту попадания
     if (shot.arriveNotBefore) shot.duration = Math.max(shot.duration, shot.arriveNotBefore - shot.start);
@@ -1563,6 +1576,7 @@
     var result = shot.result;
     flashes.push({ point: result.point, kind: shot.weapon.projectile, start: now, until: now + 320 });
     Sound.play('impact', screenDistance(result.point));
+    if (result.kind === 'shield') { shieldHit(result, shot, now); return; }
     if (result.kind !== 'unit' || result.unit.dead) return;
     if (shot.view) shot.view.hit = true;
     var target = result.unit;
@@ -1665,7 +1679,9 @@
         if (Math.max(Math.abs(deltaCol), Math.abs(deltaRow)) !== radius) continue;
         var col = portal.col + deltaCol, row = portal.row + deltaRow;
         if (!inside(col, row) || !isFreeFor(null)(col, row, portal.level)) continue;
-        var alien = makeUnit(alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
+        // двое из волны — золотистые стражи (третий и шестой по порядку: у портала, но не в центре)
+        var gold = placed === 2 || placed === 5;
+        var alien = makeUnit(gold ? goldAlienProfile(++number) : alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
         alien.timeUnits = 0;
         units.push(alien); startUnits.push(alien);
         placed++;
@@ -1673,6 +1689,9 @@
     }
     setCombat(true);
     say('Открылся портал: прибыли ' + placed + ' пришельцев');
+    // золотистый сразу ставит купол-щит вокруг портала
+    var keeper = units.filter(function (unit) { return unit.gold && unit.domeCharges > 0 && !unit.dead; })[0];
+    if (keeper) raiseDome(keeper);
   }
   function timerText() {
     if (!portal) return '';
@@ -1745,6 +1764,209 @@
       context.strokeStyle = 'rgba(200, 140, 255, ' + (0.3 + 0.2 * Math.sin(now / 200)) + ')'; context.lineWidth = cell * 0.6; context.stroke();
     }
     context.restore();
+  }
+
+  // ---------------- щиты золотистых стражей ----------------
+  // Личный щит (unit.shield, %): прикрывает спереди (стрелок в секторе ±67° от направления взгляда). Пока заряд больше
+  // нуля, попадание спереди не ранит, а снимает заряд (Combat.SHIELD_DRAIN.personal: автомат 10 %, пушка K7 25 %).
+  // В начале хода пришельцев щит, в который не попадали с прошлого хода, заряжается на 50 % — с нуля полностью за два
+  // хода, частично разряженный — быстрее. Виден только при попадании: дуга прозрачных шестиугольников перед стражем
+  // с радужными разводами от точки удара.
+  // Купол (domes): одноразовый щит золотистого вокруг портала на 2 хода. Задерживает пули и снаряды, летящие снаружи
+  // внутрь (автомат 5 %, пушка K7 15 %), изнутри наружу пропускает; гранаты летят по дуге без трассировки — пролетают.
+  var DOME_RADIUS = 4.6, PERSONAL_RECHARGE = 50;
+  var domes = [], fadingDomes = [];
+  var directionVectors = null;
+  function directionVector(direction) {
+    if (!directionVectors) {
+      directionVectors = {};
+      [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]].forEach(function (delta) {
+        var length = Math.hypot(delta[0], delta[1]);
+        directionVectors[Iso.directionOf(delta[0], delta[1])] = { x: delta[0] / length, y: delta[1] / length };
+      });
+    }
+    return directionVectors[direction] || { x: 0, y: 1 };
+  }
+  // стрелок спереди: направление на него отличается от взгляда не больше чем на один сектор
+  function facesPoint(unit, point) {
+    var direction = Iso.directionOf(point.x - unit.x, point.y - unit.y);
+    if (direction < 0) return true;
+    var difference = Math.abs(direction - unit.direction) % 8;
+    return Math.min(difference, 8 - difference) <= 1;
+  }
+  function raiseDome(keeper) {
+    if (!portal || keeper.domeCharges <= 0) return;
+    keeper.domeCharges--;
+    domes.push({ x: portal.col + 0.5, y: portal.row + 0.5, h: elevationOf(portal.col, portal.row, portal.level), level: portal.level,
+      radius: DOME_RADIUS, charge: 100, turnsLeft: phase === 'aliens' ? 3 : 2, hits: [], raisedAt: performance.now() });
+    say(keeper.callsign + ': щит вокруг портала на 2 хода');
+  }
+  function removeDome(dome, now) {
+    var index = domes.indexOf(dome);
+    if (index >= 0) domes.splice(index, 1);
+    dome.fadeStart = now; fadingDomes.push(dome);
+  }
+  function ageDomes() {
+    domes.slice().forEach(function (dome) {
+      dome.turnsLeft--;
+      if (dome.turnsLeft <= 0) { removeDome(dome, performance.now()); say('Щит вокруг портала погас'); }
+    });
+  }
+  function rechargeShields() {
+    units.forEach(function (unit) {
+      if (unit.shield === undefined || unit.dead) return;
+      if (!unit.shieldHitRound && unit.shield < 100) unit.shield = Math.min(100, unit.shield + PERSONAL_RECHARGE);
+      unit.shieldHitRound = false;
+    });
+  }
+  function shieldHit(result, shot, now) {
+    var projectile = shot.weapon.projectile;
+    if (result.dome) {
+      var dome = result.dome, drain = Combat.SHIELD_DRAIN.dome[projectile] || 5;
+      dome.charge = Math.max(0, dome.charge - drain);
+      dome.hits.push({ point: result.point, start: now });
+      flashes.push({ text: '−' + drain + '% ЩИТ', point: { x: result.point.x, y: result.point.y, h: result.point.h + 0.3 }, start: now, until: now + 1100 });
+      if (dome.charge <= 0) { removeDome(dome, now); say('Щит вокруг портала пробит'); }
+      return;
+    }
+    var unit = result.unit, loss = Combat.SHIELD_DRAIN.personal[projectile] || 10;
+    unit.shield = Math.max(0, unit.shield - loss);
+    unit.shieldHitRound = true;
+    unit.shieldFlash = { start: now, point: result.point, broken: unit.shield <= 0 };
+    flashes.push({ text: '−' + loss + '% ЩИТ', point: { x: unit.x, y: unit.y, h: unit.elevation + unit.height + 0.2 }, start: now, until: now + 1300 });
+    say(unit.callsign + (unit.shield <= 0 ? ': личный щит пробит' : ': попадание в щит, заряд ' + unit.shield + '%'));
+  }
+
+  // шестиугольник на поверхности: центр center (м, в осях клеток и высоты), касательные first/second, радиус size
+  function hexPath(origin, center, first, second, size) {
+    context.beginPath();
+    for (var corner = 0; corner < 6; corner++) {
+      var angle = corner * Math.PI / 3 + Math.PI / 6, cos = Math.cos(angle) * size, sin = Math.sin(angle) * size;
+      var point = Iso.toScreen(origin.x + (center[0] + first[0] * cos + second[0] * sin) / Iso.tileMeters, origin.y + (center[1] + first[1] * cos + second[1] * sin) / Iso.tileMeters,
+        origin.h + center[2] + first[2] * cos + second[2] * sin);
+      if (corner) context.lineTo(point.x - camera.x, point.y - camera.y); else context.moveTo(point.x - camera.x, point.y - camera.y);
+    }
+    context.closePath();
+  }
+  function normalize3(vector) { var length = Math.hypot(vector[0], vector[1], vector[2]) || 1; return [vector[0] / length, vector[1] / length, vector[2] / length]; }
+  function cross3(first, second) { return [first[1] * second[2] - first[2] * second[1], first[2] * second[0] - first[0] * second[2], first[0] * second[1] - first[1] * second[0]]; }
+  // направление «к зрителю» в осях клеток и высоты: туда, где экранный y растёт, и вверх
+  function viewerVector(origin) {
+    var base = Iso.toScreen(origin.x, origin.y, 0), alongCol = Iso.toScreen(origin.x + 1, origin.y, 0), alongRow = Iso.toScreen(origin.x, origin.y + 1, 0);
+    return normalize3([alongCol.y - base.y, alongRow.y - base.y, Math.hypot(alongCol.y - base.y, alongRow.y - base.y) * 1.1]);
+  }
+  // радужный оттенок разводов: кольца бегут от точки удара
+  function rainbowAt(direction, hits, now) {
+    var best = null;
+    hits.forEach(function (hit) {
+      var age = (now - hit.start) / 1000;
+      if (age > 1.4) return;
+      var spread = Math.acos(Math.max(-1, Math.min(1, direction[0] * hit.direction[0] + direction[1] * hit.direction[1] + direction[2] * hit.direction[2])));
+      var ring = Math.exp(-Math.pow((spread - age * 1.6) / 0.28, 2)) * (1 - age / 1.4);
+      if (ring > 0.04 && (!best || ring > best.alpha)) best = { alpha: ring, hue: (spread * 260 + now * 0.25 + hit.start * 0.05) % 360 };
+    });
+    return best;
+  }
+  // точки купола: полусфера, сетка близка к шестиугольной (спираль Фибоначчи)
+  var DOME_CELLS = (function () {
+    var cells = [], count = 230;
+    for (var index = 0; index < count; index++) {
+      var z = 1 - (index + 0.5) / count, radius = Math.sqrt(1 - z * z), angle = index * Math.PI * (3 - Math.sqrt(5));
+      cells.push([Math.cos(angle) * radius, Math.sin(angle) * radius, z]);
+    }
+    return cells;
+  })();
+  function drawDome(dome, now, fade) {
+    if (dome.level > view.level) return;
+    var origin = { x: dome.x, y: dome.y, h: dome.h }, viewer = viewerVector(origin);
+    var size = dome.radius * Math.sqrt(2 * Math.PI / DOME_CELLS.length / 2.6);
+    dome.hits.forEach(function (hit) {
+      if (!hit.direction) hit.direction = normalize3([(hit.point.x - dome.x) * Iso.tileMeters, (hit.point.y - dome.y) * Iso.tileMeters, hit.point.h - dome.h]);
+    });
+    dome.hits = dome.hits.filter(function (hit) { return now - hit.start < 1400; });
+    var strength = (0.35 + 0.65 * dome.charge / 100) * fade;
+    var pulse = 0.85 + 0.15 * Math.sin(now / 420);
+    context.save();
+    context.lineWidth = 1;
+    // сначала дальняя сторона, потом ближняя
+    [false, true].forEach(function (front) {
+      DOME_CELLS.forEach(function (cell) {
+        var facing = cell[0] * viewer[0] + cell[1] * viewer[1] + cell[2] * viewer[2];
+        if ((facing > 0) !== front) return;
+        var center = [cell[0] * dome.radius, cell[1] * dome.radius, cell[2] * dome.radius];
+        var first = normalize3(Math.abs(cell[2]) > 0.98 ? [1, 0, 0] : cross3([0, 0, 1], cell)), second = cross3(cell, first);
+        hexPath(origin, center, first, second, size * 0.92);
+        var tint = rainbowAt(cell, dome.hits, now);
+        if (tint) { context.fillStyle = 'hsla(' + tint.hue.toFixed(0) + ', 95%, 65%, ' + (tint.alpha * 0.36 * fade).toFixed(3) + ')'; context.fill(); }
+        else { context.fillStyle = 'rgba(150, 220, 255, ' + ((front ? 0.05 : 0.025) * strength).toFixed(3) + ')'; context.fill(); }
+        context.strokeStyle = 'rgba(170, 235, 255, ' + ((front ? 0.42 : 0.16) * strength * pulse).toFixed(3) + ')';
+        context.stroke();
+      });
+    });
+    // подпись над куполом: заряд и сколько ходов осталось
+    if (!dome.fadeStart) {
+      var top = Iso.toScreen(dome.x, dome.y, dome.h + dome.radius + 0.4);
+      context.font = 'bold 12px Arial, sans-serif'; context.textAlign = 'center';
+      context.fillStyle = 'rgba(0, 0, 0, 0.6)'; context.fillText('ЩИТ ' + Math.round(dome.charge) + '% · ХОДОВ ' + dome.turnsLeft, top.x - camera.x + 1, top.y - camera.y + 1);
+      context.fillStyle = 'rgba(190, 240, 255, 0.95)'; context.fillText('ЩИТ ' + Math.round(dome.charge) + '% · ХОДОВ ' + dome.turnsLeft, top.x - camera.x, top.y - camera.y);
+    }
+    context.restore();
+  }
+  // личный щит: дуга шестиугольников перед стражем, видна 0,9 с после попадания
+  function drawPersonalShield(unit, now) {
+    var flash = unit.shieldFlash;
+    if (!flash || now - flash.start > 900 || unit.level > view.level || !isSeen(unit)) return;
+    var age = (now - flash.start) / 900, fade = 1 - age;
+    var position = drawPosition(unit), origin = { x: position.x, y: position.y, h: position.elevation };
+    var facing = directionVector(unit.direction), viewer = viewerVector(origin);
+    var hit = normalize3([(flash.point.x - position.x) * Iso.tileMeters, (flash.point.y - position.y) * Iso.tileMeters, 0]);
+    var hitHeight = flash.point.h - position.elevation;
+    var faceAngle = Math.atan2(facing.y, facing.x), radius = 0.85;
+    var cells = [];
+    for (var row = 0; row < 9; row++) for (var column = -5; column <= 5; column++) {
+      var angle = faceAngle + (column + (row % 2 ? 0.5 : 0)) * 0.23;
+      if (Math.abs(angle - faceAngle) > 1.25) continue;
+      var outward = [Math.cos(angle), Math.sin(angle), 0];
+      cells.push({ outward: outward, height: 0.25 + row * 0.24, front: outward[0] * viewer[0] + outward[1] * viewer[1] > 0 });
+    }
+    context.save();
+    context.lineWidth = 1.2;
+    cells.sort(function (first, second) { return first.front - second.front; });
+    cells.forEach(function (cell) {
+      var center = [cell.outward[0] * radius, cell.outward[1] * radius, cell.height];
+      var first = [-cell.outward[1], cell.outward[0], 0], second = [0, 0, 1];
+      var spread = Math.hypot(Math.acos(Math.max(-1, Math.min(1, cell.outward[0] * hit[0] + cell.outward[1] * hit[1]))) * radius, cell.height - hitHeight);
+      var ring = Math.exp(-Math.pow((spread - age * 1.4) / 0.3, 2));
+      var alpha = fade * (0.25 + 0.75 * ring);
+      hexPath(origin, center, first, second, 0.12);
+      if (flash.broken) context.fillStyle = 'rgba(255, ' + (120 + 100 * Math.random()).toFixed(0) + ', 90, ' + (alpha * 0.5).toFixed(3) + ')';
+      else context.fillStyle = 'hsla(' + ((spread * 300 + now * 0.3) % 360).toFixed(0) + ', 95%, 65%, ' + (alpha * 0.45 * ring + 0.05 * fade).toFixed(3) + ')';
+      context.fill();
+      context.strokeStyle = 'rgba(180, 240, 255, ' + (alpha * (cell.front ? 0.8 : 0.35)).toFixed(3) + ')';
+      context.stroke();
+    });
+    context.restore();
+  }
+  // заряд личного щита над золотистым стражем
+  function drawShieldBar(unit) {
+    if (unit.level > view.level || !isSeen(unit)) return;
+    var position = drawPosition(unit), top = Iso.toScreen(position.x, position.y, position.elevation + unit.height + 0.35);
+    var x = top.x - camera.x - 18, y = top.y - camera.y;
+    context.save();
+    context.fillStyle = 'rgba(0, 0, 0, 0.55)'; context.fillRect(x - 1, y - 1, 38, 6);
+    context.fillStyle = unit.shield > 0 ? 'rgba(140, 225, 255, 0.95)' : 'rgba(255, 110, 80, 0.9)';
+    context.fillRect(x, y, 36 * unit.shield / 100, 4);
+    context.restore();
+  }
+  function drawShields(now) {
+    domes.forEach(function (dome) { drawDome(dome, now, Math.min(1, (now - dome.raisedAt) / 600)); });
+    fadingDomes = fadingDomes.filter(function (dome) { return now - dome.fadeStart < 900; });
+    fadingDomes.forEach(function (dome) { drawDome(dome, now, 1 - (now - dome.fadeStart) / 900); });
+    units.forEach(function (unit) {
+      if (unit.shield === undefined || unit.dead) return;
+      drawPersonalShield(unit, now);
+      drawShieldBar(unit);
+    });
   }
 
   // ---------------- конец задания и итоги ----------------
@@ -2056,6 +2278,7 @@
     if (combat) startAlienTalk();
     setPhaseLabel();
     units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; unit.aiShots = 0; } });
+    rechargeShields();
     approachField = null; soldierField = null;     // отряд мог переместиться: поля путей строятся заново
     aiQueue = units.filter(function (unit) { return unit.side === 'aliens'; });
     aiWaitUntil = performance.now() + 500;
@@ -2064,6 +2287,7 @@
   function finishAlienPhase() {
     phase = 'squad';
     turn++;
+    ageDomes();
     units.forEach(function (unit) { if (unit.side === 'squad') unit.timeUnits = turnTimeUnits(unit); });
     setPhaseLabel();
     say('Ход ' + turn);
@@ -2661,6 +2885,13 @@
     if (!alien) { finishAlienPhase(); return; }
     if (!approachField) buildApproachField();
     if (!rolesAssigned) assignAlienRoles();
+    // купол снят или истёк — другой золотистый у портала ставит свой (одноразовый), это действие на 20 ОД
+    if (alien.gold && alien.domeCharges > 0 && !domes.length && portal && portal.open && alien.timeUnits >= 20 &&
+        Math.max(Math.abs(alien.col - portal.col), Math.abs(alien.row - portal.row)) <= 6 && alien.level === portal.level) {
+      alien.timeUnits -= 20; raiseDome(alien); watchUnit(alien);
+      aiWaitUntil = now + 700 / Settings.values.aiSpeed;
+      return;
+    }
     var decision = aiDecide(alien);
     var firstAction = !alien.aiMoves && !alien.aiShots;
     if (decision && decision.fire) {
@@ -3737,6 +3968,7 @@
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
     drawPortal(performance.now());
+    drawShields(performance.now());
     drawHighlight(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
@@ -3812,6 +4044,7 @@
     if (hover) { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
     drawPortal(now);
+    drawShields(now);
     drawHighlight(now);
     drawMarkedEnemy();
     drawAimMarker();
@@ -3888,6 +4121,7 @@
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
     drawPortal(performance.now());
+    drawShields(performance.now());
     drawHighlight(performance.now());
     drawMarkedEnemy();
     drawAimMarker();
@@ -4073,6 +4307,7 @@
   window.__game = {
     units: units, camera: camera, view: view, select: function (index) { selectUnit(units[index], false); }, drawPosition: drawPosition,
     fire: function (shooter, target, modeIndex) { return fire(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
+    get domes() { return domes; }, startAlienPhase: function () { startAlienPhase(); }, rechargeShields: function () { rechargeShields(); }, ageDomes: function () { ageDomes(); },
     preview: function (shooter, target, modeIndex) { return shotPreview(shooter, { unit: target, point: targetPointOf(target) }, modeIndex); },
     trace: function (from, to, range, ignore) { return Combat.trace(combatWorld, from, to, range, ignore); },
     get shots() { return shots.length; }, get phase() { return phase; }, endTurn: function () { endTurn(); }, corpses: corpses, get particles() { return particles; }, kill: function (unit) { kill(unit); }, musicMood: function () { return musicMood(); }, get turn() { return turn; }, aiDecide: function (unit) { approachField = null; soldierField = null; buildApproachField(); if (!rolesAssigned) assignAlienRoles(); return aiDecide(unit); }, alienTactic: function (unit) { if (!rolesAssigned) assignAlienRoles(); return alienTactic(unit); }, groundItems: groundItems, mission: mission, summary: function () { return missionSummary(); }, get aimTarget() { return aimTarget; }, reactionCheck: function (unit) { reactionCheck(unit); },

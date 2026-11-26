@@ -28,8 +28,20 @@ var Combat = (function () {
         { name: 'Прицельный', cost: 16, accuracy: 1.0, shots: 1 },
         { name: 'Навскидку', cost: 9, accuracy: 0.6, shots: 1 }
       ]
+    },
+    // винтовка золотистого пришельца: урон в 1,5 раза больше, чем у пистолета, бьёт дальше
+    plasmaRifle: {
+      damage: 60, range: 55, magazine: 20, projectile: 'plasma',
+      modes: [
+        { name: 'Прицельный', cost: 18, accuracy: 1.05, shots: 1 },
+        { name: 'Навскидку', cost: 11, accuracy: 0.65, shots: 1 }
+      ]
     }
   };
+  // Щиты пришельцев: сколько процентов заряда снимает одно попадание.
+  //   personal — личный щит золотистого (спереди), dome — купол вокруг портала.
+  //   Автоматы (bullet) и пушка K7 (shell); плазма — как пуля.
+  var SHIELD_DRAIN = { personal: { bullet: 10, shell: 25, plasma: 10 }, dome: { bullet: 5, shell: 15, plasma: 5 } };
 
   var STEP = 0.04;             // шаг трассировки, м
   var UNIT_RADIUS = 0.3;       // радиус юнита размером в клетку, м
@@ -76,15 +88,18 @@ var Combat = (function () {
     });
     return {
       grid: grid, levels: levels, levelHeight: levelHeight, tile: map.tile || 1.25, stride: stride, map: map, solids: solids,
-      units: options.units, doorOpen: options.doorOpen, unitBody: options.unitBody
+      units: options.units, doorOpen: options.doorOpen, unitBody: options.unitBody, domes: options.domes, frontShield: options.frontShield
     };
   }
 
   function levelOf(world, height) { return Math.max(0, Math.min(world.levels - 1, Math.floor(height / world.levelHeight))); }
 
   // Трассировка от from до to и дальше, всего range метров. Возвращает первое препятствие:
-  // { kind: 'unit' | 'wall' | 'object' | 'floor' | 'ground' | 'edge' | 'none', point, unit }
-  function trace(world, from, to, range, ignore) {
+  // { kind: 'unit' | 'shield' | 'wall' | 'object' | 'floor' | 'ground' | 'edge' | 'none', point, unit, dome }
+  // projectile — настоящий выстрел: тогда задерживают щиты — купол (world.domes(): снаружи внутрь, изнутри наружу
+  // пропускает) и личный щит юнита (world.frontShield(unit, from): спереди). Для проверок видимости щиты прозрачны.
+  function trace(world, from, to, range, ignore, projectile) {
+    var domes = projectile && world.domes ? world.domes() : null;
     var dx = (to.x - from.x) * world.tile, dy = (to.y - from.y) * world.tile, dh = to.h - from.h;
     var length = Math.sqrt(dx * dx + dy * dy + dh * dh);
     if (length < 1e-6) return { kind: 'none', point: { x: from.x, y: from.y, h: from.h } };
@@ -133,13 +148,25 @@ var Combat = (function () {
           if (x >= box[3] && x <= box[5] && y >= box[4] && y <= box[6] && h >= box[7] && h <= box[8]) return { kind: 'object', point: point };
         }
       }
+      // купол щита: пересечение сферы снаружи внутрь
+      if (domes) {
+        for (var domeIndex = 0; domeIndex < domes.length; domeIndex++) {
+          var dome = domes[domeIndex];
+          var nowOutside = Math.hypot((x - dome.x) * world.tile, (y - dome.y) * world.tile, h - dome.h) > dome.radius;
+          var wasOutside = Math.hypot((previousX - dome.x) * world.tile, (previousY - dome.y) * world.tile, previousH - dome.h) > dome.radius;
+          if (wasOutside && !nowOutside && h >= dome.h) return { kind: 'shield', point: point, dome: dome };
+        }
+      }
       // юниты: вертикальный цилиндр
       for (var unitIndex = 0; unitIndex < world.units.length; unitIndex++) {
         var unit = world.units[unitIndex];
         if (unit === ignore || unit.dead) continue;
         var body = world.unitBody(unit);
         var offsetX = (x - body.x) * world.tile, offsetY = (y - body.y) * world.tile;
-        if (offsetX * offsetX + offsetY * offsetY < body.radius * body.radius && h >= body.bottom && h <= body.top) return { kind: 'unit', point: point, unit: unit };
+        if (offsetX * offsetX + offsetY * offsetY < body.radius * body.radius && h >= body.bottom && h <= body.top) {
+          if (projectile && world.frontShield && world.frontShield(unit, from)) return { kind: 'shield', point: point, unit: unit };
+          return { kind: 'unit', point: point, unit: unit };
+        }
       }
     }
     return { kind: 'none', point: { x: x, y: y, h: h } };
@@ -193,7 +220,7 @@ var Combat = (function () {
   }
 
   return {
-    WEAPONS: WEAPONS, UNIT_RADIUS: UNIT_RADIUS, KNEELING_TARGET: KNEELING_TARGET, createWorld: createWorld, trace: trace, hitChance: hitChance,
+    WEAPONS: WEAPONS, SHIELD_DRAIN: SHIELD_DRAIN, UNIT_RADIUS: UNIT_RADIUS, KNEELING_TARGET: KNEELING_TARGET, createWorld: createWorld, trace: trace, hitChance: hitChance,
     aimPoint: aimPoint, damage: damage, distanceMeters: distanceMeters, wallBlocks: wallBlocks
   };
 })();
