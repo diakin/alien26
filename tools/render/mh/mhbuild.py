@@ -22,7 +22,8 @@ KINDS = {
     'man':         dict(gender=1, age=0.52, muscle=0.55, weight=0.5, seed=11, skin=(214, 166, 136), hair=(48, 36, 26), stubble=0.5),
     'woman':       dict(gender=0, age=0.5, muscle=0.45, weight=0.5, seed=12, skin=(226, 182, 156), hair=(106, 58, 34), stubble=0, lips=(170, 70, 76)),
     'scientist':   dict(gender=1, age=0.7, muscle=0.45, weight=0.52, seed=13, skin=(218, 172, 144), hair=(150, 146, 140), stubble=0.35),
-    'engineer':    dict(gender=1, age=0.55, muscle=0.6, weight=0.52, seed=14, skin=(204, 150, 118), hair=(58, 44, 32), stubble=0.6),
+    'engineer':    dict(gender=1, age=0.55, muscle=0.45, weight=0, slim=1,
+                        shape={'measure/measure-shoulder-dist': 0.35, 'measure/measure-upperarm-circ': 0.15, 'armslegs/lr-upperarm-fat': 0.3, 'armslegs/lr-lowerarm-fat': 0.4}, seed=14, skin=(204, 150, 118), hair=(58, 44, 32), stubble=0.6),
     'worker':      dict(gender=1, age=0.58, muscle=0.65, weight=0.58, seed=15, skin=(196, 142, 108), hair=(42, 32, 24), stubble=0.8),
     'boy':         dict(gender=1, age=0.15, muscle=0.5, weight=0.5, seed=16, skin=(228, 186, 158), hair=(106, 68, 36), stubble=0),
     'girl':        dict(gender=0, age=0.14, muscle=0.5, weight=0.5, seed=17, skin=(232, 192, 166), hair=(154, 106, 58), stubble=0, lips=(196, 110, 110)),
@@ -36,7 +37,7 @@ KINDS = {
     'engineerw':   dict(gender=0, age=0.52, muscle=0.5, weight=0.5, seed=28, skin=(222, 176, 148), hair=(92, 58, 34), stubble=0, lips=(164, 80, 82)),
     'electrician': dict(gender=1, age=0.55, muscle=0.6, weight=0.52, seed=29, skin=(200, 148, 114), hair=(58, 44, 32), stubble=0.7),
     'plumber':     dict(gender=1, age=0.62, muscle=0.6, weight=0.62, seed=30, skin=(198, 144, 110), hair=(42, 32, 24), stubble=0.8),
-    'cook':        dict(gender=1, age=0.6, muscle=0.5, weight=0.66, seed=31, skin=(212, 160, 130), hair=(44, 34, 26), stubble=0.5),
+    'cook':        dict(gender=1, age=0.6, muscle=0.45, weight=0.4, seed=31, skin=(212, 160, 130), hair=(44, 34, 26), stubble=0.5),
     'cookw':       dict(gender=0, age=0.62, muscle=0.45, weight=0.62, seed=32, skin=(226, 180, 152), hair=(110, 60, 36), stubble=0, lips=(168, 84, 86)),
     'cleaner':     dict(gender=0, age=0.68, muscle=0.45, weight=0.58, seed=33, skin=(222, 176, 148), hair=(134, 92, 62), stubble=0, lips=(160, 90, 90)),
     'cleanerm':    dict(gender=1, age=0.7, muscle=0.5, weight=0.55, seed=34, skin=(206, 152, 120), hair=(84, 82, 78), stubble=0.6),
@@ -113,24 +114,132 @@ FACE_TARGETS = [
     ('eyebrows/eyebrows-trans-down', 'eyebrows/eyebrows-trans-up'), ('eyebrows/eyebrows-angle-down', 'eyebrows/eyebrows-angle-up'),
 ]
 
-def build_positions(kind):
+SLIM_TARGETS = ['waist-circ', 'hips-circ', 'underbust-circ', 'bust-circ', 'frontchest-dist', 'upperarm-circ', 'thigh-circ', 'calf-circ', 'knee-circ']
+
+# ---------------- параметры тела: KINDS или файл MakeHuman (bodies/<вид>.mhm) ----------------
+# Модификаторы — как в MakeHuman: 'группа/левый|правый' → значение −1..1 (минус — левый морф, плюс — правый),
+# например 'measure/measure-shoulder-dist-decr|incr' 0.35 или 'armslegs/l-upperarm-fat-decr|incr' 0.3.
+BODIES = os.path.join(OUT, 'bodies')
+FACE_GROUPS = ('head/', 'forehead/', 'eyebrows/', 'neck/', 'eyes/', 'nose/', 'mouth/', 'ears/', 'chin/', 'cheek/')
+
+def kind_modifiers(spec):
+    """slim и shape из KINDS → модификаторы MakeHuman"""
+    modifiers = {}
+    shape = spec.get('shape', {})
+    for name in SLIM_TARGETS:
+        modifiers['measure/measure-%s-decr|incr' % name] = -spec.get('slim', 0)
+    # плечи — уже вдвое слабее (иначе голова кажется большой)
+    modifiers['measure/measure-shoulder-dist-decr|incr'] = -spec.get('slim', 0) * 0.5
+    # shape: имя морфа без -incr/-decr; 'lr-' — обе стороны; перекрывает slim для того же обхвата
+    for name, value in shape.items():
+        for side in ([name.replace('/lr-', '/l-'), name.replace('/lr-', '/r-')] if '/lr-' in name else [name]):
+            modifiers[side + '-decr|incr'] = value
+    return {name: value for name, value in modifiers.items() if abs(value) > 1e-6}
+
+def load_mhm(path):
+    macros, modifiers = {}, {}
+    for line in open(path, encoding='utf-8'):
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == 'modifier':
+            name, value = parts[1], float(parts[2])
+            if name.startswith('macrodetails'):
+                macros[name.split('/')[1]] = value
+            elif abs(value) > 1e-6:
+                modifiers[name] = value
+    return macros, modifiers
+
+def body_spec(kind):
     spec = KINDS[kind]
+    body = dict(gender=spec['gender'], age=spec['age'], muscle=spec['muscle'], weight=spec['weight'], height=0.5, proportions=0.5,
+                ethnic={'african': 0, 'asian': 0, 'caucasian': 1}, modifiers=kind_modifiers(spec), seed=spec['seed'], face=None, source='KINDS')
+    path = os.path.join(BODIES, kind + '.mhm')
+    if os.path.exists(path):
+        macros, modifiers = load_mhm(path)
+        body.update(gender=macros.get('Gender', body['gender']), age=macros.get('Age', body['age']), muscle=macros.get('Muscle', 0.5),
+                    weight=macros.get('Weight', 0.5), height=macros.get('Height', 0.5), proportions=macros.get('BodyProportions', 0.5),
+                    modifiers={name: value for name, value in modifiers.items() if not name.startswith(FACE_GROUPS)}, source=path)
+        ethnic = {race: macros.get(race.capitalize(), 0) for race in ('african', 'asian', 'caucasian')}
+        if sum(ethnic.values()) > 0:
+            body['ethnic'] = {race: value / sum(ethnic.values()) for race, value in ethnic.items()}
+        # черты лица: если в файле их нет — случайные по seed, как без файла
+        face = {name: value for name, value in modifiers.items() if name.startswith(FACE_GROUPS)}
+        if face:
+            body['face'] = face
+    return body
+
+def export_mhm(kind):
+    """bodies/<вид>.mhm из KINDS — начальная точка для правки в MakeHuman 1.2 (Файлы → Загрузить)"""
+    body = body_spec(kind) if not os.path.exists(os.path.join(BODIES, kind + '.mhm')) else None
+    if body is None:
+        print(kind, 'уже есть', os.path.join(BODIES, kind + '.mhm'), '- не перезаписан'); return
+    os.makedirs(BODIES, exist_ok=True)
+    lines = ['# Aliens26: начальные параметры вида %s (mhbuild.py)' % kind, 'version v1.2', 'name %s' % kind,
+             'modifier macrodetails/Gender %f' % body['gender'], 'modifier macrodetails/Age %f' % body['age'],
+             'modifier macrodetails/African 0.000000', 'modifier macrodetails/Asian 0.000000', 'modifier macrodetails/Caucasian 1.000000',
+             'modifier macrodetails-universal/Muscle %f' % body['muscle'], 'modifier macrodetails-universal/Weight %f' % body['weight'],
+             'modifier macrodetails-height/Height 0.500000', 'modifier macrodetails-proportions/BodyProportions 0.500000']
+    for name, value in sorted(body['modifiers'].items()):
+        if abs(value) > 1:
+            # записывается как есть (сборка по файлу совпадёт с KINDS); MakeHuman при загрузке ограничит до ±1
+            print(kind, 'модификатор %s = %.2f за пределами ползунка MakeHuman (±1)' % (name, value))
+        lines.append('modifier %s %f' % (name, value))
+    lines += ['skeleton game_engine.mhskel', 'subdivide False']
+    open(os.path.join(BODIES, kind + '.mhm'), 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+    print(kind, '->', os.path.join(BODIES, kind + '.mhm'))
+
+missing_targets = set()
+def add_optional(positions, name, weight):
+    try:
+        add_target(positions, name, weight)
+    except FileNotFoundError:
+        if name not in missing_targets:
+            missing_targets.add(name); print('нет морфа', name)
+
+def apply_modifier(positions, name, value):
+    group, _, pair = name.partition('/')
+    left, _, right = pair.partition('|')
+    if not right:
+        print('модификатор без пары пропущен:', name); return
+    # правый морф — основа левого с другим окончанием: r-upperarm-fat-decr|incr → r-upperarm-fat-incr
+    right = left.rsplit('-', 1)[0] + '-' + right
+    add_optional(positions, '%s/%s' % (group, left if value < 0 else right), abs(value))
+
+def build_positions(kind):
+    body = body_spec(kind)
     positions = base.copy()
-    gender = {'female': 1 - spec['gender'], 'male': spec['gender']}
-    ages = age_weights(spec['age'])
-    muscles = level_weights(spec['muscle'], 'minmuscle', 'maxmuscle')
-    weights = level_weights(spec['weight'], 'minweight', 'maxweight')
+    gender = {'female': 1 - body['gender'], 'male': body['gender']}
+    ages = age_weights(body['age'])
+    muscles = level_weights(body['muscle'], 'minmuscle', 'maxmuscle')
+    weights = level_weights(body['weight'], 'minweight', 'maxweight')
+    heights = level_weights(body['height'], 'minheight', 'maxheight')
+    # пропорции: 0 — необычные, 0.5 — обычные (без морфа), 1 — идеальные
+    proportions = {'uncommonproportions': max(0, 1 - body['proportions'] / 0.5), 'idealproportions': max(0, (body['proportions'] - 0.5) / 0.5)}
     for gender_name, gender_weight in gender.items():
         for age_name, age_weight in ages.items():
-            add_target(positions, 'macrodetails/caucasian-%s-%s' % (gender_name, age_name), gender_weight * age_weight)
+            for race, race_weight in body['ethnic'].items():
+                add_optional(positions, 'macrodetails/%s-%s-%s' % (race, gender_name, age_name), gender_weight * age_weight * race_weight)
             for muscle_name, muscle_weight in muscles.items():
                 for weight_name, weight_weight in weights.items():
-                    add_target(positions, 'macrodetails/universal-%s-%s-%s-%s' % (gender_name, age_name, muscle_name, weight_name),
-                               gender_weight * age_weight * muscle_weight * weight_weight)
-    rng = np.random.default_rng(spec['seed'])
-    for decrease, increase in FACE_TARGETS:
-        amount = float(rng.uniform(-0.55, 0.55))
-        add_target(positions, increase if amount > 0 else decrease, abs(amount))
+                    base_weight = gender_weight * age_weight * muscle_weight * weight_weight
+                    add_target(positions, 'macrodetails/universal-%s-%s-%s-%s' % (gender_name, age_name, muscle_name, weight_name), base_weight)
+                    for height_name, height_weight in heights.items():
+                        if not height_name.startswith('average') and base_weight * height_weight > 1e-4:
+                            add_optional(positions, 'macrodetails/height/%s-%s-%s-%s-%s' % (gender_name, age_name, muscle_name, weight_name, height_name), base_weight * height_weight)
+                    for proportion_name, proportion_weight in proportions.items():
+                        if base_weight * proportion_weight > 1e-4:
+                            add_optional(positions, 'macrodetails/proportions/%s-%s-%s-%s-%s' % (gender_name, age_name, muscle_name, weight_name, proportion_name), base_weight * proportion_weight)
+    for name, value in body['modifiers'].items():
+        apply_modifier(positions, name, value)
+    if body['face']:
+        for name, value in body['face'].items():
+            apply_modifier(positions, name, value)
+    else:
+        rng = np.random.default_rng(body['seed'])
+        for decrease, increase in FACE_TARGETS:
+            amount = float(rng.uniform(-0.55, 0.55))
+            add_target(positions, increase if amount > 0 else decrease, abs(amount))
+    if body['source'] != 'KINDS':
+        print(kind, 'параметры тела из', body['source'])
     return positions
 
 # ---------------- скелет ----------------
@@ -326,6 +435,20 @@ def skin_image(kind, positions):
     chin_beard = band(rel_y, -2.05, -1.15, 0.15) * band(rel_x, -1.0, 1.35, 0.12)
     moustache = band(rel_y, -0.98, -0.7, 0.06) * band(rel_x, -1.0, 0.55, 0.1)
     stubble_map = np.clip(cheek_beard + chin_beard + moustache, 0, 1) * (rel_z > -1.25) * np.clip(1 - np.clip((lips - 0.15) / 0.2, 0, 1), 0, 1)
+    # худоба (slim, 0..1): обхваты талии, бёдер, груди, рук и ног уменьшаются целевыми морфами MakeHuman (measure-*-decr);
+    # суставы считаются потом по той же сетке — скелет следует за телом
+    shape = spec.get('shape', {})
+    for name in SLIM_TARGETS:
+        if 'measure/measure-' + name not in shape:
+            add_target(positions, 'measure/measure-%s-decr' % name, spec.get('slim', 0))
+    # плечи — уже вдвое слабее (иначе голова кажется большой)
+    if 'measure/measure-shoulder-dist' not in shape:
+        add_target(positions, 'measure/measure-shoulder-dist-decr', spec.get('slim', 0) * 0.5)
+    # отдельные параметры тела (shape): имя морфа MakeHuman без -incr/-decr → значение −1..1 (плюс — incr, минус — decr);
+    # 'lr-' в имени — обе стороны (l- и r-). Перекрывают slim для того же обхвата.
+    for name, value in shape.items():
+        for side in ([name.replace('/lr-', '/l-'), name.replace('/lr-', '/r-')] if '/lr-' in name else [name]):
+            add_target(positions, '%s-%s' % (side, 'incr' if value > 0 else 'decr'), abs(value))
     rng = np.random.default_rng(spec['seed'])
     base_color = np.array(spec['skin'], dtype=np.float32) / 255
     base_color = base_color * np.array([0.95, 0.88, 0.84])          # теплее и чуть темнее: под ярким светом кожа не белеет
@@ -358,6 +481,11 @@ def skin_image(kind, positions):
 json.dump(topology, open(os.path.join(OUT, 'topology.json'), 'w'))
 # ONLY=doctor,nurse — собрать только эти виды (общая топология пишется всё равно)
 ONLY = [name for name in os.environ.get('ONLY', '').split(',') if name]
+# EXPORT_MHM=engineer,cook — записать bodies/<вид>.mhm из KINDS (для правки в MakeHuman) и выйти
+EXPORT = [name for name in os.environ.get('EXPORT_MHM', '').split(',') if name]
+if EXPORT:
+    for kind in EXPORT: export_mhm(kind)
+    sys.exit(0)
 for kind in KINDS:
     if ONLY and kind not in ONLY: continue
     positions = build_positions(kind)

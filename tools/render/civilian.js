@@ -24,6 +24,8 @@ function box(width, height, depth, material, radius = 0.01) {
 // top — верх (куртка, блузка, халат, комбинезон), legs — брюки, shoes — обувь, hair — волосы,
 // build — ширина плеч и таза (женщина уже в плечах), coat — длинный халат до колен, vest — сигнальный жилет,
 // helmet — каска, glasses — очки, boots — рабочие ботинки вместо туфель, gloves — перчатки, belt — пояс с инструментом
+// виды, переведённые на новый крой одежды (прямой силуэт, складки-гребни)
+const REWORKED = new Set(['engineer', 'cook']);
 export const CIVILIANS = {
   man: { top: 0x55606c, legs: 0x2f4664, shoes: 0x3a2a1e, hair: 0x2a2018, skin: 0xc89a7c, build: 1, hairStyle: 'short' },
   woman: { top: 0x9c3e3a, legs: 0x2a2a30, shoes: 0x1e1a18, hair: 0x6a3a22, skin: 0xd8ac90, build: 0.86, hairStyle: 'long' },
@@ -46,8 +48,8 @@ export const CIVILIANS = {
   electrician: { top: 0x2c3c66, legs: 0x2c3c66, shoes: 0x2a2620, hair: 0x3a2c20, skin: 0xc0926e, build: 1.02, hairStyle: 'short', coverall: true, belt: true, gloves: 0xd8b020, boots: true },
   plumber: { top: 0x4a5a48, legs: 0x4a5a48, shoes: 0x2a2620, hair: 0x2a2018, skin: 0xbc8e6c, build: 1.05, hairStyle: 'short', coverall: true, belt: true, gloves: 0x3a3a34, boots: true, baseballCap: 0x2a4a8a },
   // повара: белая куртка, колпак, фартук
-  cook: { top: 0xeeeeea, legs: 0x3a3a3c, shoes: 0x161616, hair: 0x2a2018, skin: 0xc49a7e, build: 1.06, hairStyle: 'short', chefHat: 0xf6f6f4, apron: 0xf0f0ec },
-  cookw: { top: 0xeeeeea, legs: 0x3a3a3c, shoes: 0x161616, hair: 0x6a3a22, skin: 0xd8ac90, build: 0.88, hairStyle: 'long', female: true, chefHat: 0xf6f6f4, apron: 0xf0f0ec },
+  cook: { top: 0xeeeeea, legs: 0x3a3a3c, shoes: 0x161616, hair: 0x2a2018, skin: 0xc49a7e, build: 1.06, hairStyle: 'short', chefHat: 0xf6f6f4, apron: 0xe0dccf },
+  cookw: { top: 0xeeeeea, legs: 0x3a3a3c, shoes: 0x161616, hair: 0x6a3a22, skin: 0xd8ac90, build: 0.88, hairStyle: 'long', female: true, chefHat: 0xf6f6f4, apron: 0xe0dccf },
   // уборка помещений: синий рабочий халат, резиновые перчатки
   cleaner: { top: 0x3a68a0, legs: 0x3a3a48, shoes: 0x26221e, hair: 0x8a5a3a, skin: 0xd8ac90, build: 0.88, hairStyle: 'long', female: true, coat: 0x3a68a0, gloves: 0xc84a3a },
   cleanerm: { top: 0x3a68a0, legs: 0x3a3a48, shoes: 0x26221e, hair: 0x4a4a46, skin: 0xc0926e, build: 1, hairStyle: 'short', coat: 0x3a68a0, gloves: 0xc84a3a },
@@ -229,12 +231,24 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   const belted = look.belt || look.uniform || kind === 'man' || kind === 'boy';
   const folds = (amount, extra = {}) => ({ folds: { amount, tucked: !!look.boots, belted, ...extra } });
   const foldAmount = look.uniform ? 0.65 : coverall ? 1.25 : kind === 'woman' || kind === 'girl' ? 0.6 : 1;
+  // новый крой (как у халата врача): прямой силуэт корпуса без рельефа тела, складки — узкие гребни ткани
+  // (продольные на рукавах, штанинах и спине); пока только у части видов, остальные — по-старому
+  const reworked = REWORKED.has(kind);
+  const hipY = rest0.joints.thigh_l[0].y;
+  const jacketShape = reworked ? { ease: 0.012, flare: 0.02, bottom: coverall ? hipY + 0.06 : hipY - 0.02 } : null;
+  const jacketBackFolds = reworked ? { count: 8, depth: 0.016, flare: 0.02, bottom: coverall ? hipY - 0.1 : jacketShape.bottom } : null;
+  const ridgeFolds = { folds: { ridges: true, amount: 1, tucked: !!look.boots } };
   if (look.hazmat) {
     layer('coverall', materials.top, 0.02, { density: 1.6, ...folds(1.4, { scale: 1.7, hem: false }) });
     layer('glove', materials.glove, 0.026, { relax: 0, loose: 0 });
     layer('boot', materials.boot, 0.03, { relax: 12, loose: 0 });
+  } else if (coverall && reworked) {
+    layer('coverall', materials.top, 0.009, { relax: 40, flat: 12, trapezoid: jacketShape, backFolds: jacketBackFolds, ...ridgeFolds });
   } else if (coverall) {
     layer('coverall', materials.top, 0.009, folds(foldAmount));
+  } else if (reworked) {
+    layer('legs', materials.legs, 0.005, ridgeFolds);
+    layer(look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: 0.008, relax: 40, flat: 12, trapezoid: jacketShape, backFolds: jacketBackFolds, ...ridgeFolds });
   } else {
     layer('legs', materials.legs, 0.005, folds(foldAmount));
     layer(look.coat ? 'sleeveless' : look.shortSleeves ? 'shortTop' : 'top', materials.top, 0.009, { flare: look.uniform ? 0.022 : 0.008, ...folds(foldAmount * (look.coat ? 0.5 : 1)) });
@@ -251,11 +265,17 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
     if (!spec.handsOnHead) garments.push({ part: 'skirt', slit: kneeling ? 1 : rest0.joints.calf_l[0].y + 0.17, slitWidth: kneeling ? 0.04 : 0.006, toKnee: true, hang: 0.06, material: materials.coat, offset: 0.02, relax: 20, flat: 12, trapezoid: coatShape, backFolds: coatBackFolds,
       vent: rest0.joints.calf_l[0].y + 0.26 });
   }
-  if (look.vest) {
+  if (look.vest && reworked) {
+    // жилет — поверх прямого силуэта куртки, ровный (без рельефа тела)
+    const vestShape = { ...jacketShape, ease: jacketShape.ease + 0.012 };
+    layer('vest', materials.vest, 0.022, { relax: 40, flat: 12, trapezoid: vestShape });
+    layer('vestStripes', materials.stripe, 0.025, { thin: true, maskSmooth: 0, relax: 40, flat: 12, trapezoid: { ...vestShape, ease: vestShape.ease + 0.003 } });
+  } else if (look.vest) {
     layer('vest', materials.vest, 0.022);
     layer('vestStripes', materials.stripe, 0.025, { thin: true, maskSmooth: 0 });
   }
-  if (look.apron) layer('apron', materials.apron, look.coat ? 0.026 : 0.02, { thin: true });
+  // фартук у нового кроя — отдельное полотнище (human.apron), ниже
+  if (look.apron && !reworked) layer('apron', materials.apron, look.coat ? 0.026 : 0.02, { thin: true });
   if (look.gloves && !look.hazmat) layer('glove', materials.glove, 0.004, { thin: true, relax: 0, loose: 0 });
   // обувь — по форме стопы; ремень — лента по поясу брюк
   if (!look.hazmat) layer(look.boots ? 'workBoot' : 'shoes', look.boots ? materials.boot : materials.shoe, look.boots ? 0.014 : 0.009, { relax: look.boots ? 12 : 2, loose: 0, thin: true });
@@ -264,14 +284,17 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   // свободный крой (доля 0..1): форма и рабочие комбинезоны — мешковатые; остальная одежда — чуть свободнее тела
   const baggy = look.uniform ? { torso: 0.85, legs: 1, arms: 0.65 }
     : look.hazmat ? { torso: 0.6, legs: 0.7, arms: 0.5, tucked: true }
+    : coverall && reworked ? { torso: 0.36, legs: 0.6, arms: 0.62, armsExtra: 0.007, tucked: !!look.boots }
     : coverall ? { torso: 1, legs: 1, arms: 0.8, tucked: !!look.boots }
     : look.coat ? { torso: 0.75, legs: 0.45, arms: 0.8, armsExtra: 0.016 }
+    : reworked ? { torso: 0.45, legs: 0.5, arms: 0.6, armsExtra: 0.008 }
     : { torso: 0.45, legs: 0.4, arms: 0.3 };
   // бронежилет поверх верхнего слоя одежды
   const armorOffset = look.coat || look.hazmat ? 0.044 : 0.035;
-  if (armed) layer('vest', materials.armor, armorOffset, { relax: look.coat ? 40 : 12, loose: 0, trapezoid: look.coat ? { ease: coatShape.ease + 0.016, flare: coatShape.flare } : null });
+  const topShape = look.coat ? coatShape : jacketShape;
+  if (armed) layer('vest', materials.armor, armorOffset, { relax: topShape ? 40 : 12, loose: 0, trapezoid: topShape ? { ...topShape, ease: topShape.ease + 0.016 } : null });
   const weapon = armed && spec.ready && !spec.limp ? placeRifle(kind, spec, pelvis, torsoQuat) : null;
-  const human = buildHumanBody({ kind, look, garments, baggy, trapezoid: look.coat ? coatShape : null, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
+  const human = buildHumanBody({ kind, look, garments, baggy, trapezoid: topShape, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
     pelvis, pelvisQuat, torsoQuat, headQuat, hands: weapon ? weapon.hands : spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead, grip: !!weapon,
     elbowPoles: weapon ? weapon.elbowPoles : spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
   });
@@ -432,6 +455,12 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
     add(human.collar({ material: materials.top, gap: 0.12, offset: 0.009, stand: 0.034, fall: 0 }));
   } else if (look.nurseCap) {
     add(human.collar({ material: materials.top, gap: 0.3, offset: 0.009, stand: 0.02, fall: 0.035, tips: 0.02 }));
+  }
+  if (look.apron && reworked) {
+    // фартук: сплошное полотнище спереди от груди до колен, лямка вокруг шеи
+    add(human.apron({ material: materials.apron }));
+    const strapTop = frame.shoulderY - 0.1;
+    for (const side of [-1, 1]) add(segment(front(side * 0.1, strapTop, 0.016), human.torsoPoint(side * 0.06, rest.joints.neck_01[0].y - 0.02, rest.joints.neck_01[0].z - 0.02), 0.008, 0.008, materials.apron, 4));
   }
   if (look.tie) {
     add(segment(front(0, frame.shoulderY + 0.04, 0.019), front(0, chestY - 0.04, 0.019), 0.012, 0.022, materials.tie, 4)).scale.set(1, 1, 0.3);
