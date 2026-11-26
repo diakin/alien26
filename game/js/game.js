@@ -665,7 +665,19 @@
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
   var VISION_CELLS = 24, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
-  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0 };
+  // pending — открытые, но ещё не показанные клетки: картинка тумана обновляется не на каждом шаге (дорого: пересборка
+  // кусков карты), а когда бойцы остановились или раз в FOG_REDRAW_MS во время движения. Видимость пришельцев —
+  // по-прежнему на каждом шаге.
+  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0, pending: [], shownAt: 0 };
+  var FOG_REDRAW_MS = 1200;
+  function applyFogReveal(now) {
+    if (!fog.pending.length) return;
+    var moving = units.some(function (unit) { return unit.side === 'squad' && unit.path.length > 0; });
+    if (moving && now - fog.shownAt < FOG_REDRAW_MS) return;
+    fog.version++;
+    dropFogChunks(fog.pending);
+    fog.pending = []; fog.shownAt = now;
+  }
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
   function fogEnabled() {
@@ -751,6 +763,7 @@
   }
   function newFogGrids() { var grids = []; for (var level = 0; level < LEVELS; level++) grids.push(new Uint8Array(GRID * GRID)); return grids; }
   function computeFog() {
+    var computeStart = performance.now();
     var next = newFogGrids(), touched = newFogGrids();
     units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next, null, null, touched); });
     fog.visible = next;
@@ -772,17 +785,17 @@
         }
       }
     }
-    var opened = [];
     for (var level = 0; level < LEVELS; level++) {
       var explored = fog.explored[level], seen = next[level], near = touched[level];
       for (var cell = 0; cell < GRID * GRID; cell++) {
-        if (!explored[cell] && (seen[cell] || near[cell])) { explored[cell] = 1; opened.push(cell); }
+        if (!explored[cell] && (seen[cell] || near[cell])) { explored[cell] = 1; fog.pending.push(cell); }
       }
     }
-    if (opened.length) { fog.version++; dropFogChunks(opened); }
+    tileStats.computeMs += performance.now() - computeStart; tileStats.computes++;
   }
   // пересчёт, когда сменились клетки бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
   function updateFog(now) {
+    if (fogEnabled()) applyFogReveal(now);
     if (!fogEnabled() || now < fog.checkAt) return;
     fog.checkAt = now + 200;
     var parts = [];
@@ -873,6 +886,7 @@
     if (!fogEnabled() || !fog.explored) return null;
     var key = fog.version + ':' + viewLevel + (cut ? 'c' : 'f');
     if (fogLayerCache.key === key) return fogLayerCache.canvas;
+    var layerStart = performance.now();
     var size = GRID * FOG_PX, columns = fogColumnTops(viewLevel, cut), far = 1e9;
     var distance = new Float32Array(size * size);
     for (var y = 0; y < size; y++) {
@@ -916,6 +930,7 @@
     }
     layerContext.putImageData(image, 0, 0);
     fogLayerCache = { key: key, canvas: canvasLayer };
+    tileStats.layerMs += performance.now() - layerStart; tileStats.layers++;
     return canvasLayer;
   }
   var fogItemCache = { key: '', items: [] };
@@ -979,16 +994,22 @@
   function dropFogChunks(cells) {
     if (!chunks.size) return;
     var touchedChunks = {};
+    var columns = fogColumnTops(view.level, view.cut), seenCells = {};
     cells.forEach(function (cell) {
+      if (seenCells[cell]) return;
+      seenCells[cell] = true;
       var col = cell % GRID, row = Math.floor(cell / GRID);
-      var corners = Iso.tileCorners(col, row, 0).concat(Iso.tileCorners(col, row, LEVELS * LEVEL_H + 4));
+      // столб текущего вида; куски других видов (уровней) пересобираются целиком при смене вида
+      var corners = Iso.tileCorners(col, row, columns.bases[cell]).concat(Iso.tileCorners(col, row, columns.tops[cell]));
       var rect = quadRect(corners, 4);
       for (var chunkY = Math.floor(rect.y / CHUNK); chunkY <= Math.floor((rect.y + rect.height) / CHUNK); chunkY++)
         for (var chunkX = Math.floor(rect.x / CHUNK); chunkX <= Math.floor((rect.x + rect.width) / CHUNK); chunkX++) touchedChunks[chunkX + ':' + chunkY] = true;
     });
-    chunks.forEach(function (chunk, key) {
+    var currentPrefix = tileView(view.level, view.cut).key + (showGrid ? 'g' : '') + ':';
+    Array.from(chunks.keys()).forEach(function (key) {
+      if (key.indexOf(currentPrefix) !== 0) { chunks.delete(key); return; }        // другой вид — соберётся заново при показе
       var parts = key.split(':');
-      if (touchedChunks[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunk.stale = true;
+      if (touchedChunks[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunks.get(key).stale = true;
     });
   }
 
@@ -1079,7 +1100,7 @@
   var TILESET = MAP.tileset || null;
   // атлас может быть разбит на страницы (большие карты): TILESET.images, TILESET.shadowImages; номер страницы — в записи тайла
   var tileImage = null, shadowImage = null, tileImages = [], shadowImages = [], shadowCanvas = null, groundPieces = null, tileViews = {};
-  var tileStats = { ground: 0, shadows: 0, pieces: 0, chunkMs: 0, fogMs: 0 };
+  var tileStats = { ground: 0, shadows: 0, pieces: 0, chunkMs: 0, fogMs: 0, computeMs: 0, computes: 0, layerMs: 0, layers: 0 };
   if (TILESET) {
     tileImages = (TILESET.images || [TILESET.image]).map(function (source) { return Assets.image(source, Assets.URGENT); });
     shadowImages = (TILESET.shadowImages || [TILESET.shadows]).map(function (source) { return Assets.image(source, Assets.URGENT); });
