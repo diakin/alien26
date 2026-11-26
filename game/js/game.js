@@ -2036,7 +2036,7 @@
     if (now < talk.freeAt) return;
     var seen = isSeen(alien);
     var seconds = Sound.alienTalk({ pitch: alienVoice(alien), mood: mood, radio: !seen, distance: seen ? screenDistance(alien) : 0 });
-    talk.freeAt = now + seconds * 1000 + 250;
+    talk.freeAt = now + seconds * 1000 + 60;       // реплики идут почти без пауз
   }
   function updateTalk(now) {
     if (phase !== 'aliens' || !talk.queue.length || now < talk.queue[0].at || now < talk.freeAt) return;
@@ -2048,8 +2048,8 @@
     if (!aliens.length) return;
     var shuffled = aliens.slice().sort(function () { return Math.random() - 0.5; });
     var now = performance.now();
-    talk.queue = [{ at: now + 300, alien: shuffled[0], mood: 'call' }];
-    for (var index = 1; index < Math.min(shuffled.length, 1 + 1 + Math.floor(Math.random() * 2)); index++) talk.queue.push({ at: now + 300, alien: shuffled[index], mood: 'reply' });
+    talk.queue = [{ at: now + 150, alien: shuffled[0], mood: 'call' }];
+    for (var index = 1; index < Math.min(shuffled.length, 1 + 2 + Math.floor(Math.random() * 2)); index++) talk.queue.push({ at: now + 150, alien: shuffled[index], mood: Math.random() < 0.3 ? 'alert' : 'reply' });
   }
   function startAlienPhase() {
     phase = 'aliens';
@@ -2189,7 +2189,8 @@
   // настроение музыки: мирно — общая тема; бой без контакта (пришельцев ещё не видно) — «Высадка»; контакт или стрельба
   // на этом или прошлом ходу — «Штурм»; задание кончилось (эвакуация, зачистка) — «Возвращение»
   function musicMood() {
-    if (mission.over) return 'debrief';
+    // конец задания: если погибли бойцы — душераздирающая тема, иначе «Возвращение»
+    if (mission.over) return startUnits.some(function (unit) { return unit.dead && isFighter(unit) && unit.kind !== 'mech' && !unit.staff; }) ? 'mourn' : 'debrief';
     return !combat ? 'calm' : turn - lastShotTurn <= 1 || inContact() ? 'battle' : 'tactical';
   }
   function updateMusic(now) {

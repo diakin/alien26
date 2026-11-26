@@ -16,7 +16,7 @@ var Settings = (function () {
     { key: 'soundVolume', label: 'Громкость звуков', type: 'range', min: 0, max: 100, step: 5, value: 70, format: function (value) { return value + '%'; } },
     { key: 'musicVolume', label: 'Громкость музыки', type: 'range', min: 0, max: 100, step: 5, value: 45, format: function (value) { return value + '%'; } },
     { key: 'musicTheme', label: 'Музыка', type: 'select', value: 0, options: [[0, 'По обстановке'], [1, 'Только общая'], [2, 'Только тактическая']] },
-    { key: 'musicSet', label: 'Музыка боя', type: 'select', value: 0, options: [[0, 'Все темы по очереди'], [1, 'Высадка и штурм'], [2, 'Тень (фон, как в UFO)'], [3, 'Зонд, Улей, Шахта (повторы, как в UFO)'], [4, 'Мрак']] },
+    { key: 'musicSet', label: 'Музыка боя', type: 'select', value: 0, options: [[0, 'Все темы по очереди'], [1, 'Высадка и штурм'], [2, 'Тень (фон, как в UFO)'], [3, 'Зонд, Улей, Шахта (повторы, как в UFO)'], [4, 'Мрак'], [5, 'Импульс, Тревога, Стук (резкие акценты)'], [6, 'Утрата, Плач (душераздирающие)']] },
     { key: 'musicPause', label: 'Паузы в музыке', type: 'select', value: 30, options: [[30, '30 с играет, 30 с тишина'], [60, '30 с играет, 60 с тишина'], [0, 'Без пауз']] },
     { key: 'ambienceVolume', label: 'Громкость фона (ветер)', type: 'range', min: 0, max: 100, step: 5, value: 35, format: function (value) { return value + '%'; } },
     { group: 'ГРАФИКА' },
