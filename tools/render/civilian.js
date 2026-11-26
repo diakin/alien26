@@ -181,9 +181,12 @@ export const ARMED_POSES = {
   },
 };
 // ходьба с оружием: ноги — как у гражданского, автомат у груди
+// Таз ниже, чем у гражданского (как у бойца, 0,9 м): иначе в крайних точках шага нога не дотягивается до стопы,
+// опорная стопа отрывается от земли и отстаёт — ноги скользят относительно перемещения.
 export function armedWalk(phase) {
   const base = civilianWalk(phase);
-  return { ...base, hands: undefined, elbowPoles: undefined, twist: 0.12 + base.twist * 0.25, lean: 0.08, head: [0.05, 0, 0], aimPitch: -0.5, ready: 'low' };
+  const bob = Math.cos(phase * Math.PI * 4);
+  return { ...base, pelvis: V(0, 0.875 + 0.02 * bob, 0.02), hands: undefined, elbowPoles: undefined, twist: 0.12 + base.twist * 0.25, lean: 0.08, head: [0.05, 0, 0], aimPitch: -0.5, ready: 'low' };
 }
 // автомат по позе: положение у плеча в координатах модели, кисти — на пистолетной рукоятке и цевье
 function placeRifle(kind, spec, pelvis, torsoQuat) {

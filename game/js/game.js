@@ -26,7 +26,7 @@
     civilian: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true },
     child: { size: 1, speed: 1.1, stride: 0.92, height: 1.2, pickWidth: 18, canKneel: true },
     // персонал базы при обороне: военнослужащие по контракту, модель гражданского с бронежилетом, каской и автоматом
-    staff: { size: 1, speed: 1.4, stride: 1.4, height: 1.78, pickWidth: 24, canKneel: true }
+    staff: { size: 1, speed: 1.4, stride: 1.32, height: 1.78, pickWidth: 24, canKneel: true }
   };
   // боец или машина отряда (не гражданский)
   function isFighter(unit) { return unit.side === 'squad' && unit.kind !== 'civilian' && unit.kind !== 'child'; }
