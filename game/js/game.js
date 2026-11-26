@@ -4379,8 +4379,33 @@
 
   // ---------------- цикл ----------------
   var lastTime = performance.now();
+  // Счётчик кадров (настройка «Счётчик FPS»): кадров в секунду, средний и худший промежуток между кадрами
+  // за полсекунды и время работы скрипта в кадре (без работы видеокарты и браузера).
+  var fpsMeter = { since: 0, frames: 0, worst: 0, work: 0, text: '' };
+  function measureFrame(now, interval, work) {
+    if (!fpsMeter.since) fpsMeter.since = now;
+    fpsMeter.frames++; fpsMeter.worst = Math.max(fpsMeter.worst, interval); fpsMeter.work += work;
+    var elapsed = now - fpsMeter.since;
+    if (elapsed < 500) return;
+    fpsMeter.text = 'FPS ' + Math.round(fpsMeter.frames * 1000 / elapsed) + '  ·  кадр ' + (elapsed / fpsMeter.frames).toFixed(1) +
+      ' мс (худший ' + fpsMeter.worst.toFixed(0) + ')  ·  скрипт ' + (fpsMeter.work / fpsMeter.frames).toFixed(1) + ' мс';
+    fpsMeter.since = now; fpsMeter.frames = 0; fpsMeter.worst = 0; fpsMeter.work = 0;
+  }
+  function drawFps() {
+    if (!Settings.values.showFps || !fpsMeter.text) return;
+    context.save();
+    context.font = 'bold 11px Consolas, monospace';
+    var width = context.measureText(fpsMeter.text).width + 16, x = viewWidth - width - 10, y = viewHeight - 30;
+    context.fillStyle = 'rgba(10, 13, 15, 0.78)';
+    context.fillRect(x, y, width, 20);
+    context.fillStyle = '#bfe8c8';
+    context.textBaseline = 'middle';
+    context.fillText(fpsMeter.text, x + 8, y + 10);
+    context.restore();
+  }
   function frame(now) {
     window.requestAnimationFrame(frame);          // сразу: ошибка в кадре не останавливает игру
+    var workStart = performance.now(), interval = now - lastTime;
     var seconds = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
     var scroll = 700 * seconds;
@@ -4429,6 +4454,8 @@
       context.restore();
     }
     if (window.Panel) window.Panel.update();
+    measureFrame(now, interval, performance.now() - workStart);
+    drawFps();
   }
 
   // плашка загрузки графики слева вверху, пока очередь не опустеет
