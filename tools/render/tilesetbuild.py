@@ -298,6 +298,10 @@ def map_from_layout(layout):
     }
     if gates:
         result['gates'] = gates
+    # фонтаны: центр чаши (клетки) и уровень — воду игра рисует сама (game.js, drawFountains)
+    fountains = [[item['col'] + item['cols'] / 2, item['row'] + item['rows'] / 2, item['level']] for item in layout['objects'] if item['kind'] == 'fountain']
+    if fountains:
+        result['fountains'] = fountains
     return result
 
 

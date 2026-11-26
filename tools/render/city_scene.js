@@ -897,15 +897,170 @@ function buildTree(item, cx, cz) {
   }
   return group;
 }
-function buildHedge(width, depth, seed) {
-  const group = new THREE.Group();
-  const material = leafMaterial(0x46703a);
-  for (let blob = 0; blob < 3; blob++) {
-    const mesh = new THREE.Mesh(blobGeometry(0.5, seed * 7 + blob, 2), material);
-    mesh.scale.set(width / 2.4, 0.95, depth / 1.25);
-    mesh.position.set(width * (0.2 + blob * 0.3), 0.5, depth / 2);
-    group.add(mesh);
+// ---------- живая изгородь: подстриженная туя ----------
+// Сечение — прямоугольник со скруглёнными плечами, чуть сужен кверху; поверхность неровная, текстура — мелкие
+// чешуйчатые веточки, по ней карта нормалей. Тайл изгороди у всех клеток один (подпись не зависит от места),
+// поэтому шум и текстура вдоль изгороди периодичны с шагом в клетку: соседние клетки стыкуются без шва.
+export const HEDGE_HEIGHT = 1.5;
+function hash3(x, y, z, seed) {
+  let value = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 144665);
+  value = Math.imul(value ^ (value >>> 13), 1274126177);
+  return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
+}
+// period — период по x в узлах решётки (0 — без периода)
+function valueNoise3(x, y, z, seed, period = 0) {
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
+  const wrap = (index) => (period ? ((index % period) + period) % period : index);
+  const fx = x - x0, fy = y - y0, fz = z - z0;
+  const smooth = (value) => value * value * (3 - 2 * value);
+  const sx = smooth(fx), sy = smooth(fy), sz = smooth(fz);
+  let total = 0;
+  for (let corner = 0; corner < 8; corner++) {
+    const dx = corner & 1, dy = (corner >> 1) & 1, dz = (corner >> 2) & 1;
+    const weight = (dx ? sx : 1 - sx) * (dy ? sy : 1 - sy) * (dz ? sz : 1 - sz);
+    total += weight * hash3(wrap(x0 + dx), y0 + dy, z0 + dz, seed);
   }
+  return total * 2 - 1;
+}
+function hedgeTextures() {
+  return once('hedgeTextures', () => {
+    const size = 512;                                  // 1 м поверхности
+    const colorCanvas = makeCanvas(size, size), color = colorCanvas.getContext('2d');
+    const heightCanvas = makeCanvas(size, size), relief = heightCanvas.getContext('2d');
+    color.fillStyle = '#16260f'; color.fillRect(0, 0, size, size);
+    relief.fillStyle = '#202020'; relief.fillRect(0, 0, size, size);
+    const rng = mulberry32(4711);
+    // веточка туи: стебелёк и пары чешуек вдоль него; рисуется с переносом через край (текстура бесшовная)
+    const sprig = (x, y, angle, length, tone) => {
+      for (const shiftX of [-size, 0, size]) for (const shiftY of [-size, 0, size]) {
+        const px = x + shiftX, py = y + shiftY;
+        if (px < -40 || px > size + 40 || py < -40 || py > size + 40) continue;
+        for (const [context, fill] of [[color, null], [relief, true]]) {
+          context.save(); context.translate(px, py); context.rotate(angle);
+          for (let scale = 0; scale < length; scale += 3.2) {
+            const fade = 1 - scale / length * 0.35, width = 3.4 * fade, height = 4.6 * fade;
+            for (const side of [-1, 1]) {
+              if (fill) { const value = clampByte(110 + tone * 0.6 + scale * 2); context.fillStyle = `rgb(${value},${value},${value})`; }
+              else {
+                const green = clampByte(tone + scale * 1.6 + rng() * 18);
+                context.fillStyle = `rgb(${clampByte(green * 0.38)},${green},${clampByte(green * 0.26)})`;
+              }
+              context.beginPath(); context.ellipse(scale, side * 1.6, height / 2, width / 2, side * 0.5, 0, Math.PI * 2); context.fill();
+            }
+          }
+          context.restore();
+        }
+      }
+    };
+    for (let layer = 0; layer < 3; layer++) {
+      const count = [900, 1400, 1700][layer];
+      for (let index = 0; index < count; index++) {
+        const tone = 40 + layer * 22 + rng() * 28;
+        sprig(rng() * size, rng() * size, -Math.PI / 2 + (rng() - 0.5) * 2.4, 10 + rng() * 16, tone);
+      }
+    }
+    // редкие светлые кончики молодых побегов
+    for (let index = 0; index < 500; index++) {
+      const x = rng() * size, y = rng() * size;
+      color.fillStyle = `rgba(${clampByte(120 + rng() * 30)},${clampByte(170 + rng() * 40)},70,0.55)`;
+      color.beginPath(); color.ellipse(x, y, 2.2, 1.4, rng() * 3, 0, Math.PI * 2); color.fill();
+    }
+    return { map: canvasTexture(colorCanvas), normalMap: normalFromCanvas(heightCanvas, 4) };
+  });
+}
+function hedgeMaterial() {
+  return once('hedgeMaterial', () => {
+    const textures = hedgeTextures();
+    return new THREE.MeshStandardMaterial({ map: textures.map, normalMap: textures.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), vertexColors: true, roughness: 0.92 });
+  });
+}
+// профиль сечения: точки (z, y) по обходу «низ спереди -> верх -> низ сзади» и длина дуги до каждой (для текстуры)
+function hedgeProfile(thickness) {
+  const bottom = thickness / 2, top = thickness / 2 - 0.07, radius = 0.2, height = HEDGE_HEIGHT;
+  const points = [];
+  const sideSteps = 10, arcSteps = 7, topSteps = 6;
+  for (let step = 0; step <= sideSteps; step++) {
+    const y = (height - radius) * step / sideSteps;
+    points.push([bottom + (top - bottom) * (y / (height - radius)), y]);
+  }
+  for (let step = 1; step <= arcSteps; step++) {
+    const angle = step / arcSteps * Math.PI / 2;
+    points.push([top - radius + radius * Math.cos(angle), height - radius + radius * Math.sin(angle)]);
+  }
+  // верх: от плеча к середине (слегка выпуклый), середина одна, затем зеркально задняя половина
+  for (let step = 1; step < topSteps; step++) {
+    const z = (top - radius) * (1 - step / topSteps);
+    points.push([z, height + 0.025 * Math.cos(z / (top - radius) * Math.PI / 2)]);
+  }
+  const front = points.length;
+  points.push([0, height + 0.025]);
+  for (let index = front - 1; index >= 0; index--) points.push([-points[index][0], points[index][1]]);
+  let length = 0;
+  return points.map((point, index) => {
+    if (index) length += Math.hypot(point[0] - points[index - 1][0], point[1] - points[index - 1][1]);
+    return { z: point[0], y: point[1], arc: length };
+  });
+}
+function buildHedge(item, width, depth) {
+  const group = new THREE.Group();
+  const alongX = item.cols >= item.rows;
+  const length = alongX ? width : depth, thickness = 0.82;
+  const profile = hedgeProfile(thickness);
+  const worldCross = (alongX ? item.row : item.col) * TILE;
+  const steps = Math.ceil(length / 0.06);
+  const positions = [], uvs = [], colors = [], indices = [];
+  const profileNormal = (index) => {
+    const previous = profile[Math.max(0, index - 1)], next = profile[Math.min(profile.length - 1, index + 1)];
+    const dz = next.z - previous.z, dy = next.y - previous.y, size = Math.hypot(dz, dy) || 1;
+    return [dy / size, -dz / size];                    // наружу: (z, y)
+  };
+  for (let step = 0; step <= steps; step++) {
+    const u = length * step / steps, local = u;            // ровно в пределах клетки: торцы не уходят в соседние
+    profile.forEach((point, index) => {
+      const [normalZ, normalY] = profileNormal(index);
+      // узлов решётки на клетку: 4, 9, 20 — шум повторяется ровно через TILE
+      const sample = (nodes, seed) => valueNoise3(local / TILE * nodes, point.y * nodes / TILE, (worldCross + point.z) * nodes / TILE, seed, nodes);
+      const bump = point.y < 0.02 ? 0 : 0.035 * sample(4, 11) + 0.018 * sample(9, 23) + 0.008 * sample(20, 37);
+      const z = point.z + normalZ * bump, y = Math.max(0, point.y + normalY * bump);
+      positions.push(local, y, depth / 2 + z);
+      uvs.push(local / TILE, point.arc / TILE);           // текстура — ровно один раз на клетку
+      // тень в глубине кроны: внизу и во впадинах темнее
+      const shade = Math.max(0.45, Math.min(1.08, 0.82 + bump * 5 + Math.min(0.2, point.y * 0.25)));
+      colors.push(shade, shade, shade);
+    });
+  }
+  const ring = profile.length;
+  for (let step = 0; step < steps; step++) for (let index = 0; index < ring - 1; index++) {
+    const a = step * ring + index, b = a + ring;
+    indices.push(a, b, a + 1, a + 1, b, b + 1);         // наружу
+  }
+  // торцы (видны у проходов в изгороди)
+  // свои вершины торца: текстура по сечению (z, y), без растяжки от центра
+  for (const end of [0, steps]) {
+    const centerIndex = positions.length / 3;
+    const capX = end ? length - 0.003 : 0.003;           // чуть внутрь: на границе клетки торец срезается плоскостью среза
+    positions.push(capX, HEDGE_HEIGHT * 0.5, depth / 2);
+    uvs.push(0, HEDGE_HEIGHT * 0.5 / TILE); colors.push(0.85, 0.85, 0.85);
+    for (let index = 0; index < ring; index++) {
+      const source = (end * ring + index) * 3;
+      positions.push(capX, positions[source + 1], positions[source + 2]);
+      uvs.push((positions[source + 2] - depth / 2) / TILE, positions[source + 1] / TILE);
+      colors.push(0.8, 0.8, 0.8);
+    }
+    for (let index = 0; index < ring; index++) {
+      const a = centerIndex + 1 + index, b = centerIndex + 1 + (index + 1) % ring;   // последний — замыкает низ
+      if (end) indices.push(centerIndex, b, a); else indices.push(centerIndex, a, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, hedgeMaterial());
+  if (!alongX) { mesh.rotation.y = -Math.PI / 2; mesh.position.set(width, 0, 0); }
+  group.add(mesh);
   return group;
 }
 
@@ -929,7 +1084,7 @@ export function buildCityObject(item) {
   switch (item.kind) {
     case 'roof': return buildRoof(item);
     case 'tree': return buildTree(item, cx, cz);
-    case 'hedge': return buildHedge(width, depth, item.col + item.row * 3);
+    case 'hedge': return buildHedge(item, width, depth);
     case 'bench': {
       const local = new THREE.Group();
       for (const x of [0.18, TILE - 0.18]) {
@@ -983,17 +1138,17 @@ export function buildCityObject(item) {
       add(lathe([[0, 0], [0.75, 0], [0.75, 0.3], [0.35, 0.45], [0.25, 1.1], [0.35, 1.2], [1.7, 1.35], [1.75, 1.5], [1.6, 1.55], [0.3, 1.45], [0.18, 2.0], [0.28, 2.1], [1.0, 2.25], [1.05, 2.36], [0.9, 2.4], [0.16, 2.3], [0.1, 2.9], [0.2, 3.0], [0.06, 3.3], [0, 3.35]], CITY_MAT.stone(), cx, 0, cz, 48));
       const upper = new THREE.Mesh(new THREE.CircleGeometry(0.9, 32), CITY_MAT.water()); upper.rotation.x = -Math.PI / 2; upper.position.set(cx, 2.33, cz); add(upper);
       const lower = new THREE.Mesh(new THREE.CircleGeometry(1.6, 32), CITY_MAT.water()); lower.rotation.x = -Math.PI / 2; lower.position.set(cx, 1.48, cz); add(lower);
-      // струи: падающая вода с чаш и центральная струя
-      add(new THREE.Mesh(new THREE.CylinderGeometry(1.62, 1.95, 1.1, 32, 1, true), CITY_MAT.spray())).position.set(cx, 0.92, cz);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.6, 0.85, 32, 1, true), CITY_MAT.spray())).position.set(cx, 1.92, cz);
-      add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 1.1, 12, 1, true), CITY_MAT.spray())).position.set(cx, 3.9, cz);
+      // вода (струи, сливы с чаш, рябь) не в тайлах: её рисует игра каждый кадр (game.js, drawFountains) по MAP.fountains.
+      // Здесь — восемь бронзовых сопел по кругу и сопло на верхушке вазы.
+      const bronze = standard('bronze', { color: 0x6e5a32, roughness: 0.4, metalness: 0.7 });
       for (let jet = 0; jet < 8; jet++) {
         const angle = jet / 8 * Math.PI * 2;
-        const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 1.6, 6, 1, true), CITY_MAT.spray());
-        spout.position.set(cx + Math.cos(angle) * (radius - 1.2), 0.9, cz + Math.sin(angle) * (radius - 1.2));
-        spout.rotation.set(Math.sin(angle) * 0.6, 0, -Math.cos(angle) * 0.6);
-        add(spout);
+        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, 0.3, 8), bronze);
+        nozzle.position.set(cx + Math.cos(angle) * (radius - 0.95), 0.45, cz + Math.sin(angle) * (radius - 0.95));
+        nozzle.rotation.set(-Math.sin(angle) * 0.55, 0, Math.cos(angle) * 0.55);   // наклон к центру чаши
+        add(nozzle);
       }
+      add(cylinder(0.04, 0.05, 0.12, bronze, cx, 3.38, cz, 8));
       return group;
     }
     case 'playhouse': {

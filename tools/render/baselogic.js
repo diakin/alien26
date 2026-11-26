@@ -48,9 +48,15 @@ function mapFromLayout() {
     extraction: layout.extraction === undefined ? null : layout.extraction,
     ...(layout.mission ? { mission: layout.mission } : {}),
     ...(layout.caption ? { caption: layout.caption } : {}),
+    ...fountainsOf(layout),
     solids: solidBoxes(layout, buildObject),
   };
 }
 
+// фонтаны: центр чаши (клетки) и уровень — воду игра рисует сама (game.js, drawFountains)
+function fountainsOf(layout) {
+  const fountains = layout.objects.filter((item) => item.kind === 'fountain').map((item) => [item.col + item.cols / 2, item.row + item.rows / 2, item.level]);
+  return fountains.length ? { fountains } : {};
+}
 window.logicData = () => mapFromLayout();
 window.ready = true;

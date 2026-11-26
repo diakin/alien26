@@ -1762,6 +1762,114 @@
     context.strokeStyle = 'rgba(255, 200, 90, ' + (0.6 + 0.4 * pulse) + ')'; context.lineWidth = 3; context.stroke();
     context.restore();
   }
+  // ---------------- вода фонтанов ----------------
+  // Чаша и ваза — в тайлах, струи и рябь рисуются здесь каждый кадр. Капли считаются без состояния: у каждой своя
+  // траектория (бросок под силой тяжести) и фаза, положение — функция времени. Струи (метры от центра чаши):
+  // центральная вверх из сопла вазы, слив с верхней чаши в нижнюю, слив с нижней в бассейн, восемь косых струй
+  // от бортика к центру. Капли раскладываются по клеткам и встают в общий порядок отрисовки, поэтому ваза и
+  // бортик закрывают воду за собой, а вода — то, что за ней.
+  var FOUNTAINS = MAP.fountains || [];
+  var GRAVITY = 9.8;
+  var FOUNTAIN_STREAMS = [
+    // origin: [радиус, высота], speed: [наружу, вверх], until — высота поверхности, куда падает, count — капель
+    { origin: [0, 3.44], speed: [0.35, 4.6], until: 2.33, count: 120, spread: 0.12, width: 1.4, alpha: 0.7, tail: 0.08 },
+    { origin: [1.05, 2.36], speed: [0.35, 0], until: 1.48, count: 260, spread: 0.06, width: 2, alpha: 0.35, tail: 0.12 },
+    { origin: [1.76, 1.52], speed: [0.45, 0], until: 0.36, count: 420, spread: 0.08, width: 2.4, alpha: 0.32, tail: 0.14 },
+    { origin: [4.2, 0.58], speed: [-2.0, 3.0], until: 0.36, count: 440, jets: 8, spread: 0.08, width: 1.8, alpha: 0.55, tail: 0.07 }
+  ];
+  function fountainHash(value) {
+    var mixed = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
+    return mixed - Math.floor(mixed);
+  }
+  function flightTime(stream) {
+    var up = stream.speed[1], drop = stream.origin[1] - stream.until;
+    return (up + Math.sqrt(up * up + 2 * GRAVITY * drop)) / GRAVITY;
+  }
+  function fountainItems(now) {
+    var items = [];
+    var seconds = now / 1000, tile = MAP.tile || 1.25;
+    FOUNTAINS.forEach(function (fountain, fountainIndex) {
+      var centerCol = fountain[0], centerRow = fountain[1], level = fountain[2];
+      if (level > view.level) return;
+      var base = elevationOf(Math.floor(centerCol), Math.floor(centerRow), level);
+      var reach = 4.6 / tile, top = Iso.toScreen(centerCol, centerRow, base + 4.6);
+      var corners = [Iso.toScreen(centerCol - reach, centerRow - reach, base), Iso.toScreen(centerCol + reach, centerRow + reach, base),
+        Iso.toScreen(centerCol - reach, centerRow + reach, base), Iso.toScreen(centerCol + reach, centerRow - reach, base), top];
+      var bounds = quadRect(corners, 6);
+      if (!visibleRect(bounds)) return;
+      var buckets = {};
+      function bucketFor(x, y) {
+        var col = Math.floor(x), row = Math.floor(y), key = col + ',' + row;
+        if (!buckets[key]) buckets[key] = { col: col, row: row, near: [], far: [], ripples: [] };
+        return buckets[key];
+      }
+      FOUNTAIN_STREAMS.forEach(function (stream, streamIndex) {
+        var time = flightTime(stream), jets = stream.jets || 0;
+        for (var drop = 0; drop < stream.count; drop++) {
+          var seed = fountainIndex * 1000 + streamIndex * 100 + drop * 0.618;
+          var angle = jets ? (drop % jets) / jets * Math.PI * 2 + (fountainHash(seed) - 0.5) * 0.05 : fountainHash(seed) * Math.PI * 2;
+          var jitter = 1 + (fountainHash(seed + 3.1) - 0.5) * stream.spread * 2;
+          var phase = (seconds / time + fountainHash(seed + 7.7)) % 1;
+          var age = phase * time;
+          var position = function (moment) {
+            var radius = stream.origin[0] + stream.speed[0] * jitter * moment;
+            var height = stream.origin[1] + stream.speed[1] * jitter * moment - GRAVITY * moment * moment / 2;
+            return { x: centerCol + Math.cos(angle) * radius / tile, y: centerRow + Math.sin(angle) * radius / tile, h: base + Math.max(stream.until, height) };
+          };
+          var head = position(age), tail = position(Math.max(0, age - stream.tail));
+          var bucket = bucketFor(head.x, head.y);
+          var fraction = (head.x - Math.floor(head.x)) + (head.y - Math.floor(head.y));
+          (fraction > 1 ? bucket.near : bucket.far).push([head, tail, stream]);
+          // рябь там, где капли падают: кольцо растёт и гаснет за 0,8 с
+          if (drop % 16 === 0) {
+            var landing = position(time), cycle = (seconds / 0.8 + fountainHash(seed + 1.9)) % 1;
+            bucketFor(landing.x, landing.y).ripples.push([landing, cycle]);
+          }
+        }
+      });
+      var colStep = { x: 0, y: 0 }, rowStep = { x: 0, y: 0 };
+      var origin = Iso.toScreen(centerCol, centerRow, 0), alongCol = Iso.toScreen(centerCol + 1, centerRow, 0), alongRow = Iso.toScreen(centerCol, centerRow + 1, 0);
+      colStep = { x: alongCol.x - origin.x, y: alongCol.y - origin.y }; rowStep = { x: alongRow.x - origin.x, y: alongRow.y - origin.y };
+      Object.keys(buckets).forEach(function (key) {
+        var bucket = buckets[key];
+        var corners = Iso.tileCorners(bucket.col, bucket.row, base).concat(Iso.tileCorners(bucket.col, bucket.row, base + 4.8));
+        var rect = quadRect(corners, 4);
+        [['far', 3.6], ['near', 4.4]].forEach(function (half) {
+          var drops = bucket[half[0]], ripples = half[0] === 'far' ? bucket.ripples : [];
+          if (!drops.length && !ripples.length) return;
+          items.push({ depth: depthKey(bucket.col, bucket.row, level, half[1]), rect: rect, draw: function () { drawFountainWater(drops, ripples, colStep, rowStep, tile); } });
+        });
+      });
+    });
+    return items;
+  }
+  function drawFountainWater(drops, ripples, colStep, rowStep, tile) {
+    context.save();
+    context.lineCap = 'round';
+    ripples.forEach(function (entry) {
+      var center = Iso.toScreen(entry[0].x, entry[0].y, entry[0].h), radius = (0.08 + entry[1] * 0.32) / tile;
+      context.strokeStyle = 'rgba(220, 238, 248, ' + (0.45 * (1 - entry[1])).toFixed(3) + ')';
+      context.lineWidth = 1;
+      context.beginPath();
+      for (var step = 0; step <= 16; step++) {
+        var angle = step / 16 * Math.PI * 2, along = Math.cos(angle) * radius, across = Math.sin(angle) * radius;
+        var x = center.x + along * colStep.x + across * rowStep.x - camera.x, y = center.y + along * colStep.y + across * rowStep.y - camera.y;
+        if (step) context.lineTo(x, y); else context.moveTo(x, y);
+      }
+      context.stroke();
+    });
+    drops.forEach(function (entry) {
+      var head = Iso.toScreen(entry[0].x, entry[0].y, entry[0].h), tail = Iso.toScreen(entry[1].x, entry[1].y, entry[1].h), stream = entry[2];
+      context.strokeStyle = 'rgba(226, 242, 252, ' + stream.alpha + ')';
+      context.lineWidth = stream.width;
+      context.beginPath();
+      context.moveTo(tail.x - camera.x, tail.y - camera.y);
+      context.lineTo(head.x - camera.x + 0.01, head.y - camera.y);
+      context.stroke();
+    });
+    context.restore();
+  }
+
   function drawPortal(now) {
     if (!portal || portal.level > view.level) return;
     var center = Iso.toScreen(portal.col + 0.5, portal.row + 0.5, elevationOf(portal.col, portal.row, portal.level) + 0.05);
@@ -4117,7 +4225,7 @@
     drawChunks(current);
     var hover = hoverStyle();
 
-    var dynamic = floorOverlays().concat(corpseItems());
+    var dynamic = floorOverlays().concat(corpseItems()).concat(fountainItems(performance.now()));
     if (hover) {
       var base = elevationOf(hover.tile.col, hover.tile.row, hover.tile.level), boxHeight = hover.size > 1 ? BOX_HEIGHT * 2 : BOX_HEIGHT;
       var boxCorners = Iso.tileCorners(hover.tile.col, hover.tile.row, base, hover.size).concat(Iso.tileCorners(hover.tile.col, hover.tile.row, base + boxHeight, hover.size));
