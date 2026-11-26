@@ -337,15 +337,18 @@
     if (SHIP) {
       var crew = SHIP.crew.map(function (callsign) { return soldiers.filter(function (profile) { return profile.callsign === callsign; })[0]; }).filter(Boolean);
       (spawns.squad || []).slice(0, crew.length).forEach(function (spawn, index) { list.push(makeUnit(crew[index], spawn)); });
-      if (SHIP.mech) (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+      if (SHIP.mech && mechAtBase()) (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
     } else {
       (spawns.squad || []).forEach(function (spawn, index) { list.push(makeUnit(soldiers[index % soldiers.length], spawn)); });
-      (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
+      // на карте базы K7 нет, если машина потеряна на задании и новая ещё не собрана (BaseStore.mechState)
+      if (window.ALIENS_MAP !== 'base' || mechAtBase()) (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
     }
     if (PAGE_MODE !== 'manage') (spawns.aliens || []).forEach(function (spawn, index) { list.push(makeUnit(alienProfile(index + 1), spawn)); });
     // персонал базы (BaseStore.people, js/basestore.js) — на рабочих местах из плана базы (BASE_PLAN): в мирной обстановке
     // стоят, при нападении присели и прячутся, как гражданские задания
     if (window.ALIENS_MAP === 'base' && window.BaseStore && window.BASE_PLAN) list = list.concat(baseStaffUnits(list));
+    // спасённые с прошлого задания (учёный, дети) — в салоне КТ-6 на базе, до следующего вылета
+    if (window.ALIENS_MAP === 'base' && window.BaseStore && MAP.extraction) list = list.concat(passengerUnits(list));
     // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
     if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
       var adults = 0, children = 0;
@@ -359,6 +362,38 @@
     }
     return list;
   }
+  function mechAtBase() { return !window.BaseStore || !BaseStore.mechState || BaseStore.mechState() === 'ready'; }
+  // пассажиры КТ-6 (BaseStore.state.ship.passengers): по свободным клеткам салона у открытой рампы (рампа — со стороны
+  // больших col: там салон не закрыт корпусом), ближе к середине по ширине, через одну; лицом к рампе
+  function passengerUnits(placed) {
+    var passengers = BaseStore.state.ship.passengers || [];
+    if (!passengers.length) return [];
+    var cells = MAP.extraction.slice(), taken = {};
+    placed.forEach(function (unit) { taken[unit.level + ':' + unit.col + ':' + unit.row] = true; });
+    var centerRow = cells.reduce(function (sum, cell) { return sum + cell[1]; }, 0) / cells.length;
+    var rampCol = Math.max.apply(null, cells.map(function (cell) { return cell[0]; }));
+    // крайний ряд клеток — уже рампа: стоят на ряд глубже, в салоне
+    var score = function (cell) { return Math.abs(rampCol - 1 - cell[0]) * 1.5 + Math.abs(cell[1] - centerRow); };
+    cells.sort(function (first, second) { return score(first) - score(second); });
+    var result = [], children = 0;
+    passengers.forEach(function (passenger) {
+      var spot = cells.filter(function (cell) {
+        if (taken[(cell[2] || 0) + ':' + cell[0] + ':' + cell[1]] || !walkable(cell[0], cell[1], cell[2] || 0)) return false;
+        for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && taken[(cell[2] || 0) + ':' + (cell[0] + dx) + ':' + (cell[1] + dy)]) return false;
+        return true;
+      })[0] || cells.filter(function (cell) { return !taken[(cell[2] || 0) + ':' + cell[0] + ':' + cell[1]]; })[0];
+      if (!spot) return;
+      taken[(spot[2] || 0) + ':' + spot[0] + ':' + spot[1]] = true;
+      var profile = civilianProfile({ name: passenger.name, kind: passenger.look, child: passenger.child, vip: passenger.vip }, passenger.child ? ++children : 0);
+      profile.staff = true;                                  // не «спасается» бойцами, на базе стоит на месте
+      profile.subtitle = 'НА БОРТУ КТ-6 · ПРИБЫЛ С ЗАДАНИЯ';
+      var facing = Iso.directionOf(1, 0);
+      result.push(makeUnit(profile, [spot[0], spot[1], spot[2] || 0, facing >= 0 ? facing : 1]));
+    });
+    return result;
+  }
+  // вылет с базы: пассажиры прошлого рейса переходят в каюты
+  if (SHIP && window.ALIENS_MAP !== 'base' && window.BaseStore && BaseStore.disembark) BaseStore.disembark();
   // фигуры персонала базы: по одной свободной клетке в помещении рабочего места, от середины помещения к краям;
   // не на клетках у дверей и лестниц, не на клетках, занятых бойцами и пришельцами
   function baseStaffUnits(placed) {
@@ -2566,9 +2601,14 @@
     lists.forEach(function (list) {
       list.forEach(function (entry) { var info = Items.info(entry.item); if (info.alien) count(info.name); });
     });
-    var person = function (unit) { return { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank }; };
+    // у гражданских — вид (набор спрайтов civ<вид>), ребёнок, учёный: спасённые учёный и дети стоят на базе в салоне КТ-6
+    var person = function (unit) {
+      var entry = { callsign: unit.callsign, name: unit.name, rank: unit.kind === 'mech' ? '' : unit.rank };
+      if (isCivilian(unit)) { entry.look = String(unit.camo || '').replace(/^civ/, ''); entry.child = !!unit.child; entry.vip = !!unit.vip; }
+      return entry;
+    };
     return {
-      kind: kind, result: result, map: MAP.name || '', turn: turn, run: MISSION_RUN,
+      kind: kind, result: result, map: MAP.name || '', turn: turn, run: MISSION_RUN, fromBase: !!SHIP,
       aliensKilled: killedAliens.length, aliensTotal: aliens.length,
       artifacts: order.map(function (name) { return { name: name, count: counts[name] }; }),
       soldiersLost: soldiersDead.map(person), soldiersLeft: soldiersLeft.map(person),

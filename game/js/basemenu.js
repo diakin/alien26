@@ -104,7 +104,7 @@ var BaseMenu = (function () {
       var people = function (list) {
         return '<table><tr><th>ИМЯ</th><th>СПЕЦИАЛЬНОСТЬ</th><th>РАБОЧЕЕ МЕСТО</th><th>КАЮТА</th></tr>' + list.map(function (person) {
           return '<tr><td>' + escape(person.name) + (person.rescued ? ' <span class="dim">· спасён в задании</span>' : '') + '</td><td>' + escape(person.specialty) + '</td><td>' +
-            placeLink(person.workplace) + '</td><td>' + placeLink(person.cabin) + '</td></tr>';
+            (person.aboard ? '<span class="state wait">на борту КТ-6</span>' : placeLink(person.workplace)) + '</td><td>' + placeLink(person.cabin) + '</td></tr>';
         }).join('') + '</table>';
       };
       var crew = crewNow();
@@ -114,11 +114,11 @@ var BaseMenu = (function () {
           placeLink('Каюта ' + (Math.floor(index / 2) + 1)) + '</td><td class="state' + (aboard ? '' : ' wait') + '">' + (aboard ? 'в экипаже КТ-6' : 'на базе') + '</td></tr>';
       }).join('');
       var support = state.support || [];
-      return { facts: 'Комсостав, врачи и дежурная смена — ' + BaseStore.commandStaff().length + ', учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', обслуживающего персонала ' + support.length + ', бойцов ' + squad().length + ', шагающих машин 1 (K7). Щелчок по помещению — камера к нему.',
+      return { facts: 'Комсостав, врачи и дежурная смена — ' + BaseStore.commandStaff().length + ', учёных ' + state.scientists.length + ', инженеров ' + state.engineers.length + ', обслуживающего персонала ' + support.length + ', бойцов ' + squad().length + ', шагающих машин ' + (mechReady() ? '1 (K7)' : '0') + '. Щелчок по помещению — камера к нему.',
         body: '<h4>КОМСОСТАВ, ВРАЧИ, ДЕЖУРНАЯ СМЕНА</h4>' + people(BaseStore.commandStaff()) + '<h4>УЧЁНЫЕ</h4>' + people(state.scientists) + '<h4>ИНЖЕНЕРЫ</h4>' + people(state.engineers) + '<h4>ОБСЛУЖИВАЮЩИЙ ПЕРСОНАЛ</h4>' + people(support) +
           '<h4>ОТРЯД</h4><table><tr><th>БОЕЦ</th><th>ЗВАНИЕ · РОЛЬ</th><th>КАЮТА</th><th>СОСТОЯНИЕ</th></tr>' + soldiers +
-          '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех (стенд K7)') + '</td><td class="state' + (BaseStore.state.ship.mech ? '' : ' wait') + '">' +
-          (BaseStore.state.ship.mech ? 'в экипаже КТ-6' : 'на базе') + '</td></tr></table>' };
+          '<tr><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td><td>' + placeLink('Цех (стенд K7)') + '</td><td class="state' + (mechReady() && BaseStore.state.ship.mech ? '' : ' wait') + '">' +
+          mechText() + '</td></tr></table>' + passengersTable() };
     },
     store: function () {
       var state = BaseStore.state;
@@ -153,7 +153,9 @@ var BaseMenu = (function () {
         var seat = crew.indexOf(soldier.callsign);
         return '<tr><td><label><input type="checkbox" data-crew="' + escape(soldier.callsign) + '"' + (seat >= 0 ? ' checked' : '') + '> ' + (seat >= 0 ? seat + 1 : '—') + '</label></td><td><b>' +
           escape(soldier.callsign) + '</b> ' + escape(soldier.name) + '</td><td>' + escape(soldier.rank) + ' · ' + escape((soldier.role || '').toLowerCase()) + '</td></tr>';
-      }).join('') + '<tr><td><label><input type="checkbox" data-mech="1"' + (state.ship.mech ? ' checked' : '') + '> рампа</label></td><td><b>K7</b> шагающая машина</td><td>автопушка АП-30</td></tr></table>';
+      }).join('') + '<tr><td><label><input type="checkbox" data-mech="1"' + (state.ship.mech && mechReady() ? ' checked' : '') + (mechReady() ? '' : ' disabled') + '> рампа</label></td><td><b>K7</b> шагающая машина</td><td>автопушка АП-30' +
+        (mechReady() ? '' : ' · <span class="state wait">' + mechText() + '</span>') + '</td></tr></table>' +
+        (BaseStore.mechState() === 'lost' ? '<div class="actions"><span data-order-mech="1"' + (partsLeft() ? '' : ' class="off"') + '>ИЗГОТОВИТЬ НОВУЮ K7 (ЦЕХ, КОМПЛЕКТ ЗАПЧАСТЕЙ: ' + partsLeft() + ')</span></div>' : '');
       var types = Object.keys(state.store).concat(Object.keys(state.ship.cargo)).filter(function (type, index, list) { return list.indexOf(type) === index; });
       var cargo = '<table><tr><th>ПРЕДМЕТ</th><th>ВЕС</th><th>НА СКЛАДЕ</th><th>НА БОРТУ</th><th></th></tr>' + types.map(function (type) {
         var info = Items.info({ type: type }), stock = state.store[type] || 0, aboard = state.ship.cargo[type] || 0;
@@ -161,7 +163,8 @@ var BaseMenu = (function () {
         return '<tr><td>' + escape(info.name) + '</td><td class="number">' + info.weight + '</td><td class="number">' + stock + '</td><td class="number">' + aboard + '</td><td>' +
           '<span class="step' + (aboard ? '' : ' off') + '" data-cargo="' + type + '" data-count="-1">−</span><span class="step' + (canAdd ? '' : ' off') + '" data-cargo="' + type + '" data-count="1">+</span></td></tr>';
       }).join('') + '</table>';
-      return { title: 'СНАРЯДИТЬ КОРАБЛЬ', facts: 'Конвертоплан КТ-6 в ангаре. Экипаж: ' + crew.length + ' из ' + BaseStore.SHIP_SEATS + ' мест' + (state.ship.mech ? ' и K7 на рампе' : '') +
+      return { title: 'СНАРЯДИТЬ КОРАБЛЬ', facts: 'Конвертоплан КТ-6 в ангаре. Экипаж: ' + crew.length + ' из ' + BaseStore.SHIP_SEATS + ' мест' + (state.ship.mech && mechReady() ? ' и K7 на рампе' : '') +
+          ((state.ship.passengers || []).length ? '. На борту прибывшие: ' + state.ship.passengers.map(function (passenger) { return escape(passenger.name); }).join(', ') + ' (сойдут при следующем вылете)' : '') +
           '. Груз: ' + weight + ' из ' + BaseStore.SHIP_CAPACITY + '<div class="bar"><i style="width:' + Math.round(weight / BaseStore.SHIP_CAPACITY * 100) + '%"></i></div>',
         body: '<h4>ЭКИПАЖ</h4>' + seats + '<h4>ГРУЗ (ЯЩИК У РАМПЫ)</h4>' + cargo +
           '<div class="actions"><span data-preset="standard">СТАНДАРТНЫЙ НАБОР</span><span data-preset="empty">РАЗГРУЗИТЬ</span></div>',
@@ -187,8 +190,13 @@ var BaseMenu = (function () {
     },
     manufacture: function () {
       var items = [['Карабин КС-9', 'оружие отряда'], ['Магазин КС-9', '30 патронов'], ['Граната', 'осколочная'], ['Аптечка', 'полевая']];
-      return { title: 'ИЗГОТОВЛЕНИЕ', facts: 'Инженеры: ' + BaseStore.state.engineers.length + ' · цех: 1 (стенд ремонта K7) · очередь: пусто',
-        body: '<table><tr><th>ИЗДЕЛИЕ</th><th>ОПИСАНИЕ</th><th>СОСТОЯНИЕ</th></tr>' + items.map(function (item) {
+      var mechState = BaseStore.mechState();
+      // K7: после потери на задании собирается заново (комплект запчастей со склада имущества)
+      var mechRow = '<tr><td><b>Шагающая машина K7</b></td><td>автопушка АП-30 · комплект запчастей K7 (на складе: ' + partsLeft() + ')</td><td class="state' + (mechState === 'ready' ? '' : ' wait') + '">' +
+        (mechState === 'ready' ? 'на базе' : mechState === 'building' ? 'собирается, готова после следующего задания' :
+          '<span class="step' + (partsLeft() ? '' : ' off') + '" data-order-mech="1">ИЗГОТОВИТЬ</span> потеряна на задании') + '</td></tr>';
+      return { title: 'ИЗГОТОВЛЕНИЕ', facts: 'Инженеры: ' + BaseStore.state.engineers.length + ' · цех: 1 (стенд ремонта K7) · очередь: ' + (mechState === 'building' ? 'K7' : 'пусто'),
+        body: '<table><tr><th>ИЗДЕЛИЕ</th><th>ОПИСАНИЕ</th><th>СОСТОЯНИЕ</th></tr>' + mechRow + items.map(function (item) {
           return '<tr><td>' + item[0] + '</td><td>' + item[1] + '</td><td class="state">можно</td></tr>'; }).join('') + '</table>',
         note: 'Заказ изделий появится вместе с экономикой базы: стоимость, срок, склад.' };
     },
@@ -212,6 +220,25 @@ var BaseMenu = (function () {
     openSection = name;
     if (refresh) panel.scrollTop = scroll;
     Array.prototype.forEach.call(menu.querySelectorAll('button'), function (button) { button.classList.toggle('active', button.dataset.section === name); });
+  }
+  // K7: на базе, потеряна, собирается в цехе (BaseStore.mechState)
+  function mechReady() { return BaseStore.mechState() === 'ready'; }
+  function mechText() {
+    var stateName = BaseStore.mechState();
+    if (stateName === 'lost') return 'потеряна на задании — нужна новая';
+    if (stateName === 'building') return 'собирается в цехе, готова после следующего задания';
+    return BaseStore.state.ship.mech ? 'в экипаже КТ-6' : 'на базе';
+  }
+  function partsLeft() {
+    var parts = BaseStore.state.property.filter(function (entry) { return entry.name === 'Запчасти K7, комплект'; })[0];
+    return parts ? parts.count : 0;
+  }
+  function passengersTable() {
+    var passengers = BaseStore.state.ship.passengers || [];
+    if (!passengers.length) return '';
+    return '<h4>НА БОРТУ КТ-6 (ПРИБЫЛИ С ЗАДАНИЯ)</h4><table><tr><th>ИМЯ</th><th></th></tr>' + passengers.map(function (passenger) {
+      return '<tr><td>' + escape(passenger.name) + '</td><td class="dim">' + (passenger.vip ? 'учёный' : passenger.child ? 'ребёнок' : '') + ' · сойдёт при следующем вылете</td></tr>';
+    }).join('') + '</table>';
   }
   // экипаж — в порядке списка отряда; хотя бы один боец остаётся отмеченным
   function updateCrew() {
@@ -246,6 +273,7 @@ var BaseMenu = (function () {
       show('ship', true); return;
     }
     if (event.target.dataset.preset) { preset(event.target.dataset.preset); return; }
+    if (event.target.dataset.orderMech && !event.target.classList.contains('off')) { BaseStore.orderMech(); show(openSection || 'ship', true); return; }
     var link = event.target.closest('[data-room]');
     if (!link || !window.__game) return;
     var room = BASE_PLAN.rooms[Number(link.dataset.room)];

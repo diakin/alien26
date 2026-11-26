@@ -3,6 +3,10 @@
 // и общее для всех страниц: меню базы (basemenu.js) показывает и меняет, задания (game.js) берут экипаж и груз,
 // итоги задания (results.js) сдают на склад артефакты и записывают в персонал спасённого учёного.
 // Экономики (денег, сроков, расхода) пока нет: груз корабля не тратится и после задания остаётся на борту.
+// После задания спасения учёный и дети прилетают на базу и остаются на борту КТ-6 (ship.passengers) до следующего
+// вылета, тогда переходят в каюты. Шагающая машина K7 (k7): 'ready' — на базе, 'lost' — погибла или брошена на
+// задании, 'building' — цех собирает новую (заказ в «Снарядить корабль», расходует комплект запчастей K7),
+// готова после следующего задания: сроков в игре пока нет, сборка идёт, пока отряд на вылете.
 var BaseStore = (function () {
   'use strict';
   var KEY = 'aliens26.base.v1';
@@ -62,7 +66,9 @@ var BaseStore = (function () {
   function people() {
     var list = commandStaff();
     [state.scientists, state.engineers, state.support || []].forEach(function (group) {
-      group.forEach(function (person) { list.push({ name: person.name, specialty: person.specialty, workplace: person.workplace, cabin: person.cabin, look: LOOKS[person.name] || 'scientist' }); });
+      group.forEach(function (person) {
+        if (person.aboard) return;                          // ещё на борту КТ-6 — фигура в салоне (passengers)
+        list.push({ name: person.name, specialty: person.specialty, workplace: person.workplace, cabin: person.cabin, look: LOOKS[person.name] || 'scientist' }); });
     });
     return list;
   }
@@ -86,7 +92,8 @@ var BaseStore = (function () {
       store: { carbine: 4, carbineM: 2, carbineMag: 40, grenade: 16, medkit: 8 },
       property: PROPERTY.map(function (entry) { return { name: entry[0], unit: entry[1], count: entry[2] }; }),
       artifacts: [],                   // [{ name, count, from }]
-      ship: { configured: false, crew: [], mech: true, cargo: {} },
+      ship: { configured: false, crew: [], mech: true, cargo: {}, passengers: [] },
+      k7: 'ready',
       log: []                          // события: сданы артефакты, прибыл учёный
     };
   }
@@ -147,16 +154,60 @@ var BaseStore = (function () {
     if (summary.artifacts && summary.artifacts.length) state.log.push('Сданы артефакты: ' + summary.map);
     var rescue = summary.rescue;
     if (rescue && rescue.vipRescued && rescue.vip && !state.scientists.some(function (person) { return person.name === rescue.vip.name; })) {
-      state.scientists.push({ name: rescue.vip.name, specialty: 'исследования пришельцев', workplace: 'Ксенобиологическая', cabin: rescueCabin(state.scientists), rescued: true });
+      state.scientists.push({ name: rescue.vip.name, specialty: 'исследования пришельцев', workplace: 'Ксенобиологическая', cabin: rescueCabin(state.scientists), rescued: true, aboard: true });
       state.log.push('Прибыл учёный: ' + rescue.vip.name);
     }
+    // на борт: учёный и спасённые дети — до следующего вылета стоят в салоне КТ-6 на базе
+    if (rescue) {
+      state.ship.passengers = state.ship.passengers || [];
+      (rescue.civiliansRescued || []).forEach(function (person) {
+        if (!person.vip && !person.child) return;
+        if (state.ship.passengers.some(function (passenger) { return passenger.name === person.name; })) return;
+        state.ship.passengers.push({ name: person.name, look: person.look || (person.child ? 'boy' : 'scientist'), child: !!person.child, vip: !!person.vip });
+      });
+      var children = (rescue.civiliansRescued || []).filter(function (person) { return person.child; }).length;
+      if (children) state.log.push('Прибыли дети: ' + children);
+    }
+    save();
+  }
+  // K7 в итогах задания: погиб или остался на месте эвакуации — машины на базе больше нет; заказанная — собрана
+  function receiveMech(summary) {
+    if (!summary || !summary.run) return;
+    state.mechRuns = state.mechRuns || [];
+    if (state.mechRuns.indexOf(summary.run) >= 0) return;
+    state.mechRuns = state.mechRuns.concat([summary.run]).slice(-20);
+    if (state.k7 === 'building') { state.k7 = 'ready'; state.log.push('Цех: собрана новая K7'); }
+    else if ((summary.robotsLost || []).length || (summary.robotsLeft || []).length) {
+      state.k7 = 'lost'; state.ship.mech = false;
+      state.log.push('K7 потеряна: ' + (summary.robotsLost && summary.robotsLost.length ? 'уничтожена' : 'брошена') + ' (' + summary.map + ')');
+    }
+    save();
+  }
+  function mechState() { return state.k7 || 'ready'; }
+  // заказ новой K7 в цехе: нужен комплект запчастей на складе имущества
+  function orderMech() {
+    if (mechState() !== 'lost') return false;
+    var parts = state.property.filter(function (entry) { return entry.name === 'Запчасти K7, комплект'; })[0];
+    if (!parts || parts.count < 1) return false;
+    parts.count--;
+    state.k7 = 'building';
+    state.log.push('Цех: начата сборка K7');
+    save();
+    return true;
+  }
+  // вылет: пассажиры с прошлого рейса переходят в каюты (учёный — на рабочее место), борт свободен
+  function disembark() {
+    if (!(state.ship.passengers || []).length && !state.scientists.some(function (person) { return person.aboard; })) return;
+    state.ship.passengers = [];
+    state.scientists.forEach(function (person) { delete person.aboard; });
     save();
   }
   function reset() { state = defaults(); save(); }
 
   return {
     get state() { return state; }, SHIP_SEATS: SHIP_SEATS, SHIP_CAPACITY: SHIP_CAPACITY,
-    save: save, cargoWeight: cargoWeight, moveCargo: moveCargo, setCrew: setCrew, receiveMission: receiveMission, reset: reset,
+    save: save, cargoWeight: cargoWeight, moveCargo: moveCargo, setCrew: setCrew, receiveMission: receiveMission, receiveMech: receiveMech, reset: reset,
+    mechState: mechState, orderMech: orderMech, disembark: disembark,
     commandStaff: commandStaff, people: people
   };
 })();

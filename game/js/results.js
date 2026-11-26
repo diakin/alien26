@@ -102,6 +102,7 @@ var Results = (function () {
   }
   function show(summary) {
     if (window.BaseStore) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
+    if (window.BaseStore && summary.fromBase && BaseStore.receiveMech) BaseStore.receiveMech(summary);   // K7 потеряна / собрана новая
     var good = summary.result === 'good';
     var artifactCount = summary.artifacts.reduce(function (sum, item) { return sum + item.count; }, 0);
     root.innerHTML =
