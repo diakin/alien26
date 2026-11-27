@@ -2820,7 +2820,7 @@
       hatchTile = document.createElement('canvas');
       hatchTile.width = hatchTile.height = FIRE_HATCH;
       var tileContext = hatchTile.getContext('2d');
-      tileContext.strokeStyle = 'rgba(235, 45, 30, 0.85)'; tileContext.lineWidth = 1.6;
+      tileContext.strokeStyle = 'rgb(255, 35, 20)'; tileContext.lineWidth = 1;
       tileContext.beginPath();
       [-FIRE_HATCH, 0, FIRE_HATCH].forEach(function (shift) { tileContext.moveTo(shift, FIRE_HATCH); tileContext.lineTo(shift + FIRE_HATCH, 0); });
       tileContext.stroke();
