@@ -3091,8 +3091,23 @@
     var damage = Math.max(4, weapon.damage - (target.unit.armor || 0));
     return chance * damage * (1.6 - 0.6 * target.unit.health / target.unit.maxHealth);
   }
+  // Раненый пришелец (здоровье меньше WOUNDED_SHARE) ведёт себя по цели задания:
+  //   цель — уничтожить всех пришельцев (нет MAP.mission или его kind не 'rescue'): прячется — уходит туда, где его
+  //     не видят, и сидит тихо, оставляя ОД на ответный огонь (засада: стреляет по тем, кто вышел на него в ход
+  //     отряда); в свой ход стреляет, только если его нашли — его клетку видит хоть один боец; потом снова прячется;
+  //   цель другая (спасение): пока пришельцев на карте много (WOUNDED_RETREAT_ALIVE и больше), раненый отходит в тыл —
+  //     подальше от отряда, в укрытие, не стреляя (охрана — в пределах своего поста); если осталось мало, он мешает
+  //     отряду, как здоровый, несмотря на ранение.
+  var WOUNDED_SHARE = 0.5, WOUNDED_RETREAT_ALIVE = 3;
+  function killAllMission() { return !MISSION || MISSION.kind !== 'rescue'; }
+  function woundedMode(alien) {
+    if (alien.health >= alien.maxHealth * WOUNDED_SHARE) return null;
+    if (killAllMission()) return 'ambush';
+    var alive = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead; }).length;
+    return alive >= WOUNDED_RETREAT_ALIVE ? 'retreat' : null;
+  }
   // Решение пришельца на текущий момент: { fire } | { move } | null — ход закончен.
-  // 1. Ранен (здоровье меньше 40 %) — отходит туда, где его не видно.
+  // 1. Ранен — прячется (засада) или отходит в тыл, см. woundedMode.
   // 2. Видит цель — стреляет (выгоднейшая цель, прицельно, если после выстрела хватит ОД уйти в укрытие),
   //    после выстрелов уходит из-под огня, если может.
   // 3. Не видит — выбирает клетку: позицию для стрельбы (видно немногим, есть укрытие, 4–10 клеток до бойца)
@@ -3102,7 +3117,7 @@
     if (!weapon) return null;
     var modes = weapon.modes, snapIndex = 0;
     modes.forEach(function (mode, index) { if (mode.cost < modes[snapIndex].cost) snapIndex = index; });
-    var hurt = alien.health < alien.maxHealth * 0.4;
+    var wounded = woundedMode(alien), hurt = !!wounded;
     var reach = reachable(alien, alien.timeUnits);
     var here = nodeKey(alien.col, alien.row, alien.level);
     var cache = {};
@@ -3121,7 +3136,10 @@
     };
     var moveTo = function (item, reason) { return item && item.key !== here ? { move: reach.path(item.key), reason: reason } : null; };
 
-    var targets = alien.ammo > 0 && !hurt ? visibleTargets(alien) : [];
+    // засада: в свой ход стреляет, только если его нашли (клетку видит боец); не нашли и не видно — сидит, ждёт
+    var found = wounded === 'ambush' && info(here).seen > 0;
+    if (wounded === 'ambush' && !found) return null;
+    var targets = alien.ammo > 0 && (!hurt || found) ? visibleTargets(alien) : [];
     // вышел один робот: стреляют только из-за укрытия, иначе уходят в укрытие
     if (tactic && tactic.kind === 'hide' && coverAt(keyNode(here)) < 1) targets = [];
     // вышли бойцы: по роботу не стреляют — уходят из его обзора и ищут бойцов
@@ -3150,7 +3168,8 @@
     var currentSteps = stepsTo(here);
     var rough = reach.keys.map(function (key) {
       var node = keyNode(key), steps = stepsTo(key), score;
-      if (hurt) score = steps;
+      // раненый: подальше от отряда (поле путей от бойцов), охрана — в пределах поста
+      if (hurt) score = fieldSteps(key) - (tactic && tactic.kind === 'guard' ? Math.max(0, steps - tactic.radius) * 4 : 0);
       else if (tactic && tactic.kind === 'guard') score = -Math.max(0, steps - tactic.radius) * 3 + coverAt(node) * 2;
       else if (tactic && tactic.kind === 'hide') score = coverAt(node) * 3 - Math.max(0, 10 - steps) * 2 - Math.max(0, currentSteps - steps) * 1.5;
       else score = -Math.abs(steps - 7) * 1.2 - Math.max(0, steps - currentSteps) * 2 + coverAt(node) * 2 - (tactic && tactic.kind === 'assault' ? Math.max(0, 6 - mechDistance(node)) * 3 : 0);
@@ -3163,7 +3182,8 @@
       var item = info(key), steps = stepsTo(key), left = alien.timeUnits - item.cost, score;
       var canShoot = item.shootable.length > 0 && left >= modes[snapIndex].cost + 2;
       if (hurt) {
-        score = (item.seen === 0 ? 60 : -40 * item.seen) + steps * 1.5 + item.cover * 4;
+        score = (item.seen === 0 ? 60 : -40 * item.seen) + fieldSteps(key) * 1.5 + item.cover * 4
+          - (tactic && tactic.kind === 'guard' ? Math.max(0, steps - tactic.radius) * 8 : 0);
       } else if (tactic && tactic.kind === 'guard') {
         // оборона поста: клетка с укрытием в радиусе поста, откуда можно стрелять; за пределы поста — не уходит
         score = (canShoot ? 40 + item.cover * 12 - 20 * Math.max(0, item.seen - 1) : item.seen === 0 ? 15 + item.cover * 6 : 4 - 25 * item.seen)
@@ -3184,7 +3204,7 @@
       if (key === here) score += 1;                    // при равенстве — остаться
       if (score > choiceScore) { choiceScore = score; choiceItem = item; }
     });
-    return moveTo(choiceItem, hurt ? 'отход' : choiceItem && choiceItem.shootable.length ? 'позиция' : 'подход');
+    return moveTo(choiceItem, hurt ? (wounded === 'ambush' ? 'прячется' : 'отход') : choiceItem && choiceItem.shootable.length ? 'позиция' : 'подход');
   }
   // ---------------- персонал базы под ИИ ----------------
   // Действует после хода отряда, до пришельцев. Не рискует: стреляет (одиночным, прицельным — если хватает ОД),
