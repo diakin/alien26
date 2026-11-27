@@ -26,7 +26,10 @@ var Settings = (function () {
     { key: 'compactPanel', label: 'Компактная нижняя панель (кнопка ▴ / ▾ на панели)', type: 'check', value: true },
     { key: 'showHelp', label: 'Подсказки управления справа вверху', type: 'check', value: true },
     { key: 'showGrid', label: 'Сетка клеток', type: 'check', value: false },
-    { key: 'showFps', label: 'Счётчик FPS справа внизу', type: 'check', value: true }
+    { key: 'showFps', label: 'Счётчик FPS справа внизу', type: 'check', value: true },
+    { group: 'ОТЛАДКА' },
+    { key: 'debugReach', label: 'Границы досягаемости бойца (жёлтая — все ОД, голубая — останется на выстрел)', type: 'check', value: true },
+    { key: 'debugFire', label: 'Клетки под огнём замеченных пришельцев (розовые)', type: 'check', value: true }
   ];
   var values = {};
   FIELDS.forEach(function (field) { if (field.key) values[field.key] = field.value; });

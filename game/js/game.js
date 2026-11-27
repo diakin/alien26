@@ -2743,6 +2743,131 @@
     context.restore();
   }
 
+  // ---------------- отладка: досягаемость и клетки под огнём (настройки, группа «Отладка») ----------------
+  // Досягаемость: клетки текущего уровня, куда выбранный боец дойдёт за оставшиеся ОД (reachable — те же шаги и цены,
+  // что у поиска пути; юниты мешают). Жёлтая сплошная граница — все ОД, голубая пунктирная — после хода останется
+  // на самый дешёвый выстрел. Пересчёт — когда боец, его ОД, уровень обзора, двери или юниты сменились.
+  // Под огнём: клетки текущего уровня, по стоящему на которых может выстрелить хоть один замеченный пришелец —
+  // в пределах дальности его оружия и при свободной линии огня от его ствола до корпуса (как при выборе цели:
+  // стены, предметы и юниты на линии заслоняют). Считается частями, не больше FIRE_BUDGET мс за кадр; пока юниты
+  // идут, показывается прежняя картина.
+  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12;
+  var reachOverlay = { key: '', far: null, near: null, at: 0 };
+  var fireOverlay = { key: '', cells: null, building: null, jobs: null, index: 0 };
+  function debugOn(key) { return !!(window.Settings && Settings.values[key]); }
+  function unitsSignature() {
+    return units.map(function (unit) { return unit.col + ',' + unit.row + ',' + unit.level; }).join(';');
+  }
+  function updateReachOverlay(now) {
+    var unit = selected;
+    if (!debugOn('debugReach') || !unit || unit.dead || unit.side !== 'squad' || unit.ai || phase !== 'squad' || mission.over) { reachOverlay.far = null; reachOverlay.key = ''; return; }
+    if (unit.path.length || now < reachOverlay.at) return;
+    reachOverlay.at = now + 200;
+    var key = [units.indexOf(unit), unit.timeUnits, view.level, unitsSignature(), losDoorKey()].join('|');
+    if (key === reachOverlay.key) return;
+    reachOverlay.key = key;
+    var reach = reachable(unit, unit.timeUnits);
+    var weapon = weaponOf(unit), shotCost = weapon ? Math.min.apply(null, weapon.modes.map(function (mode) { return mode.cost; })) : null;
+    var far = {}, near = {};
+    reach.keys.forEach(function (nodeKeyValue) {
+      var node = keyNode(nodeKeyValue);
+      if (node.level !== view.level) return;
+      var cell = node.row * GRID + node.col;
+      far[cell] = 1;
+      if (shotCost !== null && unit.timeUnits - reach.cost[nodeKeyValue] >= shotCost) near[cell] = 1;
+    });
+    reachOverlay.far = far; reachOverlay.near = shotCost !== null ? near : null;
+  }
+  function updateFireOverlay(now) {
+    if (!debugOn('debugFire') || mission.over) { fireOverlay.cells = null; fireOverlay.key = ''; fireOverlay.jobs = null; return; }
+    if (units.some(function (unit) { return unit.path.length > 0; }) || shots.length) return;
+    var shooters = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead && isSeen(unit) && weaponOf(unit); });
+    var key = shooters.map(function (unit) { return units.indexOf(unit); }).join(',') + '|' + view.level + '|' + unitsSignature() + '|' + losDoorKey();
+    if (key !== fireOverlay.key) {
+      fireOverlay.key = key;
+      fireOverlay.building = {}; fireOverlay.index = 0;
+      // задания: пары «пришелец — клетка» в пределах дальности, клетка проходима и не закрыта по сетке обзора
+      var jobs = [];
+      shooters.forEach(function (shooter) {
+        var weapon = weaponOf(shooter), radius = Math.ceil(weapon.range / combatWorld.tile) + 1;
+        for (var row = Math.max(0, shooter.row - radius); row <= Math.min(GRID - 1, shooter.row + radius); row++) {
+          for (var col = Math.max(0, shooter.col - radius); col <= Math.min(GRID - 1, shooter.col + radius); col++) {
+            if (!walkable(col, row, view.level) || !mayHaveSight(shooter, col, row, view.level)) continue;
+            jobs.push({ shooter: shooter, col: col, row: row });
+          }
+        }
+      });
+      fireOverlay.jobs = jobs;
+      if (!shooters.length) fireOverlay.cells = null;
+    }
+    var jobs = fireOverlay.jobs;
+    if (!jobs || fireOverlay.index >= jobs.length) return;
+    var deadline = performance.now() + FIRE_BUDGET;
+    while (fireOverlay.index < jobs.length && performance.now() < deadline) {
+      var job = jobs[fireOverlay.index++], cell = job.row * GRID + job.col;
+      if (fireOverlay.building[cell]) continue;
+      var point = { x: job.col + 0.5, y: job.row + 0.5, h: elevationOf(job.col, job.row, view.level) + STANDING_TARGET };
+      var from = muzzleOf(job.shooter, point), distance = Combat.distanceMeters(combatWorld, from, point);
+      if (distance > weaponOf(job.shooter).range) continue;
+      var line = Combat.trace(combatWorld, from, point, distance + 0.3, job.shooter);
+      if (line.kind === 'none' || (line.kind === 'unit' && line.unit.col <= job.col && line.unit.col + line.unit.size > job.col && line.unit.row <= job.row && line.unit.row + line.unit.size > job.row)) fireOverlay.building[cell] = 1;
+    }
+    if (fireOverlay.index >= jobs.length) { fireOverlay.cells = fireOverlay.building; fireOverlay.jobs = null; }
+  }
+  function cellOf(key) { var cell = Number(key), col = cell % GRID; return { col: col, row: (cell - col) / GRID }; }
+  function drawDebugZones() {
+    if (fireOverlay.cells && debugOn('debugFire')) {
+      context.save();
+      context.fillStyle = 'rgba(255, 50, 170, 0.3)'; context.strokeStyle = 'rgba(255, 120, 210, 0.55)'; context.lineWidth = 1;
+      Object.keys(fireOverlay.cells).forEach(function (key) {
+        var cell = cellOf(key), height = elevationOf(cell.col, cell.row, view.level) + 0.02;
+        context.beginPath();
+        [[0, 0], [1, 0], [1, 1], [0, 1]].forEach(function (corner, index) {
+          var point = Iso.toScreen(cell.col + corner[0], cell.row + corner[1], height);
+          context[index ? 'lineTo' : 'moveTo'](point.x - camera.x, point.y - camera.y);
+        });
+        context.closePath(); context.fill(); context.stroke();
+      });
+      context.restore();
+    }
+    if (reachOverlay.far && debugOn('debugReach')) {
+      zoneEdges(reachOverlay.far, '#ffd23a', []);
+      if (reachOverlay.near) zoneEdges(reachOverlay.near, '#5fd0ff', [6, 4]);
+    }
+  }
+  // граница множества клеток: стороны клеток, за которыми соседняя проходимая клетка в множество не входит
+  // (вокруг стен, предметов и юнитов линий нет — только внешняя граница и граница за стенами)
+  function zoneEdges(set, color, dash) {
+    var occupied = {};
+    units.forEach(function (unit) {
+      if (unit.dead || unit.level !== view.level) return;
+      for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) occupied[(unit.row + deltaRow) * GRID + unit.col + deltaCol] = 1;
+    });
+    var outside = function (col, row) {
+      if (col < 0 || row < 0 || col >= GRID || row >= GRID) return true;
+      var index = row * GRID + col;
+      return !set[index] && walkable(col, row, view.level) && !occupied[index];
+    };
+    context.save();
+    context.beginPath();
+    Object.keys(set).forEach(function (key) {
+      var cell = cellOf(key), col = cell.col, row = cell.row, index = row * GRID + col, height = elevationOf(col, row, view.level) + 0.03;
+      var edge = function (fromCol, fromRow, toCol, toRow) {
+        var start = Iso.toScreen(fromCol, fromRow, height), end = Iso.toScreen(toCol, toRow, height);
+        context.moveTo(start.x - camera.x, start.y - camera.y); context.lineTo(end.x - camera.x, end.y - camera.y);
+      };
+      if (outside(col + 1, row)) edge(col + 1, row, col + 1, row + 1);
+      if (outside(col - 1, row)) edge(col, row, col, row + 1);
+      if (outside(col, row + 1)) edge(col, row + 1, col + 1, row + 1);
+      if (outside(col, row - 1)) edge(col, row, col + 1, row);
+    });
+    context.setLineDash(dash);
+    context.lineCap = 'round';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.55)'; context.lineWidth = 4; context.stroke();
+    context.strokeStyle = color; context.lineWidth = 2; context.stroke();
+    context.restore();
+  }
+
   var RESCUE_EXCELLENT_LOSSES = 3;
   function missionSummary() {
     var kind = mission.kind;
@@ -4780,6 +4905,7 @@
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
+    drawDebugZones();
     drawPortal(performance.now());
     drawShields(performance.now());
     drawHighlight(performance.now());
@@ -4856,6 +4982,7 @@
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
+    drawDebugZones();
     drawPortal(now);
     drawShields(now);
     drawHighlight(now);
@@ -4928,6 +5055,7 @@
       context.restore();
     });
 
+    drawDebugZones();                          // отладка: под туманом (по земле, в том числе перед юнитами)
     if (fogEnabled()) drawFogOverlay();
     drawPath();
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
@@ -5081,6 +5209,8 @@
     updateTalk(now);
     updateMissionClock(now);
     updateTimerLabel();
+    updateReachOverlay(now);
+    updateFireOverlay(now);
     updateMusic(now);
     updateSpotted(now);
     // выбранный юнит сменил этаж (лестница) — обзор переходит на его уровень
@@ -5175,6 +5305,7 @@
     },
     soldierProfiles: function () { return soldierProfiles().map(function (profile) { return { callsign: profile.callsign, name: profile.name, rank: profile.rank, role: profile.role }; }); },
     highlightArea: highlightArea,
+    debugOverlays: function () { return { reach: reachOverlay, fire: fireOverlay }; },
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, gates: gates, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, get gl3d() { return glActive() ? gl3d : null; }, get glProgress() { return glProgress; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
