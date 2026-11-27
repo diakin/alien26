@@ -2590,10 +2590,11 @@
     if (!MISSION || MISSION.kind !== 'rescue') return false;
     return units.some(function (unit) { return isCivilian(unit) && (unit.vip || unit.child) && !unit.dead && !aboard(unit); });
   }
-  // пришельцы уничтожены, ждём, пока учёного и детей доведут до конвертоплана; дошли — задание выполнено
+  // пришельцы уничтожены, ждём, пока учёного и детей доведут до конвертоплана; дошли — задание выполнено.
+  // Подкрепление из портала, открывшегося за это время, уничтожать не нужно.
   function checkDelivery() {
     if (!mission.awaitDelivery || mission.over) return;
-    if (units.some(function (unit) { return unit.side === 'aliens' || unit.path.length > 0; })) return;
+    if (shots.length || throws.length || units.some(function (unit) { return unit.path.length > 0; })) return;
     if (rescuePending()) return;
     say('Учёный и дети на борту');
     endMission('cleared', 900);
