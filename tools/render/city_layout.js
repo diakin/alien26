@@ -335,7 +335,8 @@ export function buildCity(api) {
       ],
       shelters: [[43, 4, 51, 9, 0], [3, 8, 4, 9, 0]],
       // тактика пришельцев: attackers идут в атаку, остальные держат оборону у постов (зал банка, детская площадка)
-      posts: [{ name: 'bank', col: 47, row: 15, level: 0, radius: 6 }, { name: 'playground', col: 9, row: 14, level: 0, radius: 5 }],
+      // avoidMech: охрана банка с роботом не перестреливается и после его попаданий отходит из его обзора (game.js, avoidsMech)
+      posts: [{ name: 'bank', col: 47, row: 15, level: 0, radius: 6, avoidMech: true }, { name: 'playground', col: 9, row: 14, level: 0, radius: 5 }],
       attackers: 5,
       portalElite: 'silver',                                 // двое из волны портала — серебристые стражи
     },

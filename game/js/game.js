@@ -1988,6 +1988,7 @@
     var amount = Combat.damage(shot.weapon, target.armor, Math.random);
     target.health = Math.max(0, target.health - amount);
     intelHit(shot.shooter, target, amount, target.health <= 0);
+    mechAlarm(shot.shooter, target);
     flashes.push({ text: amount ? '−' + amount : 'БРОНЯ', point: { x: target.x, y: target.y, h: target.elevation + target.height + 0.2 }, start: now, until: now + 1300 });
     if (target.health <= 0) { kill(target); if (shot.view) shot.view.killed = target; }
     else say(target.callsign + ': попадание, урон ' + amount);
@@ -2035,7 +2036,11 @@
       else selectNext();
     }
     if (unit.vip) say(unit.name + ' погиб');
-    if (!units.some(function (other) { return other.side === 'aliens'; })) { say('Пришельцы уничтожены'); endMission('cleared'); }
+    if (!units.some(function (other) { return other.side === 'aliens'; })) {
+      // спасение: пока учёный и дети не на борту конвертоплана, задание не кончается (checkDelivery)
+      if (rescuePending()) { if (!mission.awaitDelivery) { mission.awaitDelivery = true; say('Пришельцы уничтожены. Доставьте учёного и детей на конвертоплан'); } }
+      else { say('Пришельцы уничтожены'); endMission('cleared'); }
+    }
     else if (!units.some(function (other) { return isFighter(other) && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('wiped'); }
   }
 
@@ -2076,6 +2081,7 @@
     if (!portal || mission.over || document.hidden || delta > 1000 || PAGE_MODE === 'manage') return;
     missionClock.elapsed += delta;
     if (!portal.open && missionClock.elapsed >= portal.limit) openPortal(now);
+    else announcePortal();
   }
   function openPortal(now) {
     portal.open = true; portal.openedAt = now;
@@ -2094,7 +2100,8 @@
       }
     }
     setCombat(true);
-    say('Открылся портал: прибыли ' + placed + ' пришельцев');
+    Sound.play('impact', 0);
+    say('Портал вспыхнул: прибыли ' + placed + ' пришельцев');
     // страж-элита сразу ставит купол-щит вокруг портала
     var keeper = units.filter(function (unit) { return unit.elite && unit.domeCharges > 0 && !unit.dead; })[0];
     if (keeper) raiseDome(keeper);
@@ -2123,7 +2130,9 @@
     text += ' · С ОТРЯДОМ ' + rescued + ' ИЗ ' + total;
     if (text !== timerShown) { label.textContent = text; timerShown = text; }
   }
-  // портал: до открытия — слабое кольцо, которое растёт со временем; после — светящийся вихрь
+  // Портал: за PORTAL_GLOW_LEAD до срока на земле появляется круг; каждую минуту он разгорается ярче, а внутри
+  // крепнет энергетический вихрь (5 ступеней, переход за 2 с в начале минуты). В срок — вспышка (PORTAL_FLASH мс)
+  // и прибытие пришельцев, дальше — открытый портал.
   // подсветка области (меню базы: помещение, к которому перешла камера) — мигающая рамка на полу 3 с
   var highlight = null;
   function highlightArea(col, row, width, height, level, seconds) {
@@ -2251,18 +2260,79 @@
     context.restore();
   }
 
+  var PORTAL_GLOW_LEAD = 5 * 60 * 1000, PORTAL_FLASH = 1600, PORTAL_RADIUS = 2.4;
+  // ступень разгорания 0…5 (0 — круга ещё нет) и сила 0…1 с плавным переходом между ступенями
+  function portalGlow() {
+    if (!portal || portal.open) return { stage: 0, power: 0 };
+    var since = missionClock.elapsed - (portal.limit - PORTAL_GLOW_LEAD);
+    if (since < 0) return { stage: 0, power: 0 };
+    var stage = Math.min(5, Math.floor(since / 60000) + 1), intoMinute = (since % 60000) / 2000;
+    return { stage: stage, power: (stage - 1 + Math.min(1, intoMinute)) / 5 };
+  }
+  var portalStageSaid = 0;
+  function announcePortal() {
+    var glow = portalGlow();
+    if (!glow.stage || glow.stage === portalStageSaid) return;
+    portalStageSaid = glow.stage;
+    var left = 6 - glow.stage;
+    say(glow.stage === 1 ? 'Появился круг портала: до открытия ' + left + ' мин' : 'Портал разгорается: до открытия ' + left + ' мин');
+  }
   function drawPortal(now) {
     if (!portal || portal.level > view.level) return;
     var center = Iso.toScreen(portal.col + 0.5, portal.row + 0.5, elevationOf(portal.col, portal.row, portal.level) + 0.05);
     var x = center.x - camera.x, y = center.y - camera.y;
     var cell = Iso.toScreen(portal.col + 1.5, portal.row + 0.5, 0).x - Iso.toScreen(portal.col + 0.5, portal.row + 0.5, 0).x;
-    var fraction = Math.min(1, missionClock.elapsed / portal.limit);
+    var squash = 35 / 61;
     context.save();
     if (!portal.open) {
-      var radius = cell * (0.6 + fraction * 1.4);
-      context.globalAlpha = 0.25 + 0.2 * Math.sin(now / 300) * fraction + fraction * 0.3;
-      context.strokeStyle = '#b05cff'; context.lineWidth = 2 + fraction * 3;
-      context.beginPath(); context.ellipse(x, y, radius, radius * 35 / 61, 0, 0, Math.PI * 2); context.stroke();
+      var glow = portalGlow();
+      if (!glow.stage) { context.restore(); return; }
+      var power = glow.power, radius = cell * PORTAL_RADIUS, pulse = 0.85 + 0.15 * Math.sin(now / (380 - power * 200));
+      context.globalCompositeOperation = 'lighter';
+      // свечение внутри круга
+      var inner = context.createRadialGradient(x, y, 0, x, y, radius);
+      inner.addColorStop(0, 'rgba(210, 150, 255, ' + (0.05 + 0.4 * power) * pulse + ')');
+      inner.addColorStop(0.7, 'rgba(130, 50, 230, ' + (0.03 + 0.22 * power) * pulse + ')');
+      inner.addColorStop(1, 'rgba(90, 20, 160, 0)');
+      context.fillStyle = inner;
+      context.beginPath(); context.ellipse(x, y, radius, radius * squash, 0, 0, Math.PI * 2); context.fill();
+      // вихрь: спиральные рукава, гаснущие к краю; крутятся быстрее и тянутся дальше с каждой минутой
+      var arms = 3 + Math.floor(glow.stage / 2), spin = now / 1000 * (0.6 + 3.2 * power), reach = 0.3 + 0.6 * power;
+      context.lineCap = 'round';
+      for (var arm = 0; arm < arms; arm++) {
+        var base = spin + arm * Math.PI * 2 / arms, previousX = 0, previousY = 0;
+        for (var step = 0; step <= 18; step++) {
+          var part = step / 18, distance = radius * (0.06 + reach * part), angle = base + part * Math.PI * (0.8 + 0.5 * power);
+          var pointX = x + Math.cos(angle) * distance, pointY = y + Math.sin(angle) * distance * squash;
+          if (step) {
+            context.beginPath(); context.moveTo(previousX, previousY); context.lineTo(pointX, pointY);
+            context.strokeStyle = 'rgba(230, 190, 255, ' + (0.1 + 0.55 * power) * (1 - part * 0.85) * pulse + ')';
+            context.lineWidth = (1 + 3 * power) * (1.2 - part * 0.7);
+            context.stroke();
+          }
+          previousX = pointX; previousY = pointY;
+        }
+      }
+      // ядро вихря
+      var core = context.createRadialGradient(x, y, 0, x, y, radius * (0.15 + 0.25 * power));
+      core.addColorStop(0, 'rgba(255, 240, 255, ' + (0.1 + 0.6 * power) * pulse + ')');
+      core.addColorStop(1, 'rgba(200, 120, 255, 0)');
+      context.fillStyle = core;
+      context.beginPath(); context.ellipse(x, y, radius * (0.15 + 0.25 * power), radius * (0.15 + 0.25 * power) * squash, 0, 0, Math.PI * 2); context.fill();
+      // круг на земле: ярче и толще с каждой минутой
+      context.shadowColor = 'rgba(190, 110, 255, 0.9)'; context.shadowBlur = 4 + 22 * power;
+      context.strokeStyle = 'rgba(200, 130, 255, ' + (0.35 + 0.6 * power) * pulse + ')';
+      context.lineWidth = 1.5 + 3.5 * power;
+      context.beginPath(); context.ellipse(x, y, radius, radius * squash, 0, 0, Math.PI * 2); context.stroke();
+      // на последних минутах над вихрем встаёт слабый столб света
+      if (power > 0.55) {
+        var column = context.createLinearGradient(x, y, x, y - cell * 4 * power);
+        column.addColorStop(0, 'rgba(210, 160, 255, ' + (power - 0.55) * 0.9 * pulse + ')');
+        column.addColorStop(1, 'rgba(210, 160, 255, 0)');
+        context.shadowBlur = 0;
+        context.fillStyle = column;
+        context.fillRect(x - cell * 0.35 * power, y - cell * 4 * power, cell * 0.7 * power, cell * 4 * power);
+      }
     } else {
       var size = cell * 2.4;
       for (var ring = 0; ring < 5; ring++) {
@@ -2276,6 +2346,18 @@
       context.beginPath(); context.ellipse(x, y, size, size * 35 / 61, 0, now / 500, now / 500 + Math.PI * 1.6); context.stroke();
       context.beginPath(); context.moveTo(x, y); context.lineTo(x, y - cell * 3);
       context.strokeStyle = 'rgba(200, 140, 255, ' + (0.3 + 0.2 * Math.sin(now / 200)) + ')'; context.lineWidth = cell * 0.6; context.stroke();
+      // вспышка открытия: расходящийся белый свет
+      var flashAge = (now - portal.openedAt) / PORTAL_FLASH;
+      if (flashAge < 1) {
+        var flashRadius = cell * (2 + 9 * Math.sqrt(flashAge)), strength = Math.pow(1 - flashAge, 1.6);
+        context.globalCompositeOperation = 'lighter';
+        var burst = context.createRadialGradient(x, y, 0, x, y, flashRadius);
+        burst.addColorStop(0, 'rgba(255, 255, 255, ' + strength + ')');
+        burst.addColorStop(0.35, 'rgba(235, 200, 255, ' + strength * 0.75 + ')');
+        burst.addColorStop(1, 'rgba(150, 60, 240, 0)');
+        context.fillStyle = burst;
+        context.beginPath(); context.ellipse(x, y - cell * 0.6, flashRadius, flashRadius * 0.8, 0, 0, Math.PI * 2); context.fill();
+      }
     }
     context.restore();
   }
@@ -2494,7 +2576,7 @@
   // Окно итогов (js/results.js) открывается, когда долетели пули и проиграно падение.
   // Артефакты — предметы пришельцев (Items: alien) и тела пришельцев. При зачистке вывозится всё: земля, снаряжение
   // выживших, тела; при эвакуации — только снаряжение улетевших; при гибели отряда — ничего.
-  var mission = { over: false, kind: null, result: null, endAt: 0, shown: false, evacuated: null };
+  var mission = { over: false, kind: null, result: null, endAt: 0, shown: false, evacuated: null, awaitDelivery: false };
   function endMission(kind, delay) {
     if (mission.over) return;
     mission.over = true; mission.kind = kind;
@@ -2503,7 +2585,21 @@
     aiming = false; throwing = null; aimTarget = null;
     mission.result = missionSummary().result;
   }
+  // Задание спасения: учёный (vip) и дети должны быть живы — и в зоне эвакуации (на борту конвертоплана)
+  function rescuePending() {
+    if (!MISSION || MISSION.kind !== 'rescue') return false;
+    return units.some(function (unit) { return isCivilian(unit) && (unit.vip || unit.child) && !unit.dead && !aboard(unit); });
+  }
+  // пришельцы уничтожены, ждём, пока учёного и детей доведут до конвертоплана; дошли — задание выполнено
+  function checkDelivery() {
+    if (!mission.awaitDelivery || mission.over) return;
+    if (units.some(function (unit) { return unit.side === 'aliens' || unit.path.length > 0; })) return;
+    if (rescuePending()) return;
+    say('Учёный и дети на борту');
+    endMission('cleared', 900);
+  }
   function updateMission(now) {
+    checkDelivery();
     if (!mission.over || mission.shown || now < mission.endAt || shots.length || throws.length || shotView) return;
     mission.shown = true;
     if (window.Results) Results.show(missionSummary());
@@ -2729,6 +2825,7 @@
       // дешёвые проверки до трассировки: готовность, ОД на выстрел, дальность, линия взгляда по клеткам
       var score = readiness(unit, unit.timeUnits);
       if (score <= moverScore || weapon.modes[modeIndex].cost > unit.timeUnits) return;
+      if (mover.kind === 'mech' && avoidsMech(unit)) return;          // охрана банка с роботом не перестреливается
       if (Combat.distanceMeters(combatWorld, targetPointOf(unit), target.point) > weapon.range + 2) return;
       if (!mayHaveSightOf(unit, mover)) return;
       var preview = shotPreview(unit, target, modeIndex);
@@ -3170,6 +3267,17 @@
       else { alien.role = 'guard'; alien.post = nearestPost(alien).post; }
     });
   }
+  // Охрана поста с avoidMech (зал банка): с роботом в перестрелку не вступает — ни в свой ход, ни ответным огнём,
+  // в том числе через окна. Когда робот ранит или убивает кого-то из охраны этого поста (post.mechAlarm), охрана
+  // отходит из обзора робота вглубь (радиус поста + MECH_RETREAT_EXTRA) и укрывается; по бойцам стреляет только
+  // оттуда, где робот её не видит.
+  var MECH_RETREAT_EXTRA = 4;
+  function avoidsMech(alien) { return alien.role === 'guard' && !!alien.post && !!alien.post.avoidMech; }
+  function mechAlarm(shooter, target) {
+    if (!shooter || shooter.kind !== 'mech' || !target || !avoidsMech(target) || target.post.mechAlarm) return;
+    target.post.mechAlarm = true;
+    say('Пришельцы в банке отходят от робота');
+  }
   function postField(post) {
     if (!postFields[post.name]) postFields[post.name] = fieldFrom([{ col: post.col, row: post.row, level: post.level }]);
     return postFields[post.name];
@@ -3314,6 +3422,22 @@
     if (tactic && tactic.kind === 'hide' && coverAt(keyNode(here)) < 1) targets = [];
     // вышли бойцы: по роботу не стреляют — уходят из его обзора и ищут бойцов
     if (tactic && tactic.kind === 'assault') targets = targets.filter(function (target) { return target.unit.kind !== 'mech'; });
+    // охрана банка: по роботу не стреляет никогда; после тревоги — сначала уйти из его обзора, стрелять только оттуда
+    var shunMech = avoidsMech(alien), mechAlarmed = shunMech && alien.post.mechAlarm;
+    if (shunMech) targets = targets.filter(function (target) { return target.unit.kind !== 'mech'; });
+    if (mechAlarmed && info(here).seenByMech > 0) {
+      targets = [];
+      var limit = tactic.radius + MECH_RETREAT_EXTRA, away = null;
+      reach.keys.filter(function (key) { return key !== here && stepsTo(key) <= limit; })
+        .sort(function (first, second) { return reach.cost[first] - reach.cost[second]; }).slice(0, 120)
+        .forEach(function (key) {
+          var item = info(key);
+          if (item.seenByMech > 0) return;
+          var value = item.cover * 6 - item.seen * 10 - item.cost * 0.1;
+          if (!away || value > away.value) away = { item: item, value: value };
+        });
+      if (away) return moveTo(away.item, 'отход от робота');
+    }
     // память: трудную цель — только группой; без группы по ней не стреляют (остаётся ответный огонь из засады)
     var hardNear = hardEnemies(alien);
     targets = targets.filter(function (target) { return intelRating(target.unit) !== 'hard' || groupReady(target.unit); });
@@ -3363,8 +3487,11 @@
           - (tactic && tactic.kind === 'guard' ? Math.max(0, steps - tactic.radius) * 8 : 0);
       } else if (tactic && tactic.kind === 'guard') {
         // оборона поста: клетка с укрытием в радиусе поста, откуда можно стрелять; за пределы поста — не уходит
+        var guardRadius = mechAlarmed ? tactic.radius + MECH_RETREAT_EXTRA : tactic.radius;
+        if (shunMech) canShoot = item.shootable.some(function (target) { return target.unit.kind !== 'mech'; }) && left >= modes[snapIndex].cost + 2;
         score = (canShoot ? 40 + item.cover * 12 - 20 * Math.max(0, item.seen - 1) : item.seen === 0 ? 15 + item.cover * 6 : 4 - 25 * item.seen)
-          - Math.max(0, steps - tactic.radius) * 8 - (hardNear.cautious ? item.seenByHard * 30 : 0);
+          - Math.max(0, steps - guardRadius) * 8 - (hardNear.cautious ? item.seenByHard * 30 : 0)
+          - (mechAlarmed ? item.seenByMech * 90 : 0);
       } else if (tactic && tactic.kind === 'hide') {
         // против одного робота: не видно, есть укрытие, не ближе 10 клеток; стрелять — только из хорошего укрытия
         // к роботу не приближаются: каждая клетка ближе к нему — минус
