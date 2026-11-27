@@ -100,6 +100,17 @@ var Results = (function () {
       row('СПАСЕНО ГРАЖДАНСКИХ', rescue.civiliansRescued.length, rescue.civiliansTotal, peopleList(rescue.civiliansRescued)) +
       row('ПОГИБЛО ГРАЖДАНСКИХ', rescue.civiliansDead.length, rescue.civiliansTotal, peopleList(rescue.civiliansDead));
   }
+  // память пришельцев (game.js, «память пришельцев»): какие цели они считают трудными
+  function intelRow(intel) {
+    if (!intel || !intel.length) return '';
+    var ratingNames = { hard: 'трудная цель', easy: 'лёгкая цель', normal: 'обычная цель', unknown: 'мало опыта' };
+    var notes = intel.map(function (entry) {
+      return '<div><span class="callsign">' + escape(entry.name) + '</span>' + ratingNames[entry.rating] +
+        (entry.toughness !== null ? ', ≈' + Math.round(entry.toughness) + ' попаданий до гибели' : '') + ' · попаданий ' + entry.hits + '</div>';
+    }).join('');
+    var hard = intel.filter(function (entry) { return entry.rating === 'hard'; }).length;
+    return row('ПАМЯТЬ ПРИШЕЛЬЦЕВ', hard, null, notes + '<div class="none">трудных целей: пришельцы против них осторожны, нападают группой</div>');
+  }
   function show(summary) {
     if (window.BaseStore) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
     if (window.BaseStore && summary.fromBase && BaseStore.receiveMech) BaseStore.receiveMech(summary);   // K7 потеряна / собрана новая
@@ -119,6 +130,7 @@ var Results = (function () {
           (summary.kind === 'evac' ? row('НЕ ЭВАКУИРОВАНО', summary.soldiersLeft.length, summary.soldiersTotal, peopleList(summary.soldiersLeft)) : '') +
           row('ПОТЕРЯНО РОБОТОВ', summary.robotsLost.length + summary.robotsLeft.length, summary.robotsTotal,
             peopleList(summary.robotsLost.concat(summary.robotsLeft.map(function (robot) { return { callsign: robot.callsign, name: robot.name, rank: 'не эвакуирован' }; })))) +
+          intelRow(summary.intel) +
         '</table>' +
         '<div class="buttons">' +
           '<button class="left" data-action="ok">ОК</button>' +

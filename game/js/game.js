@@ -1884,6 +1884,7 @@
     var radius = target.unit ? unitBody(target.unit).radius : 0.05;
     var aim = Combat.aimPoint(combatWorld, from, point, radius, chance, Math.random);
     shot.from = from;
+    if (target.unit) intelShot(shot.shooter, target.unit);
     shot.drawFrom = spriteMuzzleOf(shot.shooter, point);
     shot.result = Combat.trace(combatWorld, from, aim.point, shot.weapon.range, shot.shooter, true);
     shot.duration = Math.max(60, Combat.distanceMeters(combatWorld, from, shot.result.point) / SHOT_SPEED[shot.weapon.projectile] * 1000);
@@ -1910,6 +1911,7 @@
     var target = result.unit;
     var amount = Combat.damage(shot.weapon, target.armor, Math.random);
     target.health = Math.max(0, target.health - amount);
+    intelHit(shot.shooter, target, amount, target.health <= 0);
     flashes.push({ text: amount ? '−' + amount : 'БРОНЯ', point: { x: target.x, y: target.y, h: target.elevation + target.height + 0.2 }, start: now, until: now + 1300 });
     if (target.health <= 0) { kill(target); if (shot.view) shot.view.killed = target; }
     else say(target.callsign + ': попадание, урон ' + amount);
@@ -2420,6 +2422,7 @@
   function endMission(kind, delay) {
     if (mission.over) return;
     mission.over = true; mission.kind = kind;
+    if (combat) { alienIntel.battles = (alienIntel.battles || 0) + 1; saveIntel(true); }   // память пришельцев — сразу в браузер
     mission.endAt = performance.now() + (delay === undefined ? 2200 : delay);
     aiming = false; throwing = null; aimTarget = null;
     mission.result = missionSummary().result;
@@ -2608,7 +2611,7 @@
       return entry;
     };
     return {
-      kind: kind, result: result, map: MAP.name || '', turn: turn, run: MISSION_RUN, fromBase: !!SHIP,
+      kind: kind, result: result, map: MAP.name || '', turn: turn, run: MISSION_RUN, fromBase: !!SHIP, intel: intelSummary(),
       aliensKilled: killedAliens.length, aliensTotal: aliens.length,
       artifacts: order.map(function (name) { return { name: name, count: counts[name] }; }),
       soldiersLost: soldiersDead.map(person), soldiersLeft: soldiersLeft.map(person),
@@ -2981,6 +2984,78 @@
   function fieldSteps(key) { return stepsIn(approachField, key); }
   function stepsIn(field, key) { var value = field && field[key]; return value === undefined ? 99 : value / COST.step; }
 
+  // ---- память пришельцев: какие цели трудные ----
+  // Пришельцы учатся на столкновениях. По каждому классу целей (K7, бойцы, персонал базы, гражданские) копится:
+  // выстрелы, попадания, нанесённый урон и полное здоровье целей при попадании, убитые цели, урон и потери,
+  // полученные от этого класса. Отсюда «попаданий до гибели» = здоровье / средний урон за попадание:
+  // не меньше INTEL_HARD — трудная цель, не больше INTEL_EASY — лёгкая (нужно хотя бы INTEL_MIN_HITS попаданий).
+  // Трудную цель пришелец бьёт, только если на неё можно навалиться группой (INTEL_GROUP здоровых пришельцев рядом
+  // её видят); иначе не стреляет по ней в свой ход, держится вне её обзора и подальше, прячется (засада ответным
+  // огнём остаётся). Лёгкие цели — в первую очередь. Память общая для всех заданий и хранится в браузере
+  // (localStorage, INTEL_KEY); позже её можно будет держать на сервере при регистрации игрока.
+  var INTEL_KEY = 'aliens26.alienIntel.v1', INTEL_HARD = 6, INTEL_EASY = 3, INTEL_MIN_HITS = 3, INTEL_GROUP = 3;
+  var INTEL_NAMES = { K7: 'шагающая машина K7', soldier: 'бойцы', staff: 'персонал базы', civilian: 'гражданские' };
+  var alienIntel = (function () {
+    try { var stored = JSON.parse(localStorage.getItem(INTEL_KEY)); if (stored && stored.version === 1 && stored.classes) return stored; } catch (error) { }
+    return { version: 1, classes: {}, battles: 0 };
+  })();
+  var intelSaveTimer = null;
+  function saveIntel(now) {
+    if (intelSaveTimer) { clearTimeout(intelSaveTimer); intelSaveTimer = null; }
+    var write = function () { intelSaveTimer = null; try { localStorage.setItem(INTEL_KEY, JSON.stringify(alienIntel)); } catch (error) { } };
+    if (now) write(); else intelSaveTimer = setTimeout(write, 1500);
+  }
+  function targetClass(unit) { return unit.kind === 'mech' ? 'K7' : unit.staff ? 'staff' : unit.side === 'squad' ? 'soldier' : 'civilian'; }
+  function intelEntry(name) {
+    if (!alienIntel.classes[name]) alienIntel.classes[name] = { shots: 0, hits: 0, damage: 0, health: 0, kills: 0, taken: 0, aliensKilled: 0 };
+    return alienIntel.classes[name];
+  }
+  function intelShot(shooter, target) {
+    if (!combat || shooter.side !== 'aliens' || !target || target.side === 'aliens') return;
+    intelEntry(targetClass(target)).shots++; saveIntel();
+  }
+  function intelHit(shooter, target, amount, killed) {
+    if (!combat || !shooter || !target) return;
+    if (shooter.side === 'aliens' && target.side !== 'aliens') {
+      var entry = intelEntry(targetClass(target));
+      entry.hits++; entry.damage += amount; entry.health += target.maxHealth; if (killed) entry.kills++;
+    } else if (shooter.side !== 'aliens' && target.side === 'aliens') {
+      var source = intelEntry(targetClass(shooter));
+      source.taken += amount; if (killed) source.aliensKilled++;
+    } else return;
+    saveIntel();
+  }
+  // попаданий до гибели цели этого класса или null, пока опыта мало
+  function intelToughness(name) {
+    var entry = alienIntel.classes[name];
+    if (!entry || entry.hits < INTEL_MIN_HITS) return null;
+    return (entry.health / entry.hits) / Math.max(1, entry.damage / entry.hits);
+  }
+  function intelRating(unit) {
+    var toughness = intelToughness(targetClass(unit));
+    if (toughness === null) return 'unknown';
+    return toughness >= INTEL_HARD ? 'hard' : toughness <= INTEL_EASY ? 'easy' : 'normal';
+  }
+  // можно навалиться группой: столько здоровых пришельцев в пределах дальности видят клетку цели
+  function groupReady(target) {
+    var count = 0;
+    units.forEach(function (unit) {
+      if (unit.side !== 'aliens' || unit.dead || woundedMode(unit)) return;
+      var weapon = weaponOf(unit);
+      if (!weapon || Combat.distanceMeters(combatWorld, targetPointOf(unit), targetPointOf(target)) > weapon.range) return;
+      if (mayHaveSightOf(unit, target)) count++;
+    });
+    return count >= INTEL_GROUP;
+  }
+  // для окна итогов: что пришельцы знают о целях
+  function intelSummary() {
+    return Object.keys(alienIntel.classes).map(function (name) {
+      var entry = alienIntel.classes[name], toughness = intelToughness(name);
+      return { name: INTEL_NAMES[name] || name, hits: entry.hits, toughness: toughness, rating: toughness === null ? 'unknown' : toughness >= INTEL_HARD ? 'hard' : toughness <= INTEL_EASY ? 'easy' : 'normal', aliensKilled: entry.aliensKilled };
+    });
+  }
+  window.AlienIntel = { data: function () { return alienIntel; }, reset: function () { alienIntel = { version: 1, classes: {}, battles: 0 }; saveIntel(true); } };
+
   // ---- тактика пришельцев в задании (MAP.mission.posts, attackers) ----
   // В начале боя пришельцы делятся: attackers (5) — те, кто не стоит у постов, ближние к отряду, — идут в атаку;
   // остальные — охрана: каждый идёт к ближнему посту (зал банка, детская площадка) и держит там оборону — выбирает
@@ -3031,6 +3106,22 @@
     if (units.some(function (unit) { return unit.side === 'squad' && unit.kind === 'mech' && !unit.dead && !aboard(unit); })) return { kind: 'hide' };
     return null;
   }
+  // известные трудные враги рядом (до 20 клеток); cautious — если навалиться на них группой нельзя
+  function hardEnemies(alien) {
+    var list = units.filter(function (unit) {
+      return isEnemyOf(alien, unit) && !unit.dead && intelRating(unit) === 'hard' && Math.max(Math.abs(unit.col - alien.col), Math.abs(unit.row - alien.row)) <= 20;
+    });
+    return { list: list, cautious: list.some(function (unit) { return !groupReady(unit); }) };
+  }
+  function hardDistance(node, list) {
+    var best = 99;
+    list.forEach(function (unit) {
+      var size = unit.size || 1;
+      var dx = Math.max(0, unit.col - node.col, node.col - (unit.col + size - 1)), dy = Math.max(0, unit.row - node.row, node.row - (unit.row + size - 1));
+      best = Math.max(0, Math.min(best, Math.max(dx, dy)));
+    });
+    return best;
+  }
   // клеток до ближайшего робота отряда (по прямой, чебышёв)
   function mechDistance(node) {
     var best = 99;
@@ -3050,7 +3141,7 @@
   function exposureAt(alien, node) {
     var elevation = elevationOf(node.col, node.row, node.level);
     var body = { x: node.col + 0.5, y: node.row + 0.5, h: elevation + alien.height * 0.62 };
-    var seen = 0, seenByMech = 0, shootable = [];
+    var seen = 0, seenByMech = 0, seenByHard = 0, shootable = [];
     var ownWeapon = weaponOf(alien);
     units.forEach(function (unit) {
       if (!isEnemyOf(alien, unit)) return;
@@ -3061,10 +3152,10 @@
       if (distance > Math.max(weapon ? weapon.range : 0, ownWeapon ? ownWeapon.range : 0)) return;
       var line = Combat.trace(combatWorld, from, body, distance, unit);
       if (line.kind !== 'none' && !(line.kind === 'unit' && line.unit === alien)) return;
-      if (weapon && distance <= weapon.range) { seen++; if (unit.kind === 'mech') seenByMech++; }
+      if (weapon && distance <= weapon.range) { seen++; if (unit.kind === 'mech') seenByMech++; if (intelRating(unit) === 'hard') seenByHard++; }
       if (ownWeapon && distance <= ownWeapon.range) shootable.push({ unit: unit, distance: distance });
     });
-    return { seen: seen, seenByMech: seenByMech, shootable: shootable };
+    return { seen: seen, seenByMech: seenByMech, seenByHard: seenByHard, shootable: shootable };
   }
   // укрытие: стены и препятствия на гранях клетки со стороны ближайшего бойца
   function coverAt(node, mover) {
@@ -3122,7 +3213,7 @@
     var here = nodeKey(alien.col, alien.row, alien.level);
     var cache = {};
     var info = function (key) {
-      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(alien, node); cache[key] = { key: key, node: node, seen: exposure.seen, seenByMech: exposure.seenByMech, shootable: exposure.shootable, cover: coverAt(node), cost: reach.cost[key] || 0 }; }
+      if (!cache[key]) { var node = keyNode(key); var exposure = exposureAt(alien, node); cache[key] = { key: key, node: node, seen: exposure.seen, seenByMech: exposure.seenByMech, seenByHard: exposure.seenByHard, shootable: exposure.shootable, cover: coverAt(node), cost: reach.cost[key] || 0 }; }
       return cache[key];
     };
     var tactic = alienTactic(alien);
@@ -3144,11 +3235,16 @@
     if (tactic && tactic.kind === 'hide' && coverAt(keyNode(here)) < 1) targets = [];
     // вышли бойцы: по роботу не стреляют — уходят из его обзора и ищут бойцов
     if (tactic && tactic.kind === 'assault') targets = targets.filter(function (target) { return target.unit.kind !== 'mech'; });
+    // память: трудную цель — только группой; без группы по ней не стреляют (остаётся ответный огонь из засады)
+    var hardNear = hardEnemies(alien);
+    targets = targets.filter(function (target) { return intelRating(target.unit) !== 'hard' || groupReady(target.unit); });
     if (targets.length) {
       var best = null;
       targets.forEach(function (target) {
         // вышли бойцы: робота стараются не трогать — бьют по бойцам
-        var value = targetValue(alien, target, modes[0]) * (tactic && tactic.kind === 'assault' && target.unit.kind === 'mech' ? 0.15 : 1);
+        var rating = intelRating(target.unit);
+        var value = targetValue(alien, target, modes[0]) * (tactic && tactic.kind === 'assault' && target.unit.kind === 'mech' ? 0.15 : 1) *
+          (rating === 'easy' ? 1.6 : rating === 'hard' ? 0.3 : 1);
         if (!best || value > best.value) best = { target: target, value: value };
       });
       var turn = turnCostTo(alien, best.target.point);
@@ -3180,14 +3276,16 @@
     var choiceItem = null, choiceScore = -Infinity;
     candidates.forEach(function (key) {
       var item = info(key), steps = stepsTo(key), left = alien.timeUnits - item.cost, score;
-      var canShoot = item.shootable.length > 0 && left >= modes[snapIndex].cost + 2;
+      // трудные цели без группы в счёт не идут: позиция «для стрельбы» по ним не нужна
+      var usable = hardNear.list.length ? item.shootable.filter(function (target) { return intelRating(target.unit) !== 'hard' || groupReady(target.unit); }) : item.shootable;
+      var canShoot = usable.length > 0 && left >= modes[snapIndex].cost + 2;
       if (hurt) {
         score = (item.seen === 0 ? 60 : -40 * item.seen) + fieldSteps(key) * 1.5 + item.cover * 4
           - (tactic && tactic.kind === 'guard' ? Math.max(0, steps - tactic.radius) * 8 : 0);
       } else if (tactic && tactic.kind === 'guard') {
         // оборона поста: клетка с укрытием в радиусе поста, откуда можно стрелять; за пределы поста — не уходит
         score = (canShoot ? 40 + item.cover * 12 - 20 * Math.max(0, item.seen - 1) : item.seen === 0 ? 15 + item.cover * 6 : 4 - 25 * item.seen)
-          - Math.max(0, steps - tactic.radius) * 8;
+          - Math.max(0, steps - tactic.radius) * 8 - (hardNear.cautious ? item.seenByHard * 30 : 0);
       } else if (tactic && tactic.kind === 'hide') {
         // против одного робота: не видно, есть укрытие, не ближе 10 клеток; стрелять — только из хорошего укрытия
         // к роботу не приближаются: каждая клетка ближе к нему — минус
@@ -3200,6 +3298,8 @@
         score = Math.max(firing, sneaking);
         // вышли бойцы: держатся вне обзора робота и не ближе 6 клеток к нему
         if (tactic && tactic.kind === 'assault') score -= item.seenByMech * 30 + Math.max(0, 6 - mechDistance(item.node)) * 6;
+        // трудные цели без группы: осторожно — вне их обзора, не ближе 8 клеток, в укрытии
+        if (hardNear.cautious) score -= item.seenByHard * 35 + Math.max(0, 8 - hardDistance(item.node, hardNear.list)) * 6 - item.cover * 4;
       }
       if (key === here) score += 1;                    // при равенстве — остаться
       if (score > choiceScore) { choiceScore = score; choiceItem = item; }
