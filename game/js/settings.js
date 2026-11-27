@@ -23,6 +23,7 @@ var Settings = (function () {
     { key: 'render3d', label: '3D-карта (WebGL, база): поворот камеры «,» / «.»', type: 'check', value: true },
     { key: 'renderScale', label: 'Разрешение отрисовки', type: 'select', value: 1, options: [[1, 'Полное'], [0.75, '75 % — быстрее'], [0.5, '50 % — для слабых машин']] },
     { key: 'fullscreen', label: 'Полный экран', type: 'check', value: false, live: true },
+    { key: 'compactPanel', label: 'Компактная нижняя панель (кнопка ▴ / ▾ на панели)', type: 'check', value: true },
     { key: 'showHelp', label: 'Подсказки управления справа вверху', type: 'check', value: true },
     { key: 'showGrid', label: 'Сетка клеток', type: 'check', value: false },
     { key: 'showFps', label: 'Счётчик FPS справа внизу', type: 'check', value: true }

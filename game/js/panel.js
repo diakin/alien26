@@ -1,5 +1,7 @@
 // Нижняя панель: мини-карта, портрет, характеристики, кнопки действий, режим огня, оружие.
-// Макет 1280x260 пикселей; в окне уже 1280 панель целиком уменьшается.
+// Два макета: полный (DESIGN_W x 260) и компактный (COMPACT_W x 130, по умолчанию) — меньше мини-карта, портрет
+// и ячейки рук, полосы характеристик в два столбца, кнопки ниже. Переключает кнопка ▴ / ▾ в правом верхнем углу
+// панели или настройка «Компактная нижняя панель». В окне уже макета панель целиком уменьшается.
 var Panel = (function () {
   'use strict';
 
@@ -7,6 +9,9 @@ var Panel = (function () {
   var SHIFT = MINIMAP_W - 216;                // на столько блоки правее мини-карты сдвинуты против прежней вёрстки
   var ACTIONS_EXTRA = 32;                     // кнопки реже: подписи «КОНЕЦ ХОДА» и «ЭВАКУАЦ.» не сходятся
   var DESIGN_W = 1280 + SHIFT + ACTIONS_EXTRA, DESIGN_H = 260;
+  var COMPACT_W = 1180, COMPACT_H = 130;
+  var COMPACT_MAP_W = 182, COMPACT_MAP_H = 108;   // мини-карта в компактном макете, те же пропорции
+  var compact = true;
   var root = document.getElementById('panel');
   var inner = document.createElement('div');
   inner.className = 'panel-inner';
@@ -80,6 +85,41 @@ var Panel = (function () {
     '.panel-inner .action-label { letter-spacing: 0.2px; font-size: 8.5px; margin-left: -12px; margin-right: -12px; transform: none; }',
     '.panel-inner .action:last-child .action-label { transform: none; }',
     '.no-unit .hand > * { visibility: hidden; }',
+    // компактный макет: всё по высоте 116 px
+    '.panel-inner.compact > .box { top: 7px; }',
+    '.panel-inner.compact .minimap { left: 12px; width: ' + (COMPACT_MAP_W + 8) + 'px; height: ' + (COMPACT_MAP_H + 8) + 'px; }',
+    '.panel-inner.compact .minimap .caption { font-size: 9px; left: 8px; bottom: 3px; }',
+    '.panel-inner.compact .hand { width: 112px; height: 116px; }',
+    '.panel-inner.compact .hand.left { left: 210px; } .panel-inner.compact .hand.right { left: 430px; }',
+    '.panel-inner.compact .hand-title { top: 4px; font-size: 8px; }',
+    '.panel-inner.compact .hand-name { top: 15px; font-size: 8px; line-height: 10px; max-height: 20px; overflow: hidden; }',
+    '.panel-inner.compact .hand canvas { left: 6px; top: 36px; width: 54px; height: 71px; }',
+    '.panel-inner.compact .hand-empty { top: 52px; font-size: 10px; }',
+    '.panel-inner.compact .hand-ammo { left: 60px; right: 6px; bottom: 6px; flex-direction: column; align-items: flex-end; }',
+    '.panel-inner.compact .hand-rounds { font-size: 16px; } .panel-inner.compact .hand-rounds span { font-size: 10px; }',
+    '.panel-inner.compact .hand-reserve { font-size: 8px; margin: 2px 0 0; }',
+    '.panel-inner.compact .portrait { left: 330px; width: 92px; height: 116px; }',
+    '.panel-inner.compact .portrait img { top: 2px; width: 92px; height: 112px; object-position: 50% 0; }',
+    '.panel-inner.compact .nameplate { height: 16px; padding: 0 5px; justify-content: center; }',
+    '.panel-inner.compact #callsign { font-size: 10px; letter-spacing: 1px; } .panel-inner.compact #rank { display: none; }',
+    '.panel-inner.compact .stats { left: 554px; top: 6px; width: 330px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }',
+    '.panel-inner.compact .unit-name, .panel-inner.compact .unit-sub, .panel-inner.compact .chips { grid-column: 1 / -1; }',
+    '.panel-inner.compact .unit-name { font-size: 15px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+    '.panel-inner.compact .unit-sub { font-size: 9px; margin: 1px 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+    '.panel-inner.compact .stat { margin-bottom: 5px; }',
+    '.panel-inner.compact .stat-value { font-size: 12px; }',
+    '.panel-inner.compact .stat-track { height: 6px; margin-top: 2px; }',
+    '.panel-inner.compact .chips { margin-top: 1px; overflow: hidden; }',
+    '.panel-inner.compact .chip { font-size: 8.5px; padding: 1px 4px; }',
+    '.panel-inner.compact .actions { left: 898px; top: 8px; width: 260px; }',
+    '.panel-inner.compact .action-grid { grid-template-columns: repeat(5, 40px); column-gap: 12px; row-gap: 6px; }',
+    '.panel-inner.compact .action-box { width: 40px; height: 38px; }',
+    '.panel-inner.compact .action-box svg { width: 28px; height: 28px; }',
+    '.panel-inner.compact .action-label { font-size: 8px; margin-top: 2px; }',
+    // кнопка свернуть / развернуть — вне масштабируемого макета, в правом верхнем углу панели
+    '#panel-toggle { position: absolute; right: 6px; top: 5px; z-index: 2; width: 26px; height: 20px; padding: 0; background: #161b1e; border: 1px solid #3a454b;',
+    '  color: #cfd8dc; font: 11px Arial, sans-serif; line-height: 18px; cursor: pointer; }',
+    '#panel-toggle:hover { border-color: #e8a33a; color: #ffd28a; }',
     '.viewing .portrait, .viewing .hand { border-color: #c0462e; }',
     '.viewing .unit-name { color: #ff9a7a; }',
     '.viewing #chip-stance { color: #ff9a7a; border-color: #6a3328; }',
@@ -483,12 +523,49 @@ var Panel = (function () {
     setClass(inner, 'busy', Game.busy);
   }
 
+  // ---------------- компактный / полный макет ----------------
+  var toggle = document.createElement('button');
+  toggle.id = 'panel-toggle';
+  root.appendChild(toggle);
+  toggle.addEventListener('click', function () {
+    if (window.Settings) Settings.set('compactPanel', !compact); else applyCompact(!compact);
+  });
+  function applyCompact(value) {
+    compact = !!value;
+    setClass(inner, 'compact', compact);
+    toggle.textContent = compact ? '▴' : '▾';
+    toggle.title = compact ? 'Развернуть панель' : 'Свернуть панель';
+    // мини-карта: холст своего размера в каждом макете, фон пересобирается
+    var width = compact ? COMPACT_MAP_W : MINIMAP_W, height = compact ? COMPACT_MAP_H : MINIMAP_H;
+    if (minimap.width !== width || minimap.height !== height) {
+      minimap.width = width; minimap.height = height;
+      if (mapBackground) buildMinimapBackground();
+    }
+    layout();
+    // высота панели изменилась — карта пересчитывает свою высоту (game.js, resize)
+    window.dispatchEvent(new Event('resize'));
+  }
+  applyCompact(compact);
+  // настройки (js/settings.js) подключаются после панели: подписка — при первой раскладке, когда они уже есть
+  var subscribed = false;
+  function subscribe() {
+    if (subscribed || !window.Settings) return;
+    subscribed = true;
+    Settings.onChange(function (values, key) {
+      if ((key === null || key === 'compactPanel') && values.compactPanel !== undefined && !!values.compactPanel !== compact) applyCompact(values.compactPanel);
+    });
+  }
+
   // ---------------- масштаб под ширину окна ----------------
   function layout() {
-    var scale = Math.min(1, window.innerWidth / DESIGN_W);
-    root.style.height = Math.round(DESIGN_H * scale) + 'px';
+    subscribe();
+    var designWidth = compact ? COMPACT_W : DESIGN_W, designHeight = compact ? COMPACT_H : DESIGN_H;
+    var scale = Math.min(1, window.innerWidth / designWidth);
+    inner.style.width = designWidth + 'px';
+    inner.style.height = designHeight + 'px';
+    root.style.height = Math.round(designHeight * scale) + 'px';
     inner.style.transform = 'scale(' + scale + ')';
-    inner.style.left = Math.round((window.innerWidth - DESIGN_W * scale) / 2) + 'px';
+    inner.style.left = Math.round((window.innerWidth - designWidth * scale) / 2) + 'px';
   }
   layout();
 
