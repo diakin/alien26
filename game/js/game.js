@@ -2743,6 +2743,7 @@
     context.restore();
   }
 
+  var RESCUE_EXCELLENT_LOSSES = 3;
   function missionSummary() {
     var kind = mission.kind;
     var lost = function (test) { return startUnits.filter(function (unit) { return test(unit) && unit.dead; }); };
@@ -2762,8 +2763,15 @@
     var civiliansDead = civilians.filter(function (unit) { return unit.dead; });
     var vip = civilians.filter(function (unit) { return unit.vip; })[0] || null;
     var vipRescued = !!vip && civiliansRescued.indexOf(vip) >= 0;
-    // задание спасения: «хорошо» — учёный спасён и уничтожено не меньше половины пришельцев (или все)
-    if (MISSION && MISSION.kind === 'rescue') result = vipRescued && (kind === 'cleared' || killedAliens.length * 2 >= aliens.length) ? 'good' : 'bad';
+    // задание спасения: уничтожать пришельцев не обязательно, главное — вывезти учёного и детей.
+    // «Хорошо» — учёный и все дети спасены, потеряно (погибли или не эвакуированы) меньше половины бойцов;
+    // «отлично» — спасены все гражданские и потеряно меньше RESCUE_EXCELLENT_LOSSES бойцов; иначе «плохо».
+    if (MISSION && MISSION.kind === 'rescue') {
+      var soldiersLostCount = soldiersDead.length + soldiersLeft.length, soldiersCount = startUnits.filter(isSoldier).length;
+      var keyRescued = vipRescued && civilians.every(function (unit) { return !unit.child || civiliansRescued.indexOf(unit) >= 0; });
+      result = keyRescued && soldiersLostCount * 2 < soldiersCount ? 'good' : 'bad';
+      if (result === 'good' && civiliansRescued.length === civilians.length && soldiersLostCount < RESCUE_EXCELLENT_LOSSES) result = 'excellent';
+    }
     var counts = {}, order = [];
     var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
     var lists = [];

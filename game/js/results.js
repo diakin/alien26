@@ -1,5 +1,5 @@
 // Окно итогов задания: открывается из game.js (updateMission), когда задание кончилось.
-// summary: { result: 'good'|'bad', map, turn, aliensKilled, aliensTotal, artifacts: [{ name, count }],
+// summary: { result: 'excellent'|'good'|'bad', map, turn, aliensKilled, aliensTotal, artifacts: [{ name, count }],
 //            soldiersLost: [{ callsign, name, rank }], soldiersTotal, robotsLost: [...], robotsTotal }
 var Results = (function () {
   'use strict';
@@ -20,6 +20,7 @@ var Results = (function () {
     '#results .verdict .label { font-size: 12px; font-weight: bold; letter-spacing: 1px; color: #8fb894; }',
     '#results .verdict .value { font: bold 26px Consolas, "DejaVu Sans Mono", monospace; letter-spacing: 2px; }',
     '#results .verdict.good .value { color: #9fe07a; } #results .verdict.bad .value { color: #ff6a55; }',
+    '#results .verdict.excellent .value { color: #ffd24a; }',
     '#results .verdict .note { margin-left: auto; font-size: 12px; color: #a8c8a8; }',
     '#results table { border-collapse: collapse; margin: 0 12px; width: calc(100% - 24px); }',
     '#results td { border-bottom: 1px solid #22382c; padding: 7px 8px; vertical-align: top; }',
@@ -83,7 +84,9 @@ var Results = (function () {
     if (rescue) {
       var vipText = rescue.vipRescued ? 'учёный доставлен на базу' : rescue.vipDead ? 'учёный погиб' : 'учёный не спасён';
       var how = summary.kind === 'cleared' ? 'пришельцы уничтожены' : summary.kind === 'wiped' ? 'отряд погиб' : 'эвакуация';
-      return how.charAt(0).toUpperCase() + how.slice(1) + ', ' + vipText + ', спасено гражданских ' + rescue.civiliansRescued.length + ' из ' + rescue.civiliansTotal;
+      var losses = summary.soldiersLost.length + summary.soldiersLeft.length;
+      return how.charAt(0).toUpperCase() + how.slice(1) + ', ' + vipText + ', детей ' + rescue.childrenRescued + ' из ' + rescue.childrenTotal +
+        ', гражданских ' + rescue.civiliansRescued.length + ' из ' + rescue.civiliansTotal + ', потери бойцов ' + losses + ' из ' + summary.soldiersTotal;
     }
     if (summary.kind === 'cleared') return 'Все пришельцы в зоне уничтожены';
     if (summary.kind === 'wiped') return 'Отряд погиб, зона не очищена';
@@ -114,13 +117,13 @@ var Results = (function () {
   function show(summary) {
     if (window.BaseStore) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
     if (window.BaseStore && summary.fromBase && BaseStore.receiveMech) BaseStore.receiveMech(summary);   // K7 потеряна / собрана новая
-    var good = summary.result === 'good';
+    var good = summary.result === 'good' || summary.result === 'excellent';
     var artifactCount = summary.artifacts.reduce(function (sum, item) { return sum + item.count; }, 0);
     root.innerHTML =
       '<div class="sheet">' +
         '<div class="head"><b>ИТОГИ ЗАДАНИЯ</b><span>' + escape(summary.map) + ' · ХОД ' + summary.turn + '</span></div>' +
-        '<div class="verdict ' + (good ? 'good' : 'bad') + '"><span class="label">РЕЗУЛЬТАТ</span>' +
-          '<span class="value">' + (good ? 'ХОРОШО' : 'ПЛОХО') + '</span>' +
+        '<div class="verdict ' + summary.result + '"><span class="label">РЕЗУЛЬТАТ</span>' +
+          '<span class="value">' + (summary.result === 'excellent' ? 'ОТЛИЧНО' : good ? 'ХОРОШО' : 'ПЛОХО') + '</span>' +
           '<span class="note">' + verdictNote(summary) + '</span></div>' +
         '<table>' +
           (summary.rescue ? rescueRows(summary.rescue) : '') +
