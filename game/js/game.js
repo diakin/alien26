@@ -2765,11 +2765,12 @@
     var vipRescued = !!vip && civiliansRescued.indexOf(vip) >= 0;
     // задание спасения: уничтожать пришельцев не обязательно, главное — вывезти учёного и детей.
     // «Хорошо» — учёный и все дети спасены, потеряно (погибли или не эвакуированы) меньше половины бойцов;
-    // «отлично» — спасены все гражданские и потеряно меньше RESCUE_EXCELLENT_LOSSES бойцов; иначе «плохо».
+    // «отлично» — спасены все гражданские и потеряно меньше RESCUE_EXCELLENT_LOSSES бойцов;
+    // «удовлетворительно» — учёный и дети спасены, но бойцов потеряно половина или больше; иначе «плохо».
     if (MISSION && MISSION.kind === 'rescue') {
       var soldiersLostCount = soldiersDead.length + soldiersLeft.length, soldiersCount = startUnits.filter(isSoldier).length;
       var keyRescued = vipRescued && civilians.every(function (unit) { return !unit.child || civiliansRescued.indexOf(unit) >= 0; });
-      result = keyRescued && soldiersLostCount * 2 < soldiersCount ? 'good' : 'bad';
+      result = !keyRescued ? 'bad' : soldiersLostCount * 2 < soldiersCount ? 'good' : 'satisfactory';
       if (result === 'good' && civiliansRescued.length === civilians.length && soldiersLostCount < RESCUE_EXCELLENT_LOSSES) result = 'excellent';
     }
     var counts = {}, order = [];
