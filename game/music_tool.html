@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Aliens26 — темы музыки</title>
+<style>
+  html, body { margin: 0; background: #0d1012; color: #e4e8ea; font: 13px Arial, sans-serif; }
+  .page { max-width: 980px; margin: 0 auto; padding: 18px 20px 120px; }
+  h1 { font-size: 18px; letter-spacing: 1px; margin: 0 0 6px; }
+  .hint { color: #8a959c; line-height: 18px; margin: 0 0 14px; }
+  .controls { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; padding: 10px 12px; background: #12181b; border: 1px solid #2f373c; }
+  .controls label { color: #8a959c; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+  .controls input[type=range] { width: 180px; }
+  .group { margin: 0 0 16px; }
+  .group h2 { font-size: 11px; letter-spacing: 1.5px; color: #8fd18a; margin: 0 0 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { border-bottom: 1px solid #1e262a; padding: 6px 8px; vertical-align: middle; }
+  tr.marked td { background: #2a1512; }
+  tr.marked .title { text-decoration: line-through; color: #c08a80; }
+  tr.playing td { background: #1d2614; }
+  .check { width: 70px; white-space: nowrap; color: #8a959c; font-size: 11px; }
+  .play { width: 40px; }
+  .title { font-size: 14px; font-weight: bold; }
+  .name { color: #56636a; font: 11px Consolas, monospace; margin-left: 6px; }
+  .info { width: 150px; color: #8a959c; font: 11px Consolas, monospace; white-space: nowrap; }
+  .progress { width: 190px; }
+  .track { position: relative; height: 6px; background: #060809; border: 1px solid #262d31; }
+  .track i { position: absolute; left: 0; top: 0; bottom: 0; background: #e8a33a; width: 0; }
+  .bar { color: #8a959c; font: 10px Consolas, monospace; margin-top: 3px; height: 12px; }
+  button { background: #161b1e; border: 1px solid #3a454b; color: #cfd8dc; font: bold 11px Arial, sans-serif; letter-spacing: 1px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: #e8a33a; color: #ffd28a; }
+  button:disabled { opacity: 0.4; cursor: default; border-color: #3a454b; color: #cfd8dc; }
+  .play button { width: 34px; padding: 6px 0; font-size: 12px; }
+  .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #12181b; border-top: 1px solid #4a555c; }
+  .footer .inner { max-width: 980px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+  .status { flex: 1; color: #a8c8a8; line-height: 17px; min-height: 17px; }
+  .status.error { color: #ff8a75; }
+  .status.warn { color: #e8c070; }
+  #delete { border-color: #c0462e; color: #ffb09a; padding: 9px 16px; }
+  #delete:hover { border-color: #ff7a5a; color: #ffd0c0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>ТЕМЫ МУЗЫКИ</h1>
+  <p class="hint">
+    Музыка игры синтезируется в браузере по нотам из файла <b>game/js/music.js</b>, отдельных звуковых файлов нет.
+    Здесь каждую тему можно прослушать (▶ — по кругу, ■ — стоп) и отметить галкой темы, которые не нужны.
+    Кнопка «Удалить отмеченные темы» вырезает их из music.js; прежний файл сохраняется в <b>game/js/music_backup</b>.
+    Браузер попросит выбрать папку игры (game) и разрешить запись в неё.
+  </p>
+  <div class="controls">
+    <label for="volume">ГРОМКОСТЬ</label><input id="volume" type="range" min="0" max="100" value="70">
+    <button id="stop-all">СТОП</button>
+    <span id="count" class="hint" style="margin: 0"></span>
+  </div>
+  <div id="list"></div>
+</div>
+<div class="footer"><div class="inner">
+  <div id="status" class="status"></div>
+  <button id="delete" disabled>УДАЛИТЬ ОТМЕЧЕННЫЕ ТЕМЫ</button>
+</div></div>
+<input id="file-input" type="file" accept=".js" style="display: none">
+<script src="js/music.js"></script>
+<script src="js/musictool.js"></script>
+</body>
+</html>
