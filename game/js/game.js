@@ -700,17 +700,8 @@
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
   var VISION_CELLS = 24, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
-  // pending — открытые, но ещё не показанные клетки. Граница разведанного (fog.explored) и видимость юнитов
-  // пересчитываются на каждом шаге бойца, а картинка тумана перерисовывается (дорого: пересборка кусков карты)
-  // только когда ни один боец не идёт: дошёл до цели, кончились ОД или остановился, заметив врага (sightCheck).
-  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0, pending: [] };
-  function applyFogReveal() {
-    if (!fog.pending.length) return;
-    if (units.some(function (unit) { return unit.side === 'squad' && !unit.dead && unit.path.length > 0; })) return;
-    fog.version++;
-    dropFogChunks(fog.pending);
-    fog.pending = [];
-  }
+  // explored — разведанное; version растёт при каждом открытии клеток, по нему пересчитывается картинка тумана
+  var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0 };
   var doorByEdge = {};
   doors.forEach(function (door) { doorByEdge[door.orient + ':' + door.col + ':' + door.row + ':' + door.level] = door; });
   function fogEnabled() {
@@ -801,7 +792,9 @@
     units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next, null, null, touched); });
     fog.visible = next;
     // разведка: новые клетки открываются навсегда; куски карты, которые они задевают, перерисовываются
+    var opened = false;
     if (!fog.explored) {
+      opened = true;
       fog.explored = newFogGrids();
       // в начале задания открыто всё, что на экране: граница тумана — по краю экрана (клетки, центр которых в окне)
       for (var screenRow = 0; screenRow < GRID; screenRow++) for (var screenCol = 0; screenCol < GRID; screenCol++) {
@@ -821,14 +814,14 @@
     for (var level = 0; level < LEVELS; level++) {
       var explored = fog.explored[level], seen = next[level], near = touched[level];
       for (var cell = 0; cell < GRID * GRID; cell++) {
-        if (!explored[cell] && (seen[cell] || near[cell])) { explored[cell] = 1; fog.pending.push(cell); }
+        if (!explored[cell] && (seen[cell] || near[cell])) { explored[cell] = 1; opened = true; }
       }
     }
+    if (opened) fog.version++;
     tileStats.computeMs += performance.now() - computeStart; tileStats.computes++;
   }
   // пересчёт, когда сменились клетки бойцов или открылась/закрылась дверь (не чаще 5 раз в секунду)
   function updateFog(now) {
-    if (fogEnabled()) applyFogReveal();
     if (!fogEnabled() || now < fog.checkAt) return;
     fog.checkAt = now + 200;
     var parts = [];
@@ -851,15 +844,14 @@
     return false;
   }
   // ---------------- туман на карте ----------------
-  // Неразведанная клетка закрыта столбом тумана: снизу — пол верхнего видимого уровня клетки, сверху — самое
-  // высокое в ней (стены её граней W/N, предметы по рамкам MAP.solids, у среза — срезанные стены), не ниже 0,35 м.
-  // Столбы встают в общий порядок отрисовки после всех частей своей клетки: ближние разведанные предметы и юниты
-  // рисуются поверх, дальние закрываются.
-  // Плотность тумана — картинка в координатах клеток (FOG_PX пикселей на клетку, fogLayer): цвет — бесшовные клубы,
-  // прозрачность растёт от 0 на границе с разведанными клетками до полной на расстоянии FOG_BAND клеток (по
-  // карте расстояний). Верх столба — кусок этой картинки под своей клеткой, переведённый в вид преобразованием
-  // клетки -> экран; видимые боковые грани — полоска картинки у грани, растянутая по высоте. Та же картинка
-  // накладывается на мини-карту.
+  // Туман рисуется поверх готовой карты отдельным слоем, кэш карты не трогается — поэтому граница может двигаться
+  // за бойцом на каждом шаге. Плотность — картинка в координатах клеток (fogLayer, FOG_PX пикселей на клетку):
+  // цвет — бесшовные клубы, прозрачность от 0 на границе с разведанным до полной через FOG_BAND клеток.
+  // Одним drawImage она переводится на экран изометрическим преобразованием клетки -> экран (это линейно).
+  // Слой кладётся несколько раз на высотах 0, 1, 2 … м (FOG_STEP): на высоте h — только клетки, у которых
+  // содержимое (стены граней, предметы по рамкам MAP.solids) дотягивается до h, — так закрываются и дома, и деревья.
+  // Цена: туман не встаёт в порядок глубины — верх открытого предмета у самой границы, залезающий на экране
+  // на туман позади, слегка затемняется. Та же картинка — туман на мини-карте.
   var FOG_FLOOR_TOP = 0.35;
   var fogColumns = {};
   function fogColumnTops(viewLevel, cut) {
@@ -888,7 +880,7 @@
     return fogColumns[key];
   }
   function cellExplored(col, row, level) { return !fog.explored || !!fog.explored[level][row * GRID + col]; }
-  var FOG_PX = 6, FOG_BAND = 1.6;
+  var FOG_PX = 4, FOG_BAND = 1.6;
   var fogCloud = null, fogLayerCache = { key: '', canvas: null };
   function fogCloudColors() {
     if (fogCloud) return fogCloud;
@@ -966,84 +958,129 @@
     tileStats.layerMs += performance.now() - layerStart; tileStats.layers++;
     return canvasLayer;
   }
-  var fogItemCache = { key: '', items: [] };
-  function fogItems(current) {
-    if (!fogEnabled() || !fog.explored) return [];
-    var key = current.key + ':' + fog.version + ':' + viewTurns;
-    if (fogItemCache.key === key) return fogItemCache.items;
-    var fogStart = performance.now();
-    var columns = fogColumnTops(view.level, view.cut), items = [];
-    var hidden = function (col, row, top) {
-      if (!inside(col, row)) return false;
-      var cell = row * GRID + col;
-      return !cellExplored(col, row, columns.floors[cell]) && columns.tops[cell] >= top;
-    };
-    for (var cell = 0; cell < GRID * GRID; cell++) {
-      var col = cell % GRID, row = Math.floor(cell / GRID), floor = columns.floors[cell];
-      if (cellExplored(col, row, floor)) continue;
-      var base = columns.bases[cell], top = columns.tops[cell];
-      // ближние грани (к большим row и col): не рисуются, если их целиком закрывает соседний столб тумана
-      var column = { col: col, row: row, base: base, top: top, south: !hidden(col, row + 1, top), east: !hidden(col + 1, row, top) };
-      var corners = Iso.tileCorners(col, row, base).concat(Iso.tileCorners(col, row, top));
-      items.push({ depth: depthKey(col, row, view.level, 9), rect: quadRect(corners, 3), column: column, draw: drawFogItem });
+  // маски высот: клетки, чей столб тумана захватывает высоту h (по пикселю на клетку, края смягчаются при растяжке).
+  // Каждая маска хранит рамку своих клеток — слой высоты строится и рисуется только в её пределах.
+  var FOG_STEP = 1, FOG_HEIGHT_PX = 2, fogHeightMasks = { key: '', list: [] };
+  function fogHeights(viewLevel, cut) {
+    var key = viewLevel + (cut ? 'c' : 'f');
+    if (fogHeightMasks.key === key) return fogHeightMasks.list;
+    var columns = fogColumnTops(viewLevel, cut), highest = 0;
+    for (var cell = 0; cell < GRID * GRID; cell++) highest = Math.max(highest, columns.tops[cell]);
+    var list = [];
+    // первый слой — на полметра (скамейки, урны, низкие кусты), дальше через FOG_STEP
+    for (var height = 0.5; height < highest; height = height < FOG_STEP ? FOG_STEP : height + FOG_STEP) {
+      var minCol = GRID, minRow = GRID, maxCol = -1, maxRow = -1;
+      for (cell = 0; cell < GRID * GRID; cell++) {
+        if (columns.bases[cell] - 0.5 <= height && columns.tops[cell] >= height) {
+          var col = cell % GRID, row = (cell - col) / GRID;
+          if (col < minCol) minCol = col; if (col > maxCol) maxCol = col;
+          if (row < minRow) minRow = row; if (row > maxRow) maxRow = row;
+        }
+      }
+      if (maxCol < 0) continue;
+      // запас в клетку — чтобы сглаженный край маски не обрезался рамкой
+      minCol = Math.max(0, minCol - 1); minRow = Math.max(0, minRow - 1);
+      maxCol = Math.min(GRID - 1, maxCol + 1); maxRow = Math.min(GRID - 1, maxRow + 1);
+      var spanCols = maxCol - minCol + 1, spanRows = maxRow - minRow + 1;
+      var maskCanvas = document.createElement('canvas');
+      maskCanvas.width = spanCols; maskCanvas.height = spanRows;
+      var maskContext = maskCanvas.getContext('2d'), image = maskContext.createImageData(spanCols, spanRows);
+      for (row = minRow; row <= maxRow; row++) {
+        for (col = minCol; col <= maxCol; col++) {
+          cell = row * GRID + col;
+          if (columns.bases[cell] - 0.5 <= height && columns.tops[cell] >= height) image.data[((row - minRow) * spanCols + col - minCol) * 4 + 3] = 255;
+        }
+      }
+      maskContext.putImageData(image, 0, 0);
+      list.push({ height: height, mask: maskCanvas, col: minCol, row: minRow, cols: spanCols, rows: spanRows, layer: null, version: -1 });
     }
-    fogItemCache = { key: key, items: items };
-    tileStats.fogMs += performance.now() - fogStart;
-    return items;
+    fogHeightMasks = { key: key, list: list };
+    return list;
   }
-  function drawFogItem() { drawFogColumn(this.column); }
-  function drawFogColumn(column) {
-    var layer = fogLayer(view.level, view.cut);
-    if (!layer) return;
-    var zero = Iso.toScreen(0, 0, 0), alongCol = Iso.toScreen(1, 0, 0), alongRow = Iso.toScreen(0, 1, 0);
+  // слой тумана на высоте: кусок картинки плотности в рамке маски, обрезанный маской (смешение destination-in).
+  // Разрешение ниже основного слоя (FOG_HEIGHT_PX) — граница всё равно размыта.
+  function fogHeightLayer(entry, density) {
+    if (entry.version === fog.version && entry.layer) return entry.layer;
+    var width = entry.cols * FOG_HEIGHT_PX, height = entry.rows * FOG_HEIGHT_PX;
+    if (!entry.layer) { entry.layer = document.createElement('canvas'); entry.layer.width = width; entry.layer.height = height; }
+    var layerContext = entry.layer.getContext('2d');
+    layerContext.imageSmoothingEnabled = true;
+    layerContext.globalCompositeOperation = 'copy';
+    layerContext.drawImage(density, entry.col * FOG_PX, entry.row * FOG_PX, entry.cols * FOG_PX, entry.rows * FOG_PX, 0, 0, width, height);
+    layerContext.globalCompositeOperation = 'destination-in';
+    layerContext.drawImage(entry.mask, 0, 0, width, height);
+    layerContext.globalCompositeOperation = 'source-over';
+    entry.version = fog.version;
+    return entry.layer;
+  }
+  // Сборка слоёв в координатах клеток. Подъём на h метров на экране — это сдвиг вверх, а в координатах клеток —
+  // сдвиг на постоянный вектор (обратное преобразование экран -> клетки линейно). Поэтому все высоты складываются
+  // в одну картинку клеток простыми сдвигами, без поворота, а на экран идёт один drawImage с изометрией.
+  // Пересобирается только при изменении тумана, уровня или поворота (масштаб на сдвиг в клетках не влияет).
+  var fogComposite = { canvas: null, key: '', pad: 0 };
+  function fogCompositeLayer(density) {
+    var zero = Iso.toScreen(0, 0, 0), alongCol = Iso.toScreen(1, 0, 0), alongRow = Iso.toScreen(0, 1, 0), lifted = Iso.toScreen(0, 0, 1);
     var colX = alongCol.x - zero.x, colY = alongCol.y - zero.y, rowX = alongRow.x - zero.x, rowY = alongRow.y - zero.y;
-    var rise = (column.top - column.base) * Iso.pixelsPerMeterUp, camX = Math.round(camera.x), camY = Math.round(camera.y);
-    var col = column.col, row = column.row, pixels = FOG_PX;
+    var determinant = colX * rowY - colY * rowX;
+    var liftX = lifted.x - zero.x, liftY = lifted.y - zero.y;
+    // сдвиг в клетках на метр подъёма
+    var shiftCol = (liftX * rowY - liftY * rowX) / determinant, shiftRow = (colX * liftY - colY * liftX) / determinant;
+    var heights = fogHeights(view.level, view.cut);
+    var key = [fog.version, view.level, view.cut ? 1 : 0, shiftCol.toFixed(4), shiftRow.toFixed(4), density.width].join(':');
+    if (fogComposite.key === key) return fogComposite;
+    var top = heights.length ? heights[heights.length - 1].height : 0;
+    var pad = Math.ceil((Math.max(Math.abs(shiftCol), Math.abs(shiftRow)) * top + 1) * FOG_PX);
+    var size = density.width + 2 * pad;
+    if (!fogComposite.canvas) fogComposite.canvas = document.createElement('canvas');
+    var canvas = fogComposite.canvas;
+    if (canvas.width !== size) { canvas.width = size; canvas.height = size; }
+    var compositeContext = canvas.getContext('2d');
+    compositeContext.clearRect(0, 0, size, size);
+    compositeContext.imageSmoothingEnabled = true;
+    compositeContext.drawImage(density, pad, pad);
+    heights.forEach(function (entry) {
+      var layer = fogHeightLayer(entry, density);
+      var left = pad + Math.round((entry.col + shiftCol * entry.height) * FOG_PX), upper = pad + Math.round((entry.row + shiftRow * entry.height) * FOG_PX);
+      compositeContext.drawImage(layer, left, upper, entry.cols * FOG_PX, entry.rows * FOG_PX);
+    });
+    fogComposite.key = key; fogComposite.pad = pad;
+    return fogComposite;
+  }
+  // На экран туман идёт через картинку в половинном разрешении (туман мягкий, детали не нужны) с запасом по краям
+  // (FOG_SCREEN_MARGIN доли экрана). Она пересобирается при изменении тумана, масштаба, поворота, уровня
+  // или когда камера ушла за запас; в остальные кадры — один drawImage готовой картинки со сдвигом.
+  var FOG_SCREEN_SCALE = 0.5, FOG_SCREEN_MARGIN = 0.2, fogScreen = { canvas: null, key: '', camX: 0, camY: 0, marginX: 0, marginY: 0 };
+  function drawFogOverlay() {
+    var density = fogLayer(view.level, view.cut);
+    if (!density) return;
+    var composite = fogCompositeLayer(density);
+    var camX = Math.round(camera.x), camY = Math.round(camera.y);
+    var marginX = Math.round(viewWidth * FOG_SCREEN_MARGIN), marginY = Math.round(viewHeight * FOG_SCREEN_MARGIN);
+    var zero = Iso.toScreen(0, 0, 0), alongCol = Iso.toScreen(1, 0, 0), alongRow = Iso.toScreen(0, 1, 0);
+    var key = [composite.key, viewWidth, viewHeight, zero.x, zero.y, alongCol.x, alongCol.y, alongRow.x, alongRow.y].join(':');
+    var shifted = Math.abs(camX - fogScreen.camX) > fogScreen.marginX || Math.abs(camY - fogScreen.camY) > fogScreen.marginY;
+    if (fogScreen.key !== key || shifted) {
+      var scale = FOG_SCREEN_SCALE;
+      var width = Math.ceil((viewWidth + 2 * marginX) * scale), height = Math.ceil((viewHeight + 2 * marginY) * scale);
+      if (!fogScreen.canvas) fogScreen.canvas = document.createElement('canvas');
+      var screenCanvas = fogScreen.canvas;
+      if (screenCanvas.width !== width || screenCanvas.height !== height) { screenCanvas.width = width; screenCanvas.height = height; }
+      var screenContext = screenCanvas.getContext('2d');
+      screenContext.setTransform(1, 0, 0, 1, 0, 0);
+      screenContext.clearRect(0, 0, width, height);
+      screenContext.imageSmoothingEnabled = true;
+      screenContext.setTransform((alongCol.x - zero.x) * scale, (alongCol.y - zero.y) * scale, (alongRow.x - zero.x) * scale, (alongRow.y - zero.y) * scale,
+        (zero.x - camX + marginX) * scale, (zero.y - camY + marginY) * scale);
+      var cellsPad = composite.pad / FOG_PX;
+      screenContext.drawImage(composite.canvas, -cellsPad, -cellsPad, composite.canvas.width / FOG_PX, composite.canvas.height / FOG_PX);
+      fogScreen.key = key; fogScreen.camX = camX; fogScreen.camY = camY; fogScreen.marginX = marginX; fogScreen.marginY = marginY;
+      tileStats.overlayBuilds = (tileStats.overlayBuilds || 0) + 1;
+    }
     context.save();
     context.imageSmoothingEnabled = true;
-    var topOrigin = Iso.toScreen(0, 0, column.top);
-    // верх: кусок картинки под клеткой, клетки -> экран на высоте верха
-    context.save();
-    context.transform(colX, colY, rowX, rowY, topOrigin.x - camX, topOrigin.y - camY);
-    context.drawImage(layer, col * pixels, row * pixels, pixels, pixels, col, row, 1, 1);
+    var built = fogScreen.canvas;
+    context.drawImage(built, fogScreen.camX - camX - fogScreen.marginX, fogScreen.camY - camY - fogScreen.marginY, built.width / FOG_SCREEN_SCALE, built.height / FOG_SCREEN_SCALE);
     context.restore();
-    if (column.south && rise > 0.5) {
-      var south = Iso.toScreen(0, row + 1, column.top);
-      context.save();
-      context.transform(colX, colY, 0, rise, south.x - camX, south.y - camY);
-      context.drawImage(layer, col * pixels, (row + 1) * pixels - 1, pixels, 1, col, 0, 1, 1);
-      context.restore();
-    }
-    if (column.east && rise > 0.5) {
-      var east = Iso.toScreen(col + 1, 0, column.top);
-      context.save();
-      context.transform(0, rise, rowX, rowY, east.x - camX, east.y - camY);
-      context.drawImage(layer, (col + 1) * pixels - 1, row * pixels, 1, pixels, 0, row, 1, 1);
-      context.restore();
-    }
-    context.restore();
-  }
-  // открылись клетки: куски карты (всех видов), которые задевают их столбы, собираются заново
-  function dropFogChunks(cells) {
-    if (!chunks.size) return;
-    var touchedChunks = {};
-    var columns = fogColumnTops(view.level, view.cut), seenCells = {};
-    cells.forEach(function (cell) {
-      if (seenCells[cell]) return;
-      seenCells[cell] = true;
-      var col = cell % GRID, row = Math.floor(cell / GRID);
-      // столб текущего вида; куски других видов (уровней) пересобираются целиком при смене вида
-      var corners = Iso.tileCorners(col, row, columns.bases[cell]).concat(Iso.tileCorners(col, row, columns.tops[cell]));
-      var rect = quadRect(corners, 4);
-      for (var chunkY = Math.floor(rect.y / CHUNK); chunkY <= Math.floor((rect.y + rect.height) / CHUNK); chunkY++)
-        for (var chunkX = Math.floor(rect.x / CHUNK); chunkX <= Math.floor((rect.x + rect.width) / CHUNK); chunkX++) touchedChunks[chunkX + ':' + chunkY] = true;
-    });
-    var currentPrefix = tileView(view.level, view.cut).key + (showGrid ? 'g' : '') + ':';
-    Array.from(chunks.keys()).forEach(function (key) {
-      if (key.indexOf(currentPrefix) !== 0) { chunks.delete(key); return; }        // другой вид — соберётся заново при показе
-      var parts = key.split(':');
-      if (touchedChunks[parts[parts.length - 2] + ':' + parts[parts.length - 1]]) chunks.get(key).stale = true;
-    });
   }
 
   // ---------------- уровни обзора и варианты картинки ----------------
@@ -1302,7 +1339,6 @@
       var list = [];
       current.pieces.forEach(function (piece) { if (visibleRect(piece)) list.push({ depth: piece.depth, piece: piece }); });
       staticItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
-      fogItems(current).forEach(function (item) { if (visibleRect(item.rect)) list.push(item); });
       list.sort(function (first, second) { return first.depth - second.depth; });
       list.forEach(function (item) { if (item.piece) drawTilePiece(tileImage, item.piece); else safeDraw(item); });
     });
@@ -4693,7 +4729,7 @@
       groups.push(group);
     });
     tileStats.pieces = 0;
-    var overlays = staticItems(current).concat(fogItems(current));
+    var overlays = staticItems(current);
     groups.forEach(function (group) {
       var threshold = Infinity;
       group.items.forEach(function (item) { threshold = Math.min(threshold, item.depth); });
@@ -4709,6 +4745,7 @@
       context.restore();
     });
 
+    if (fogEnabled()) drawFogOverlay();
     drawPath();
     if (selected && selected.level <= view.level) drawSelectionMarker(selected);
     drawPathLabel();
@@ -4922,7 +4959,7 @@
       if (values.render3d !== false) startMap3D();
       updateRotateBar();
     }
-    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; chunks.clear(); fogItemCache.key = ''; fogLayerCache.key = ''; }
+    if (key === 'fog') { fog.signature = ''; fog.checkAt = 0; fogLayerCache.key = ''; }
   });
   resize();
   setView(selected.level, false);
