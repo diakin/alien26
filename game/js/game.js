@@ -2818,7 +2818,7 @@
   function drawDebugZones() {
     if (fireOverlay.cells && debugOn('debugFire')) {
       context.save();
-      context.fillStyle = 'rgba(255, 50, 170, 0.3)'; context.strokeStyle = 'rgba(255, 120, 210, 0.55)'; context.lineWidth = 1;
+      context.fillStyle = 'rgba(220, 40, 30, 0.3)'; context.strokeStyle = 'rgba(255, 80, 60, 0.55)'; context.lineWidth = 1;
       Object.keys(fireOverlay.cells).forEach(function (key) {
         var cell = cellOf(key), height = elevationOf(cell.col, cell.row, view.level) + 0.02;
         context.beginPath();
