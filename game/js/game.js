@@ -2751,7 +2751,7 @@
   // в пределах дальности его оружия и при свободной линии огня от его ствола до корпуса (как при выборе цели:
   // стены, предметы и юниты на линии заслоняют). Считается частями, не больше FIRE_BUDGET мс за кадр; пока юниты
   // идут, показывается прежняя картина.
-  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12;
+  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12, FIRE_HATCH = 7;
   var reachOverlay = { key: '', far: null, near: null, at: 0 };
   var fireOverlay = { key: '', cells: null, building: null, jobs: null, index: 0 };
   function debugOn(key) { return !!(window.Settings && Settings.values[key]); }
@@ -2814,20 +2814,39 @@
     }
     if (fireOverlay.index >= jobs.length) { fireOverlay.cells = fireOverlay.building; fireOverlay.jobs = null; }
   }
+  var hatchTile = null, hatchCache = null;
+  function hatchPattern() {
+    if (!hatchCache) {
+      hatchTile = document.createElement('canvas');
+      hatchTile.width = hatchTile.height = FIRE_HATCH;
+      var tileContext = hatchTile.getContext('2d');
+      tileContext.strokeStyle = 'rgba(235, 45, 30, 0.85)'; tileContext.lineWidth = 1.6;
+      tileContext.beginPath();
+      [-FIRE_HATCH, 0, FIRE_HATCH].forEach(function (shift) { tileContext.moveTo(shift, FIRE_HATCH); tileContext.lineTo(shift + FIRE_HATCH, 0); });
+      tileContext.stroke();
+      hatchCache = context.createPattern(hatchTile, 'repeat');
+    }
+    return hatchCache;
+  }
   function cellOf(key) { var cell = Number(key), col = cell % GRID; return { col: col, row: (cell - col) / GRID }; }
   function drawDebugZones() {
     if (fireOverlay.cells && debugOn('debugFire')) {
+      // клетки под огнём — штриховка красными линиями: все клетки одним путём, заливка узором из наклонных линий;
+      // узор привязан к карте (сдвигается с камерой), шаг и толщина линий — в пикселях экрана при любом приближении
       context.save();
-      context.fillStyle = 'rgba(220, 40, 30, 0.3)'; context.strokeStyle = 'rgba(255, 80, 60, 0.55)'; context.lineWidth = 1;
+      context.beginPath();
       Object.keys(fireOverlay.cells).forEach(function (key) {
         var cell = cellOf(key), height = elevationOf(cell.col, cell.row, view.level) + 0.02;
-        context.beginPath();
         [[0, 0], [1, 0], [1, 1], [0, 1]].forEach(function (corner, index) {
           var point = Iso.toScreen(cell.col + corner[0], cell.row + corner[1], height);
           context[index ? 'lineTo' : 'moveTo'](point.x - camera.x, point.y - camera.y);
         });
-        context.closePath(); context.fill(); context.stroke();
+        context.closePath();
       });
+      var pattern = hatchPattern();
+      if (pattern.setTransform && window.DOMMatrix) pattern.setTransform(new DOMMatrix([1 / zoom, 0, 0, 1 / zoom, -camera.x % FIRE_HATCH, -camera.y % FIRE_HATCH]));
+      context.fillStyle = pattern;
+      context.fill();
       context.restore();
     }
     if (reachOverlay.far && debugOn('debugReach')) {
@@ -3509,16 +3528,18 @@
   //   цель — уничтожить всех пришельцев (нет MAP.mission или его kind не 'rescue'): прячется — уходит туда, где его
   //     не видят, и сидит тихо, оставляя ОД на ответный огонь (засада: стреляет по тем, кто вышел на него в ход
   //     отряда); в свой ход стреляет, только если его нашли — его клетку видит хоть один боец; потом снова прячется;
-  //   цель другая (спасение): пока пришельцев на карте много (WOUNDED_RETREAT_ALIVE и больше), раненый отходит в тыл —
-  //     подальше от отряда, в укрытие, не стреляя (охрана — в пределах своего поста); если осталось мало, он мешает
-  //     отряду, как здоровый, несмотря на ранение.
+  //   цель другая (спасение): пока пришельцев на карте много (WOUNDED_RETREAT_ALIVE и больше) и среди них есть
+  //     здоровые, раненый отходит в тыл — подальше от отряда, в укрытие, не стреляя (охрана — в пределах своего поста);
+  //     если пришельцев осталось мало или здоровых не осталось ни одного, раненые мешают отряду выполнить задание,
+  //     как здоровые, несмотря на ранения.
   var WOUNDED_SHARE = 0.5, WOUNDED_RETREAT_ALIVE = 3;
   function killAllMission() { return !MISSION || MISSION.kind !== 'rescue'; }
   function woundedMode(alien) {
     if (alien.health >= alien.maxHealth * WOUNDED_SHARE) return null;
     if (killAllMission()) return 'ambush';
-    var alive = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead; }).length;
-    return alive >= WOUNDED_RETREAT_ALIVE ? 'retreat' : null;
+    var alive = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead; });
+    var healthy = alive.some(function (unit) { return unit.health >= unit.maxHealth * WOUNDED_SHARE; });
+    return alive.length >= WOUNDED_RETREAT_ALIVE && healthy ? 'retreat' : null;
   }
   // Решение пришельца на текущий момент: { fire } | { move } | null — ход закончен.
   // 1. Ранен — прячется (засада) или отходит в тыл, см. woundedMode.

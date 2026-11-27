@@ -29,7 +29,7 @@ var Settings = (function () {
     { key: 'showFps', label: 'Счётчик FPS справа внизу', type: 'check', value: true },
     { group: 'ОТЛАДКА' },
     { key: 'debugReach', label: 'Границы досягаемости бойца (жёлтая — все ОД, голубая — останется на выстрел)', type: 'check', value: true },
-    { key: 'debugFire', label: 'Клетки под огнём замеченных пришельцев (красноватые)', type: 'check', value: true }
+    { key: 'debugFire', label: 'Клетки под огнём замеченных пришельцев (красная штриховка)', type: 'check', value: true }
   ];
   var values = {};
   FIELDS.forEach(function (field) { if (field.key) values[field.key] = field.value; });
