@@ -830,6 +830,8 @@ var Music = (function () {
   // ---------------- «Мрак» (мрачная) ----------------
   // 48 ударов, такт 5 с, 32 такта (160 с). Очень низкий гул, медленные кластеры с тритоном и малой секундой,
   // глухой мотив «рога» в нижнем регистре (до — ре-бемоль — соль), далёкий металл, ветер, редкий стеклянный призвук.
+  // Гул тихий; поверх него — редкие громкие удары в неровных местах (GLOOM_STRIKES, раз в 2–3 такта, 10–15 с):
+  // низкий удар с медным аккордом, резкий аккорд-удар, диссонирующие колокола, рубленый высокий кластер с металлом.
   // Вариант при контакте — тот же фон и глухой пульс.
   var GLOOM_BLOCKS = [
     { bass: 24, notes: [43, 44, 48] },        // C: соль, ля-бемоль, до
@@ -848,6 +850,27 @@ var Music = (function () {
     [17, 2, 'metal', 34, 0.38, 0.5], [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.02, 0.4], [22, 3, 'metal', 32, 0.42, -0.4],
     [25, 0.5, 'metal', 36, 0.36, 0.6], [27, 0, 'draft', 110, 0.12, 460], [29, 2, 'metal', 31, 0.44, -0.5], [31, 0, 'swell', 0, 0.07, 0]
   ];
+  // [такт, доля, вид]: boom — низкий удар и медный аккорд кластера; stab — резкий аккорд-удар октавой выше;
+  // bell — два колокола через малую секунду; shriek — рубленый высокий кластер и удар по металлу
+  var GLOOM_STRIKES = [
+    [0, 0, 'boom'], [2, 2.5, 'stab'], [5, 1, 'bell'], [7, 3, 'boom'], [10, 0.5, 'shriek'], [12, 0, 'boom'], [14, 2, 'bell'],
+    [17, 1.5, 'stab'], [20, 0, 'boom'], [22, 3, 'shriek'], [25, 1, 'bell'], [28, 0, 'boom'], [30, 2.5, 'stab']
+  ];
+  function gloomStrike(kit, kind, at, block) {
+    if (kind === 'boom') {
+      drum(kit, at, 44, 0.6, 1.8, 0);
+      stab(kit, block.notes.map(function (note) { return note + 12; }), at, 0.075);
+    } else if (kind === 'stab') {
+      stab(kit, block.notes.map(function (note) { return note + 24; }), at, 0.06);
+      drum(kit, at, 62, 0.32, 0.6, 0.3);
+    } else if (kind === 'bell') {
+      bell(kit, block.notes[0] + 36, at, 0.22, -0.4);
+      bell(kit, block.notes[0] + 37, at + 0.05, 0.18, 0.4);
+    } else if (kind === 'shriek') {
+      chop(kit, block.notes.map(function (note) { return note + 36; }), at, 0.06, 0.2);
+      metal(kit, block.notes[1] + 12, at, 0.7, -0.3);
+    }
+  }
   function gloomTheme(name, contact) {
     return {
       name: name, tempo: 48, bars: 32, echo: 1.25, level: 1.3,
@@ -856,9 +879,9 @@ var Music = (function () {
         var block = GLOOM_BLOCKS[Math.floor(bar / 4)];
         if (bar % 4 === 0 || absoluteBar === 0) {
           var length = (4 - bar % 4) * barLength + 2;
-          deepDrone(kit, block.bass + 12, time, length, 0.17);
-          deepDrone(kit, block.bass + 6, time + 1, length, 0.05);          // тритон под гулом, еле слышно
-          shade(kit, block.notes, time, length, 0.065);
+          deepDrone(kit, block.bass + 12, time, length, 0.055);          // гул втрое тише прежнего
+          deepDrone(kit, block.bass + 6, time + 1, length, 0.017);         // тритон под гулом, еле слышно
+          shade(kit, block.notes, time, length, 0.03);
         }
         // мотив «рога» в тактах 2–3 каждых восьми
         if (bar % 8 === 2 || bar % 8 === 3) GLOOM_HORN.forEach(function (entry) {
@@ -866,6 +889,7 @@ var Music = (function () {
           lead(kit, entry[2] + (bar >= 16 ? -12 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.04, cutoff: 650, attack: 0.6, release: 1.6, vibrato: 0.002, reverb: 0.7, echo: 0.2 });
         });
         GLOOM_EVENTS.forEach(function (entry) { if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength); });
+        GLOOM_STRIKES.forEach(function (entry) { if (entry[0] === bar) gloomStrike(kit, entry[2], time + entry[1] * beat, block); });
         if (contact) { heartbeat(kit, time, 0.3); heartbeat(kit, time + 2 * beat, bar % 4 === 3 ? 0.36 : 0.26); }
       }
     };
