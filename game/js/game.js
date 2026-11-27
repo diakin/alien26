@@ -295,6 +295,8 @@
   var PAGE_MODE = (function () { var match = /[?&]mode=([a-z]+)/.exec(location.search); return match ? match[1] : ''; })();
   // Задание карты (MAP.mission): спасение — гражданские, учёный (vip), таймер портала (timeLimit, с), место портала
   var MISSION = MAP.mission || null;
+  // демо: финальный кадр на базе (arrivalUnits, arrivalFinale)
+  var ARRIVAL = !!(window.Demo && Demo.arrival) && window.ALIENS_MAP === 'base' && !!window.BaseStore && !!MAP.extraction && PAGE_MODE === 'manage';
   function civilianProfile(person, number) {
     var child = !!person.child;
     return {
@@ -334,7 +336,8 @@
     var soldiers = soldierProfiles();
     var mech = PROFILES.filter(function (profile) { return profile.kind === 'mech'; })[0];
     var list = [];
-    if (SHIP) {
+    if (ARRIVAL) list = arrivalUnits(soldiers, mech);
+    else if (SHIP) {
       var crew = SHIP.crew.map(function (callsign) { return soldiers.filter(function (profile) { return profile.callsign === callsign; })[0]; }).filter(Boolean);
       (spawns.squad || []).slice(0, crew.length).forEach(function (spawn, index) { list.push(makeUnit(crew[index], spawn)); });
       if (SHIP.mech && mechAtBase()) (spawns.mech || []).forEach(function (spawn) { list.push(makeUnit(mech, spawn)); });
@@ -348,7 +351,7 @@
     // стоят, при нападении присели и прячутся, как гражданские задания
     if (window.ALIENS_MAP === 'base' && window.BaseStore && window.BASE_PLAN) list = list.concat(baseStaffUnits(list));
     // спасённые с прошлого задания (учёный, дети) — в салоне КТ-6 на базе, до следующего вылета
-    if (window.ALIENS_MAP === 'base' && window.BaseStore && MAP.extraction) list = list.concat(passengerUnits(list));
+    if (window.ALIENS_MAP === 'base' && window.BaseStore && MAP.extraction && !ARRIVAL) list = list.concat(passengerUnits(list));
     // гражданские задания (MAP.mission.civilians): прячутся, пока к ним не подойдёт боец
     if (MISSION && MISSION.civilians && PAGE_MODE !== 'manage') {
       var adults = 0, children = 0;
@@ -360,6 +363,43 @@
         list.push(unit);
       });
     }
+    return list;
+  }
+  // Демо, финальный кадр (js/demo.js, base.html?…&arrival=1): вернувшиеся с задания бойцы (BaseStore.state.arrival),
+  // учёный и дети (ship.passengers) стоят на рампе КТ-6 лицом вниз по рампе; K7, если вернулся, — на своём месте
+  // в салоне у кабины. Рампа — крайние ряды зоны эвакуации со стороны больших col; места — от края рампы вглубь,
+  // от середины по ширине к бортам: впереди посередине учёный и дети, бойцы — по краям и за ними.
+  function arrivalUnits(soldiers, mech) {
+    var arrival = BaseStore.state.arrival;
+    var crew = (arrival ? arrival.crew : soldiers.slice(0, 6).map(function (profile) { return profile.callsign; }))
+      .map(function (callsign) { return soldiers.filter(function (profile) { return profile.callsign === callsign; })[0]; }).filter(Boolean);
+    var passengers = (BaseStore.state.ship.passengers || []).slice().sort(function (first, second) { return (second.vip ? 2 : second.child ? 1 : 0) - (first.vip ? 2 : first.child ? 1 : 0); });
+    var cells = MAP.extraction.filter(function (cell) { return walkable(cell[0], cell[1], cell[2] || 0); });
+    var rampCol = Math.max.apply(null, cells.map(function (cell) { return cell[0]; }));
+    var noseCol = Math.min.apply(null, cells.map(function (cell) { return cell[0]; }));
+    var centerRow = cells.reduce(function (sum, cell) { return sum + cell[1]; }, 0) / cells.length;
+    var spots = cells.slice().sort(function (first, second) { return (rampCol - first[0]) - (rampCol - second[0]) || Math.abs(first[1] - centerRow) - Math.abs(second[1] - centerRow); });
+    var facing = Iso.directionOf(1, 0);
+    if (facing < 0) facing = 1;
+    var bayRow = Math.floor(centerRow) - 1 + (centerRow % 1 ? 1 : 0);
+    var takenSpots = mech && arrival && arrival.mech ? spots.filter(function (cell) { return cell[0] <= noseCol + 1 && cell[1] >= bayRow && cell[1] <= bayRow + 1; }) : [];
+    var free = spots.filter(function (cell) { return takenSpots.indexOf(cell) < 0; });
+    // сначала места спасённым (впереди посередине), затем бойцам
+    var passengerSpots = free.slice(0, passengers.length), crewSpots = free.slice(passengers.length);
+    var list = [], children = 0;
+    crew.forEach(function (profile, index) {
+      var spot = crewSpots[index];
+      if (spot) list.push(makeUnit(profile, [spot[0], spot[1], spot[2] || 0, facing]));
+    });
+    if (takenSpots.length) list.push(makeUnit(mech, [noseCol, bayRow, 0, facing]));
+    passengers.forEach(function (passenger, index) {
+      var spot = passengerSpots[index];
+      if (!spot) return;
+      var profile = civilianProfile({ name: passenger.name, kind: passenger.look, child: passenger.child, vip: passenger.vip }, passenger.child ? ++children : 0);
+      profile.staff = true;
+      profile.subtitle = 'НА БОРТУ КТ-6 · ПРИБЫЛ С ЗАДАНИЯ';
+      list.push(makeUnit(profile, [spot[0], spot[1], spot[2] || 0, facing]));
+    });
     return list;
   }
   function mechAtBase() { return !window.BaseStore || !BaseStore.mechState || BaseStore.mechState() === 'ready'; }
@@ -2655,6 +2695,9 @@
       robotsLost: robotsDead.map(person), robotsLeft: robotsLeft.map(person),
       robotsTotal: startUnits.filter(isRobot).length,
       evacuated: evacuated.filter(function (unit) { return !isCivilian(unit); }).length,
+      // вернулись на базу: при зачистке — все живые, при эвакуации — улетевшие (финальный кадр демо, js/demo.js)
+      soldiersHome: startUnits.filter(function (unit) { return isSoldier(unit) && !unit.dead && (kind !== 'evac' || evacuated.indexOf(unit) >= 0); }).map(function (unit) { return unit.callsign; }),
+      robotHome: startUnits.some(function (unit) { return isRobot(unit) && !unit.dead && (kind !== 'evac' || evacuated.indexOf(unit) >= 0); }),
       rescue: MISSION && MISSION.kind === 'rescue' ? {
         civiliansTotal: civilians.length, civiliansRescued: civiliansRescued.map(person), civiliansDead: civiliansDead.map(person),
         childrenTotal: civilians.filter(function (unit) { return unit.child; }).length,
@@ -3029,7 +3072,7 @@
   // её видят); иначе не стреляет по ней в свой ход, держится вне её обзора и подальше, прячется (засада ответным
   // огнём остаётся). Лёгкие цели — в первую очередь. Память общая для всех заданий и хранится в браузере
   // (localStorage, INTEL_KEY); позже её можно будет держать на сервере при регистрации игрока.
-  var INTEL_KEY = 'aliens26.alienIntel.v1', INTEL_HARD = 6, INTEL_EASY = 3, INTEL_MIN_HITS = 3, INTEL_GROUP = 3;
+  var INTEL_KEY = window.Demo ? Demo.storageKey('aliens26.alienIntel.v1') : 'aliens26.alienIntel.v1', INTEL_HARD = 6, INTEL_EASY = 3, INTEL_MIN_HITS = 3, INTEL_GROUP = 3;
   var INTEL_NAMES = { K7: 'шагающая машина K7', soldier: 'бойцы', staff: 'персонал базы', civilian: 'гражданские' };
   var alienIntel = (function () {
     try { var stored = JSON.parse(localStorage.getItem(INTEL_KEY)); if (stored && stored.version === 1 && stored.classes) return stored; } catch (error) { }
@@ -3984,6 +4027,7 @@
   canvas.addEventListener('contextmenu', function (event) { event.preventDefault(); });
   canvas.addEventListener('mousedown', function (event) {
     mouse.x = event.clientX / zoom; mouse.y = event.clientY / zoom; mouse.overView = true;
+    if (ARRIVAL && event.button === 0) return;                // финальный кадр демо: только осмотр
     if (event.button === 2 || event.button === 1) {
       mouse.dragging = true; mouse.moved = false;
       mouse.dragStartX = event.clientX; mouse.dragStartY = event.clientY;
@@ -4052,6 +4096,7 @@
   window.addEventListener('keydown', function (event) {
     if (window.Inventory && Inventory.isOpen()) return;          // окно снаряжения обрабатывает клавиши само
     keys[event.key] = true;
+    if (ARRIVAL) return;                                        // финальный кадр демо: только прокрутка камеры
     if (event.key === 'i' || event.key === 'I' || event.key === 'ш' || event.key === 'Ш') { openInventory(); if (window.Inventory && Inventory.isOpen()) event.stopImmediatePropagation(); return; }
     if (event.key === 'Escape') { if (window.Panel && Panel.closeMenu()) return; if (throwing) { throwing = null; updateHover(); } else if (aiming) cancelAim(); else selectUnit(null); }
     if (event.key === 'g' || event.key === 'G' || event.key === 'п' || event.key === 'П') Settings.set('showGrid', !showGrid);
@@ -4964,7 +5009,19 @@
   resize();
   setView(selected.level, false);
   centerOn(selected.x, selected.y - 2);
+  if (ARRIVAL) arrivalFinale();
   window.requestAnimationFrame(frame);
+  // финальный кадр демо: без панели, подсказок и меню, камера на рампе КТ-6, чуть ближе обычного
+  function arrivalFinale() {
+    ['panel', 'help', 'turn', 'levelbar', 'settings-button'].forEach(function (id) { var element = document.getElementById(id); if (element) element.style.display = 'none'; });
+    selectUnit(null);
+    resize();
+    var cells = MAP.extraction, rampCol = Math.max.apply(null, cells.map(function (cell) { return cell[0]; }));
+    var centerRow = cells.reduce(function (sum, cell) { return sum + cell[1]; }, 0) / cells.length;
+    setZoom(1.25, screenWidth / 2, screenHeight / 2);
+    centerOn(rampCol, centerRow + 0.5, 1.2);
+    Demo.finale();
+  }
 
   // для автотеста
   window.__game = {

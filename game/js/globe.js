@@ -13,6 +13,9 @@ var Globe = (function () {
     { name: 'СПАСЕНИЕ В ГОРОДЕ', title: 'Спасение в центре города', place: 'Санкт-Петербург, центр', signal: 'пришельцы похищают людей, в хранилище банка — учёный',
       lat: 59.94, lon: 30.31, page: 'city.html' }
   ];
+  // демоверсия (js/demo.js): на глобусе только «Спасение в городе», остальные кнопки меню недоступны
+  var DEMO = !!(window.Demo && Demo.on);
+  if (DEMO) MISSIONS = MISSIONS.filter(function (item) { return item.page === 'city.html'; });
   var MISSION = MISSIONS[0];
   // своя база — в горе Ямантау (Южный Урал, 54°15′ с. ш., 58°06′ в. д.)
   // page — карта базы и меню управления; attack — тестовый бой на той же карте
@@ -321,6 +324,7 @@ var Globe = (function () {
     drawBorders(globeRadius, middle);
     drawBase();
     drawMission(now);
+    if (homeFlight) drawHomeFlight(now);
   }
 
   // ---------------- управление ----------------
@@ -393,7 +397,7 @@ var Globe = (function () {
     if (keyMap[event.key]) { held[keyMap[event.key]] = true; event.preventDefault(); }
     if (event.key === '+' || event.key === '=') { view.zoom *= 1.25; clampView(); }
     if (event.key === '-' || event.key === '_') { view.zoom /= 1.25; clampView(); }
-    if (event.key === 'Enter') startMission();
+    if (event.key === 'Enter' && !homeFlight) startMission();
     if (event.key === 'b' || event.key === 'B' || event.key === 'и' || event.key === 'И') openBase();
     if (event.key === 'n' || event.key === 'N' || event.key === 'т' || event.key === 'Т') attackBase();
   });
@@ -402,13 +406,105 @@ var Globe = (function () {
     if (keyMap[event.key]) held[keyMap[event.key]] = false;
   });
 
-  function startMission() { window.location.href = MISSION.page; }
+  function startMission() {
+    if (homeFlight) return;                      // демо: во время перелёта на базу задание не начинается
+    window.location.href = DEMO ? Demo.link(MISSION.page) : MISSION.page;
+  }
   document.getElementById('start').addEventListener('click', startMission);
   // своя подземная база (game/base.html)
-  function openBase() { window.location.href = BASE.page; }
+  function openBase() { if (!DEMO) window.location.href = BASE.page; }
   document.getElementById('base').addEventListener('click', openBase);
-  function attackBase() { window.location.href = BASE.attack; }
+  function attackBase() { if (!DEMO) window.location.href = BASE.attack; }
   document.getElementById('base-attack').addEventListener('click', attackBase);
+  if (DEMO) {
+    ['base', 'base-attack', 'mission-next'].forEach(function (id) {
+      var button = document.getElementById(id);
+      button.disabled = true; button.title = 'В демоверсии недоступно';
+    });
+    var startButton = document.getElementById('start');
+    startButton.textContent = 'СПАСЕНИЕ В ГОРОДЕ';
+    startButton.title = 'Задание «Спасение в центре города» (Enter)';
+  }
+
+  // ---------------- демо: перелёт КТ-6 из города на базу ----------------
+  // По дуге большого круга от места задания до базы за HOME_FLIGHT_TIME мс; глобус поворачивается вслед.
+  // После посадки (и паузы HOME_LANDED_PAUSE) — финальный кадр на базе (base.html, режим arrival).
+  var HOME_FLIGHT_TIME = 7000, HOME_LANDED_PAUSE = 1500;
+  var homeFlight = DEMO && Demo.flight ? { start: 0, from: unitVector(MISSION.lat, MISSION.lon), to: unitVector(BASE.lat, BASE.lon), progress: 0, landedAt: 0 } : null;
+  if (homeFlight) {
+    var startButtonFlight = document.getElementById('start');
+    startButtonFlight.disabled = true;
+    view.lon = MISSION.lon * DEGREE; view.lat = (MISSION.lat - 8) * DEGREE; view.zoom = 2.2;
+  }
+  function unitVector(lat, lon) {
+    var latitude = lat * DEGREE, longitude = lon * DEGREE;
+    return [Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude), Math.cos(latitude) * Math.cos(longitude)];
+  }
+  // точка дуги: доля пути 0…1 -> { lat, lon } в градусах (сферическая интерполяция)
+  function arcPoint(fraction) {
+    var from = homeFlight.from, to = homeFlight.to;
+    var angle = Math.acos(Math.max(-1, Math.min(1, from[0] * to[0] + from[1] * to[1] + from[2] * to[2])));
+    var weightFrom = Math.sin((1 - fraction) * angle) / Math.sin(angle), weightTo = Math.sin(fraction * angle) / Math.sin(angle);
+    var pointX = from[0] * weightFrom + to[0] * weightTo, pointY = from[1] * weightFrom + to[1] * weightTo, pointZ = from[2] * weightFrom + to[2] * weightTo;
+    return { lat: Math.asin(Math.max(-1, Math.min(1, pointY))) / DEGREE, lon: Math.atan2(pointX, pointZ) / DEGREE };
+  }
+  function updateHomeFlight(now) {
+    if (!homeFlight || !texture) return;
+    if (!homeFlight.start) homeFlight.start = now + 600;          // короткая пауза над городом перед вылетом
+    var linear = Math.max(0, Math.min(1, (now - homeFlight.start) / HOME_FLIGHT_TIME));
+    homeFlight.progress = linear < 0.5 ? 2 * linear * linear : 1 - Math.pow(-2 * linear + 2, 2) / 2;
+    var position = arcPoint(homeFlight.progress);
+    view.lon = position.lon * DEGREE; view.lat = Math.max(-60, Math.min(60, position.lat - 8)) * DEGREE;
+    if (linear > 0 && linear < 1) draftUntil = now + 160;
+    if (linear >= 1 && !homeFlight.landedAt) homeFlight.landedAt = now;
+    if (homeFlight.landedAt && now - homeFlight.landedAt > HOME_LANDED_PAUSE) {
+      homeFlight.landedAt = Infinity;
+      window.location.href = Demo.link('base.html?mode=manage', 'arrival=1');
+    }
+  }
+  function drawHomeFlight(now) {
+    var progress = homeFlight.progress, steps = 64;
+    context.save();
+    // маршрут: пройденная часть — сплошная, оставшаяся — пунктир
+    [[0, progress, []], [progress, 1, [5, 5]]].forEach(function (part) {
+      context.setLineDash(part[2]);
+      context.strokeStyle = part[2].length ? 'rgba(255, 210, 138, 0.55)' : '#ffd28a';
+      context.lineWidth = 2;
+      context.beginPath();
+      var drawing = false;
+      for (var step = 0; step <= steps; step++) {
+        var fraction = part[0] + (part[1] - part[0]) * step / steps, point = arcPoint(fraction), screen = projectLatLon(point.lat, point.lon);
+        if (screen.depth < 0.05) { drawing = false; continue; }
+        if (drawing) context.lineTo(screen.x, screen.y); else { context.moveTo(screen.x, screen.y); drawing = true; }
+      }
+      context.stroke();
+    });
+    context.setLineDash([]);
+    // конвертоплан: стрелка по направлению полёта и подпись
+    var here = arcPoint(progress), ahead = arcPoint(Math.min(1, progress + 0.01)), behind = arcPoint(Math.max(0, progress - 0.01));
+    var point = projectLatLon(here.lat, here.lon), front = projectLatLon(ahead.lat, ahead.lon), back = projectLatLon(behind.lat, behind.lon);
+    var heading = Math.atan2(front.y - back.y, front.x - back.x);
+    context.translate(point.x, point.y);
+    context.rotate(heading);
+    context.fillStyle = '#ffd28a'; context.strokeStyle = '#1a1206'; context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(11, 0); context.lineTo(-7, -7); context.lineTo(-3, 0); context.lineTo(-7, 7); context.closePath();
+    context.fill(); context.stroke();
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.font = 'bold 11px Arial, sans-serif';
+    var label = 'КТ-6 «ГРИФ»', labelWidth = context.measureText(label).width + 12;
+    context.fillStyle = 'rgba(10, 13, 15, 0.82)'; context.fillRect(point.x + 14, point.y - 26, labelWidth, 18);
+    context.strokeStyle = '#ffd28a'; context.lineWidth = 1; context.strokeRect(point.x + 14.5, point.y - 25.5, labelWidth - 1, 17);
+    context.fillStyle = '#ffd28a'; context.textBaseline = 'middle'; context.fillText(label, point.x + 20, point.y - 17);
+    // строка состояния над глобусом
+    var status = homeFlight.landedAt ? 'ПОСАДКА НА БАЗЕ «ЯМАНТАУ»' : 'КТ-6 ВОЗВРАЩАЕТСЯ НА БАЗУ «ЯМАНТАУ» · НА БОРТУ ОТРЯД И СПАСЁННЫЕ';
+    context.font = 'bold 13px Arial, sans-serif';
+    var statusWidth = context.measureText(status).width + 28, middle = center();
+    context.fillStyle = 'rgba(10, 13, 15, 0.85)'; context.fillRect(middle.x - statusWidth / 2, 18, statusWidth, 30);
+    context.strokeStyle = '#e8a33a'; context.strokeRect(middle.x - statusWidth / 2 + 0.5, 18.5, statusWidth - 1, 29);
+    context.fillStyle = '#ffd28a'; context.textAlign = 'center'; context.fillText(status, middle.x, 33);
+    context.restore();
+  }
 
   // ---------------- часы ----------------
   // игровое время идёт со скоростью реального; кнопки ускорения пока не работают
@@ -445,6 +541,7 @@ var Globe = (function () {
     window.requestAnimationFrame(frame);
     var steps = Math.min(4, (now - lastFrame) / 16.7);
     lastFrame = now;
+    updateHomeFlight(now);
     if (flight) {
       var progress = Math.min(1, (now - flight.start) / flight.duration), eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
       view.lon = flight.fromLon + flight.deltaLon * eased; view.lat = flight.fromLat + flight.deltaLat * eased;

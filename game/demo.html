@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Aliens26 — демоверсия</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d1012; color: #8a959c; font: 13px Arial, sans-serif; }
+  div { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div>ДЕМОВЕРСИЯ · ЗАГРУЗКА…</div>
+<script src="js/demo.js"></script>
+<script>
+  // новый запуск демо: база и память пришельцев демо — с чистого листа, сохранения основной игры не трогаются
+  try { Demo.KEYS.forEach(function (key) { localStorage.removeItem(key.replace(/^aliens26\./, 'aliens26.demo.')); }); } catch (error) { }
+  location.replace(Demo.link('city.html'));
+</script>
+</body>
+</html>

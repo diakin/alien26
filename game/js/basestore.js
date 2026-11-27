@@ -9,7 +9,7 @@
 // готова после следующего задания: сроков в игре пока нет, сборка идёт, пока отряд на вылете.
 var BaseStore = (function () {
   'use strict';
-  var KEY = 'aliens26.base.v1';
+  var KEY = window.Demo ? Demo.storageKey('aliens26.base.v1') : 'aliens26.base.v1';    // в демо — своё хранилище (js/demo.js)
   var VERSION = 3;                    // 2 — база по плану модернизации (tools/base/plan_v2.py); 3 — обслуживающий персонал, каюты 13–18 на втором уровне
   var SHIP_SEATS = 6;                 // места в салоне КТ-6, K7 — на рампе отдельно
   var SHIP_CAPACITY = 60;             // груз, единиц веса (вес предметов — Items: магазин 2, граната 3, аптечка 5, карабин 8)
@@ -152,6 +152,8 @@ var BaseStore = (function () {
       else state.artifacts.push({ name: item.name, count: item.count, from: summary.map });
     });
     if (summary.artifacts && summary.artifacts.length) state.log.push('Сданы артефакты: ' + summary.map);
+    // кто прилетел: позывные бойцов и K7 — для финального кадра демо (бойцы на рампе КТ-6)
+    state.arrival = { crew: (summary.soldiersHome || []).slice(), mech: !!summary.robotHome, map: summary.map };
     var rescue = summary.rescue;
     if (rescue && rescue.vipRescued && rescue.vip && !state.scientists.some(function (person) { return person.name === rescue.vip.name; })) {
       state.scientists.push({ name: rescue.vip.name, specialty: 'исследования пришельцев', workplace: 'Ксенобиологическая', cabin: rescueCabin(state.scientists), rescued: true, aboard: true });

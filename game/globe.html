@@ -22,6 +22,8 @@
   #start:hover { color: #000; background: linear-gradient(180deg, #ffc35e, #d89028); }
   .menu { display: grid; grid-template-columns: 1fr; gap: 5px; }
   .menu button.test { border-style: dashed; color: #e8a090; }
+  .menu button.test:disabled { color: #56626a; border-color: #263036; }
+  #start:disabled { opacity: 0.45; cursor: default; }
   .card button.small { margin-top: 8px; width: 100%; height: 22px; font-size: 10px; }
   .clock { border: 1px solid #3a454b; background: #0a1013; text-align: center; padding: 6px 4px 7px; }
   .clock .time { font: bold 28px Consolas, "DejaVu Sans Mono", monospace; color: #9fd7ee; letter-spacing: 1px; }
@@ -98,6 +100,7 @@
   </div>
   <div class="hint">Стрелки — вращение, + / − — приближение, Enter — начать задание.</div>
 </div>
+<script src="js/demo.js"></script>
 <script src="js/globe_texture.js"></script>
 <script src="js/globe_borders.js"></script>
 <script src="js/globe.js"></script>

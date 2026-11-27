@@ -135,7 +135,9 @@ var Results = (function () {
         '<div class="buttons">' +
           '<button class="left" data-action="ok">ОК</button>' +
           '<button data-action="retry">ПОВТОРИТЬ ЗАДАНИЕ</button>' +
-          '<button class="main" data-action="globe">К ГЛОБУСУ</button>' +
+          // демо: после успеха — перелёт на базу (глобус, затем финальный кадр), иначе — глобус демо
+          (window.Demo && Demo.on && good ? '<button class="main" data-action="home">ЛЕТЕТЬ НА БАЗУ</button>'
+            : '<button class="main" data-action="globe">К ГЛОБУСУ</button>') +
         '</div>' +
       '</div>';
     summarySheet = root.innerHTML;
@@ -158,7 +160,8 @@ var Results = (function () {
       if (window.Game && Game.freeRoam) Game.freeRoam();
     }
     if (button.dataset.action === 'retry') location.reload();
-    if (button.dataset.action === 'globe') location.href = 'globe.html';
+    if (button.dataset.action === 'globe') location.href = window.Demo && Demo.on ? Demo.link('globe.html') : 'globe.html';
+    if (button.dataset.action === 'home') location.href = Demo.link('globe.html', 'flight=1');
     if (button.dataset.action === 'cancel') closeConfirm(false);
     if (button.dataset.action === 'takeoff') closeConfirm(true);
     if (button.dataset.action === 'gather') closeConfirm('gather');

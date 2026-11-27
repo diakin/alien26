@@ -7,6 +7,7 @@
 var BaseMenu = (function () {
   'use strict';
   if (!/[?&]mode=manage/.test(location.search) || !window.BASE_PLAN) return null;
+  if (window.Demo && Demo.arrival) return null;           // финальный кадр демо — без меню базы
 
   // сдвиг плана на поле карты — как BASE_COL, BASE_ROW в tools/render/outpost_layout.js
   var PLAN_COL = 1, PLAN_ROW = 6;            // сдвиг плана на поле карты (tools/render/outpost_layout.js, BASE_COL и BASE_ROW)
