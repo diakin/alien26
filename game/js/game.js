@@ -3076,7 +3076,8 @@
   // на этом или прошлом ходу — «Штурм»; задание кончилось (эвакуация, зачистка) — «Возвращение»
   function musicMood() {
     // конец задания: если погибли бойцы — душераздирающая тема, иначе «Возвращение»
-    if (mission.over) return startUnits.some(function (unit) { return unit.dead && isFighter(unit) && unit.kind !== 'mech' && !unit.staff; }) ? 'mourn' : 'debrief';
+    // конец задания — музыка по оценке: ХОРОШО и ОТЛИЧНО — «Чествование», УДОВЛЕТВОРИТЕЛЬНО — «Возвращение», ПЛОХО — «Марш»
+    if (mission.over) return mission.result === 'good' || mission.result === 'excellent' ? 'triumph' : mission.result === 'satisfactory' ? 'debrief' : 'defeat';
     return !combat ? 'calm' : turn - lastShotTurn <= 1 || inContact() ? 'battle' : 'tactical';
   }
   function updateMusic(now) {
