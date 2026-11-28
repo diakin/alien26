@@ -114,7 +114,7 @@ var Sound = (function () {
   }
   function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
 
-  // открытие портала (около 10 с): чистый нарастающий вихрь. Шум через узкий полосовой фильтр, частота
+  // открытие портала (около 10 с): нарастающий вихрь и с 3-й секунды — треск разрядов. Шум через узкий полосовой фильтр, частота
   // поднимается 180 Гц → 2,8 кГц к пику (6 с), кружение (колебание частоты фильтра) ускоряется с 0,6 до 7 Гц
   // и становится шире; под ним — низкий рёв, сверху — шелест; после пика вихрь плавно стихает; всё в отзвуке
   var PORTAL_SOUND = 11.5;                 // до полной тишины; слышно около 10 с
@@ -162,6 +162,43 @@ var Sound = (function () {
     vortexLayer(bus, time, 'lowpass', 2, [[0, 80], [peakAt, 420], [10, 120]], 1.0, peakAt, 1.1, total);
     // шелест сверху
     vortexLayer(bus, time, 'highpass', 0.7, [[0, 5000], [peakAt, 3500], [10, 6000]], 0.12, peakAt, 0.9, total);
+    // треск электрических разрядов: с 3-й секунды, к пику чаще и громче, после пика редеет
+    var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(3.0, peakAt, 9.0);
+    var crackleFilter = audio.createBiquadFilter(), crackleLevel = audio.createGain();
+    crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 1200;
+    crackleLevel.gain.value = 1.0;
+    crackle.connect(crackleFilter); crackleFilter.connect(crackleLevel); crackleLevel.connect(bus);
+    crackle.start(time + 3.0);
+  }
+  // треск: пачки щелчков (короткие всплески шума с затуханием 0,2–2,5 мс, внутри пачки — через 1–25 мс);
+  // плотность и громкость пачек растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука
+  function crackleBuffer(from, peak, to) {
+    var rate = audio.sampleRate, length = Math.ceil((to - from) * rate), buffer = audio.createBuffer(1, length, rate);
+    var data = buffer.getChannelData(0);
+    var strength = function (second) {
+      var at = from + second;
+      return at < peak ? Math.pow((at - from) / (peak - from), 1.5) : Math.pow(Math.max(0, 1 - (at - peak) / (to - peak)), 2);
+    };
+    var cursor = 0;
+    while (cursor < length) {
+      var level = strength(cursor / rate);
+      // пауза между пачками: в начале до 0,5 с, у пика — 10–60 мс
+      cursor += Math.floor(rate * (0.01 + Math.random() * (0.05 + 0.45 * (1 - level))));
+      if (cursor >= length) break;
+      level = strength(cursor / rate);
+      if (level < 0.02) continue;
+      var clicks = 1 + Math.floor(Math.random() * (2 + 14 * level)), at = cursor;
+      var burstPeak = (0.25 + 0.75 * level) * (0.5 + Math.random() * 0.5);
+      for (var click = 0; click < clicks && at < length; click++) {
+        var decay = rate * (0.0002 + Math.random() * 0.0023), amplitude = burstPeak * (0.4 + Math.random() * 0.6);
+        var span = Math.min(length - at, Math.ceil(decay * 6));
+        for (var index = 0; index < span; index++) data[at + index] += (Math.random() * 2 - 1) * amplitude * Math.exp(-index / decay);
+        at += Math.floor(rate * (0.001 + Math.random() * 0.024));
+      }
+      cursor = at;
+    }
+    for (var sample = 0; sample < length; sample++) data[sample] = Math.tanh(data[sample] * 1.6);   // жёсткость щелчка
+    return buffer;
   }
 
 
