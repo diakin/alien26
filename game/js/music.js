@@ -3,7 +3,7 @@
 //   dawn    — «Рассвет»: общая, светлая, до мажор с лидийской IV ступенью;
 //   shade   — «Тень»: тактическая, фон без мелодии и ритма (как в UFO), 128 с по кругу; contact — она же с пульсом;
 //   landing — «Высадка», assault — «Штурм»: тактическая и при контакте, ля минор;
-//   gloom   — «Мрак»: мрачная, тихий гул с частой сменой тональности, капли, всплески, ветер; gloomContact — с пульсом;
+//   gloom   — «Мрак»: мрачная, тихий гул с частой сменой тональности, всплески, ветер; gloomContact — с пульсом;
 //   probe, hive, mine — «Зонд», «Улей», «Шахта»: фон с повторяющимися звуками (как в тактике UFO);
 //            *Contact — их варианты при контакте: плотнее и резче;
 //   impulse, alarm, knock — «Импульс», «Тревога», «Стук»: фон с резкими акцентами около 4 раз в секунду;
@@ -904,7 +904,7 @@ var Music = (function () {
   // 48 ударов, такт 5 с, 32 такта (160 с). Очень низкий гул, медленные кластеры с тритоном и малой секундой,
   // глухой мотив «рога» в нижнем регистре (до — ре-бемоль — соль), далёкий металл, ветер, редкий стеклянный призвук.
   // Гул тихий, тональность меняется каждые 2 такта (10 с); поверх — в неровных местах, раз в 1–3 такта (GLOOM_ACCENTS),
-  // негромкие звуки природы и высокие призвуки: капли, всплеск, порыв ветра, «сонар», стеклянный звон.
+  // негромкие звуки природы и высокие призвуки: всплеск, порыв ветра, «сонар», стеклянный звон; середина гула приглушена.
   // Резких громких ударов и низких вставок нет.
   // Вариант при контакте — тот же фон и глухой пульс.
   var GLOOM_BLOCKS = [
@@ -924,11 +924,12 @@ var Music = (function () {
     [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.03, 0.4],
     [27, 0, 'draft', 110, 0.12, 460]
   ];
-  // [такт, доля, вид]: drips — капли, splash — всплеск, gust — порыв ветра, ping — «сонар», chime — стеклянный звон
+  // [такт, доля, вид]: splash — всплеск, gust — порыв ветра, ping — «сонар», chime — стеклянный звон (капель нет)
+  var GLOOM_MID_CUT = 18;
   var GLOOM_ACCENTS = [
-    [1, 2, 'drips'], [2, 3.5, 'ping'], [4, 1, 'splash'], [5, 2.5, 'drips'], [7, 0.5, 'gust'], [8, 3, 'chime'],
-    [9, 1.5, 'drips'], [12, 2, 'splash'], [13, 3, 'ping'], [14, 0.5, 'drips'], [16, 2.5, 'gust'], [18, 1, 'drips'],
-    [20, 3, 'chime'], [21, 1.5, 'splash'], [23, 0, 'drips'], [24, 2.5, 'ping'], [26, 1, 'gust'], [28, 2, 'drips'],
+    [2, 3.5, 'ping'], [4, 1, 'splash'], [7, 0.5, 'gust'], [8, 3, 'chime'],
+    [12, 2, 'splash'], [13, 3, 'ping'], [16, 2.5, 'gust'],
+    [20, 3, 'chime'], [21, 1.5, 'splash'], [24, 2.5, 'ping'], [26, 1, 'gust'],
     [29, 3.5, 'splash'], [31, 1, 'chime']
   ];
   function gloomAccent(kit, kind, at, block, barLength) {
@@ -947,14 +948,16 @@ var Music = (function () {
         var block = GLOOM_BLOCKS[Math.floor(bar / 2) % GLOOM_BLOCKS.length];   // тональность гула — каждые 2 такта
         if (bar % 2 === 0 || absoluteBar === 0) {
           var length = (2 - bar % 2) * barLength + 2;
-          deepDrone(kit, block.bass + 12, time, length, 0.06);
-          deepDrone(kit, block.bass + 6, time + 1, length, 0.019);         // тритон под гулом, еле слышно
-          shade(kit, block.notes, time, length, 0.038);
+          // середина гула приглушена на GLOOM_MID_CUT дБ
+          deepDrone(kit, block.bass + 12, time, length, 0.06, GLOOM_MID_CUT);
+          deepDrone(kit, block.bass + 6, time + 1, length, 0.019, GLOOM_MID_CUT);   // тритон под гулом, еле слышно
+          shade(kit, block.notes, time, length, 0.038, GLOOM_MID_CUT);
         }
         // мотив «рога» в тактах 2–3 каждых восьми
         if (bar % 8 === 2 || bar % 8 === 3) GLOOM_HORN.forEach(function (entry) {
           if (entry[0] !== bar % 8 - 2) return;
-          lead(kit, entry[2] + (bar >= 16 ? -12 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.04, cutoff: 650, attack: 0.6, release: 1.6, vibrato: 0.002, reverb: 0.7, echo: 0.2 });
+          // низкая валторна — тоже часть гула: фильтр закрыт сильнее (320 Гц) и тише, середины меньше
+          lead(kit, entry[2] + (bar >= 16 ? -12 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.028, cutoff: 320, attack: 0.6, release: 1.6, vibrato: 0.002, reverb: 0.7, echo: 0.2 });
         });
         GLOOM_EVENTS.forEach(function (entry) { if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength); });
         GLOOM_ACCENTS.forEach(function (entry) { if (entry[0] === bar) gloomAccent(kit, entry[2], time + entry[1] * beat, block, barLength); });
@@ -1021,6 +1024,26 @@ var Music = (function () {
   var PROBE_BLOCKS = [{ root: 28, notes: [47, 52, 53] }, { root: 24, notes: [48, 51, 55] }, { root: 29, notes: [48, 53, 56] }, { root: 26, notes: [45, 50, 53] },
                       { root: 28, notes: [46, 52, 55] }, { root: 31, notes: [50, 55, 58] }, { root: 27, notes: [46, 51, 54] }, { root: 29, notes: [47, 53, 56] }];
   var PROBE_PATTERN = [[0, 0, 0.11], [1, 12, 0.06], [2, 1, 0.09], [3, 12, 0.05], [4, 0, 0.1], [5, 7, 0.06], [6, 1, 0.08], [7, 10, 0.05]];
+  // Развитие «Зонда»: поверх неизменного рефрена со временем добавляются ритмические слои других инструментов
+  // (по номеру такта с начала звучания, цикл 64 такта ≈ 3,5 мин): с 8-го — тихие щелчки на слабые восьмые;
+  // с 16-го — басовый пульс 3+3+2; с 24-го — спиккато по нотам аккорда, синкопы шестнадцатыми; с 32-го — удары
+  // по металлу через такт и дробь шестнадцатыми в конце такта; с 56-го слои снимаются (остаются рефрен и щелчки),
+  // и с 64-го всё нарастает снова.
+  var PROBE_SNAPS = [[3, 0, 0.8], [6, 1, 0.6], [10, 2, 0.8], [11, 1, 0.5], [14, 0, 0.7]];
+  function probeStage(absoluteBar) {
+    var bar = absoluteBar % 64;
+    return bar < 8 ? 0 : bar < 16 ? 1 : bar < 24 ? 2 : bar < 32 ? 3 : bar < 56 ? 4 : 1;
+  }
+  function probeLayers(kit, block, absoluteBar, time, beat, lift) {
+    var stage = probeStage(absoluteBar), eighth = beat / 2, sixteenth = beat / 4;
+    if (stage >= 1) [1, 3, 5, 7].forEach(function (step) { clack(kit, time + step * eighth, 0.05 * lift, step % 4 === 1 ? 0.35 : -0.35, 5200); });
+    if (stage >= 2) [0, 3, 6].forEach(function (step, index) { throb(kit, block.root + 12, time + step * eighth, eighth * (index === 2 ? 1.6 : 2.4), (index ? 0.028 : 0.036) * lift); });
+    if (stage >= 3) PROBE_SNAPS.forEach(function (entry) { snap(kit, block.notes[entry[1]] + 12, time + entry[0] * sixteenth, 0.024 * entry[2] * lift, entry[0] % 2 ? 0.4 : -0.4, 0.3); });
+    if (stage >= 4) {
+      if (absoluteBar % 2 === 0) metal(kit, block.root + 24, time, 0.07 * lift, -0.3);
+      [12, 13, 14, 15].forEach(function (step, index) { clack(kit, time + step * sixteenth, (0.03 + index * 0.012) * lift, 0.2, 3600); });
+    }
+  }
   // «Улей»: 80 ударов. Низкий «вом» на два тона через полутон раз в две доли; поверх — спиккато по шестнадцатым
   // (в 8 раз чаще «вомов») с акцентами в группах 3+3+2 и щелчками на сильных.
   var HIVE_BLOCKS = [{ root: 33, notes: [57, 58, 64] }, { root: 33, notes: [57, 60, 63] }, { root: 29, notes: [56, 60, 65] }, { root: 28, notes: [56, 59, 65] }];
@@ -1038,15 +1061,17 @@ var Music = (function () {
         var block = settings.blocks[Math.floor(bar / span) % settings.blocks.length];
         if (bar % span === 0 || absoluteBar === 0) {
           var length = (span - bar % span) * barLength + 2;
-          // «Зонд» и «Улей» — гул ещё тише остальных, «Зонд» — тише всех
-          deepDrone(kit, block.root + 12, time, length, kind === 'mine' ? 0.14 : kind === 'probe' ? 0.05 : 0.08);
-          shade(kit, block.notes, time, length, (contact ? 0.06 : 0.05) * (kind === 'mine' ? 1 : kind === 'probe' ? 0.4 : 0.6));
+          // «Зонд» и «Улей» — гул тише всех остальных, у «Улья» — совсем тихий
+          deepDrone(kit, block.root + 12, time, length, kind === 'mine' ? 0.14 : kind === 'probe' ? 0.05 : 0.015);
+          shade(kit, block.notes, time, length, (contact ? 0.06 : 0.05) * (kind === 'mine' ? 1 : kind === 'probe' ? 0.4 : 0.15));
         }
         var lift = contact ? 1.3 : 1;
         if (kind === 'probe') {
+          // рефрен не меняется — только переносится в тональность блока (block.root)
           PROBE_PATTERN.forEach(function (step) {
             blip(kit, block.root + 24 + step[1], time + step[0] * beat / 2, 0.12 * accented(step[2] / 0.11) * lift, step[0] % 2 ? 0.45 : -0.45, 0.45);
           });
+          probeLayers(kit, block, absoluteBar, time, beat, lift);
           if (bar % 2 === 1) ping(kit, 88 + (bar % 8 === 7 ? 3 : 0), time + 2.5 * beat, 0.07, 0.5);
           if (contact) { throb(kit, block.root + 12, time, beat * 1.5, 0.13); throb(kit, block.root + 12, time + 2 * beat, beat * 1.5, 0.11); }
         } else if (kind === 'hive') {
@@ -1057,8 +1082,9 @@ var Music = (function () {
             snap(kit, block.notes[step % 3] + (strong ? 0 : 12), time + step * beat / 4, 0.085 * accented(level) * lift, step % 2 ? 0.35 : -0.35, strong ? 0.75 : 0.3);
             if (strong) clack(kit, time + step * beat / 4, 0.08 * lift, step % 2 ? 0.4 : -0.4, 3800);
           }
-          throb(kit, block.root + 12, time, beat * 2, 0.12 * lift);
-          throb(kit, block.root + 13, time + 2 * beat, beat * 2, 0.11 * lift);
+          // «вомы» — тоже гудение: вчетверо тише прежнего
+          throb(kit, block.root + 12, time, beat * 2, 0.03 * lift);
+          throb(kit, block.root + 13, time + 2 * beat, beat * 2, 0.027 * lift);
           if (bar % 4 === 2) glass(kit, block.notes[2] + 24, time + beat, barLength * 2, 0.02, 0.4);
           if (contact) heartbeat(kit, time + 3 * beat, 0.24);
         } else {
