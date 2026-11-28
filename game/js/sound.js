@@ -162,16 +162,17 @@ var Sound = (function () {
     vortexLayer(bus, time, 'lowpass', 2, [[0, 80], [peakAt, 420], [10, 120]], 1.0, peakAt, 1.1, total);
     // шелест сверху
     vortexLayer(bus, time, 'highpass', 0.7, [[0, 5000], [peakAt, 3500], [10, 6000]], 0.12, peakAt, 0.9, total);
-    // треск электрических разрядов: с 3-й секунды, к пику чаще и громче, после пика редеет
+    // треск электрических разрядов: громкие редкие потрескивания с 3-й секунды, к пику чаще, после пика редеют
     var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(3.0, peakAt, 9.0);
     var crackleFilter = audio.createBiquadFilter(), crackleLevel = audio.createGain();
-    crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 1200;
-    crackleLevel.gain.value = 1.0;
+    crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 900;
+    crackleLevel.gain.value = 1.3;
     crackle.connect(crackleFilter); crackleFilter.connect(crackleLevel); crackleLevel.connect(bus);
     crackle.start(time + 3.0);
   }
-  // треск: пачки щелчков (короткие всплески шума с затуханием 0,2–2,5 мс, внутри пачки — через 1–25 мс);
-  // плотность и громкость пачек растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука
+  // треск: редкие громкие потрескивания — отдельные резкие щелчки (всплеск шума с затуханием 0,05–0,6 мс и коротким
+  // «телом» 2–5 мс), по 1–4 подряд через 3–30 мс; между ними у пика 0,12–0,5 с, в начале — до 1,2 с.
+  // Частота и громкость растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука
   function crackleBuffer(from, peak, to) {
     var rate = audio.sampleRate, length = Math.ceil((to - from) * rate), buffer = audio.createBuffer(1, length, rate);
     var data = buffer.getChannelData(0);
@@ -182,22 +183,25 @@ var Sound = (function () {
     var cursor = 0;
     while (cursor < length) {
       var level = strength(cursor / rate);
-      // пауза между пачками: в начале до 0,5 с, у пика — 10–60 мс
-      cursor += Math.floor(rate * (0.01 + Math.random() * (0.05 + 0.45 * (1 - level))));
+      cursor += Math.floor(rate * (0.12 + Math.random() * (0.38 + 0.7 * (1 - level))));
       if (cursor >= length) break;
       level = strength(cursor / rate);
       if (level < 0.02) continue;
-      var clicks = 1 + Math.floor(Math.random() * (2 + 14 * level)), at = cursor;
-      var burstPeak = (0.25 + 0.75 * level) * (0.5 + Math.random() * 0.5);
+      var clicks = 1 + Math.floor(Math.random() * (1 + 3 * level)), at = cursor;
+      var burstPeak = (0.5 + 0.5 * level) * (0.7 + Math.random() * 0.3);
       for (var click = 0; click < clicks && at < length; click++) {
-        var decay = rate * (0.0002 + Math.random() * 0.0023), amplitude = burstPeak * (0.4 + Math.random() * 0.6);
-        var span = Math.min(length - at, Math.ceil(decay * 6));
-        for (var index = 0; index < span; index++) data[at + index] += (Math.random() * 2 - 1) * amplitude * Math.exp(-index / decay);
-        at += Math.floor(rate * (0.001 + Math.random() * 0.024));
+        var amplitude = burstPeak * (click ? 0.5 + Math.random() * 0.5 : 1);
+        var snap = rate * (0.00005 + Math.random() * 0.00055), body = rate * (0.002 + Math.random() * 0.003);
+        var span = Math.min(length - at, Math.ceil(body * 5));
+        data[at] += amplitude * 2.5 * (Math.random() < 0.5 ? -1 : 1);                       // фронт щелчка
+        for (var index = 0; index < span; index++) {
+          data[at + index] += (Math.random() * 2 - 1) * amplitude * (2.2 * Math.exp(-index / snap) + 0.35 * Math.exp(-index / body));
+        }
+        at += Math.floor(rate * (0.003 + Math.random() * 0.027));
       }
       cursor = at;
     }
-    for (var sample = 0; sample < length; sample++) data[sample] = Math.tanh(data[sample] * 1.6);   // жёсткость щелчка
+    for (var sample = 0; sample < length; sample++) data[sample] = Math.tanh(data[sample] * 2.5);   // жёсткость щелчка
     return buffer;
   }
 
