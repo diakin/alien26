@@ -3215,7 +3215,11 @@
     ready.sort(function (first, second) { return second.score - first.score; });
     var fired = false;
     ready.forEach(function (entry, order) {
-      if (fire(entry.unit, target, entry.modeIndex, order * 420)) { fired = true; say(entry.unit.callsign + ': ответный огонь по ' + mover.callsign); }
+      if (fire(entry.unit, target, entry.modeIndex, order * 420)) {
+        fired = true; say(entry.unit.callsign + ': ответный огонь по ' + mover.callsign);
+        // ответный огонь полиции — камера на полицейского (первого из стреляющих)
+        if (entry.unit.police && !shotView) { watchUnit(entry.unit, true); startShotView(entry.unit, target, true); }
+      }
     });
     if (fired && mover.side === 'squad' && mover.path.length) {
       var refund = 0;
@@ -3265,8 +3269,8 @@
   // Каждый пришелец по очереди принимает решения (aiDecide), пока может: стреляет, уходит в укрытие, занимает позицию
   // или скрытно подходит. В мирной обстановке пришельцы ничего не делают.
   var aiQueue = [], aiWaitUntil = 0;
-  function watchUnit(unit) {
-    if (!Settings.values.followAliens || !isSeen(unit)) return;
+  function watchUnit(unit, force) {
+    if ((!force && !Settings.values.followAliens) || !isSeen(unit)) return;
     centerOn(unit.x, unit.y, unit.elevation);
     var level = followLevel(unit);
     setView(level, isIndoor(unit.col, unit.row, unit.level) || isIndoor(unit.col, unit.row, level));
@@ -4077,7 +4081,9 @@
       return;
     }
     if (decision && decision.fire) {
-      if (fire(unit, decision.fire, decision.mode)) unit.aiShots++;
+      // выстрел полицейского показывается всегда: камера на стрелке, затем на месте попадания
+      if (unit.police) watchUnit(unit, true);
+      if (fire(unit, decision.fire, decision.mode)) { unit.aiShots++; if (unit.police) startShotView(unit, decision.fire, true); }
       else unit.aiShots = 2;
       staffWaitUntil = now + 450 / speed;
       return;
@@ -4103,12 +4109,13 @@
   // Если стрелок и цель видны в одном кадре, камера не двигается, остаётся только пауза из п. 3.
   var shotView = null;
   var SHOT_VIEW_MS = { shooter: 450, arrive: 250, hit: 900, miss: 600, afterFall: 700 };
-  function startShotView(shooter, target) {
-    if (!Settings.values.followAliens) return;
+  // force — показать независимо от настройки «Камера следит за пришельцами» (выстрелы полиции)
+  function startShotView(shooter, target, force) {
+    if (!force && !Settings.values.followAliens) return;
     var volley = shots.filter(function (shot) { return shot.shooter === shooter && !shot.result; });
     if (!volley.length) return;
     var speed = Settings.values.aiSpeed;
-    var view = { shooter: shooter, target: target.unit || null, point: target.point, volley: volley, stage: 'shooter', hit: false, killed: null };
+    var view = { shooter: shooter, target: target.unit || null, point: target.point, volley: volley, stage: 'shooter', hit: false, killed: null, force: !!force };
     var targetHeight = target.unit ? target.unit.height : 1;
     var targetFoot = target.unit ? { x: target.unit.x, y: target.unit.y, h: target.unit.elevation } : target.point;
     view.cut = !frameFor(targetFoot.x, targetFoot.y, targetFoot.h, targetHeight).inside;
@@ -4159,7 +4166,7 @@
     }
     if (view.stage === 'hold' && now >= view.until) {
       shotView = null;
-      if (view.cut && !view.shooter.dead && units.indexOf(view.shooter) >= 0) watchUnit(view.shooter);
+      if (view.cut && !view.shooter.dead && units.indexOf(view.shooter) >= 0) watchUnit(view.shooter, view.force);
       aiWaitUntil = Math.max(aiWaitUntil, now + 250 / speed);
     }
   }
