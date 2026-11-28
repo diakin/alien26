@@ -377,7 +377,11 @@
       });
     }
     if (MISSION && MISSION.police && PAGE_MODE !== 'manage') {
-      MISSION.police.forEach(function (person, index) { list.push(makeUnit(policeProfile(person, index + 1), [person.col, person.row, person.level, person.dir])); });
+      MISSION.police.forEach(function (person, index) {
+        var officer = makeUnit(policeProfile(person, index + 1), [person.col, person.row, person.level, person.dir]);
+        if (person.holdout) officer.holdout = { col: person.holdout[0], row: person.holdout[1], level: person.holdout[2] || 0 };
+        list.push(officer);
+      });
     }
     return list;
   }
@@ -3961,7 +3965,65 @@
   //   4) если сидящего видят, а укрытия со стороны врага нет, — отходит туда, где его не видят, и снова приседает;
   //   раненый (здоровье меньше половины) или без патронов — сразу отходит из обзора и приседает.
   // Замеченные цели — пришельцы, видимые отряду (isSeen). Без них полицейский стоит на месте.
+  // Оборона в дальней комнате (MISSION.policeRoom: { area: [col0, row0, col1, row1, level], door: [col, row] },
+  // у каждого полицейского holdout — своя клетка у стены в простенке между окнами). С первой фазы «Полиция»
+  // полицейский идёт туда (за ход — сколько хватит ОД, не стреляя). В комнате:
+  //   — если его клетку видит пришелец (обычно — подошедший к окну), сначала стреляет по нему (до двух выстрелов,
+  //     оставляя ОД на перебежку), потом перебегает на клетку комнаты, которую сидящего не видит ни один пришелец
+  //     (ближайшую, лучше у стены), и приседает;
+  //   — иначе поворачивается к двери, приседает и ждёт: ответный огонь и выстрелы по вошедшим в комнату.
+  function insidePoliceRoom(other) {
+    var area = MISSION && MISSION.policeRoom && MISSION.policeRoom.area;
+    return !!area && other.level === area[4] && other.col >= area[0] && other.col <= area[2] && other.row >= area[1] && other.row <= area[3];
+  }
+  function holdoutDecide(unit) {
+    var spot = unit.holdout, room = MISSION.policeRoom, weapon = weaponOf(unit);
+    var kneel = function () { return !unit.kneeling && unit.timeUnits >= COST.kneel ? { kneel: true } : null; };
+    var shootAt = function (targets, reserve) {
+      if (!weapon || unit.ammo <= 0 || (unit.aiShots || 0) >= 2 || !targets.length) return null;
+      var target = targets[0], cost = turnCostTo(unit, target.point);
+      for (var index = 0; index < 2; index++) {
+        if (weapon.modes[index] && unit.timeUnits - weapon.modes[index].cost - cost >= reserve) return { fire: { unit: target.unit, point: target.point }, mode: index };
+      }
+      return null;
+    };
+    if (!insidePoliceRoom(unit)) {
+      var path = findPath(unit, spot);
+      if (!path || !path.length) return kneel();
+      var steps = affordableSteps(unit, path);
+      return steps ? { move: path.slice(0, steps) } : null;
+    }
+    if (weapon && unit.ammo <= 0 && unit.reserve > 0 && !unit.aiReloaded && unit.timeUnits >= COST.reload) return { reload: true };
+    var here = { col: unit.col, row: unit.row, level: unit.level };
+    var exposure = exposureAt(unit, here, true);
+    if (exposure.seen > 0) {
+      // кто видит — по тем и стрелять; запас ОД — встать и пробежать 3 клетки
+      var threats = visibleTargets(unit).filter(function (entry) { return exposure.shootable.some(function (item) { return item.unit === entry.unit; }); });
+      var shot = shootAt(threats, COST.stand + 3 * COST.step);
+      if (shot) return shot;
+      if (!unit.aiHidden && unit.aiMoves < 3) {
+        var area = room.area, reach = reachable(unit, Math.max(0, unit.timeUnits - (unit.kneeling ? COST.stand : 0) - COST.kneel)), best = null;
+        reach.keys.forEach(function (key) {
+          var node = keyNode(key);
+          if (node.level !== area[4] || node.col < area[0] || node.col > area[2] || node.row < area[1] || node.row > area[3]) return;
+          if (exposureAt(unit, node, true).seen > 0) return;
+          var score = reach.cost[key] - coverAt(node, unit) * 4 - (node.col === spot.col && node.row === spot.row ? 6 : 0);
+          if (!best || score < best.score) best = { key: key, score: score };
+        });
+        unit.aiHidden = true;
+        if (best) return { move: reach.path(best.key) };
+      }
+      return kneel();
+    }
+    var door = { x: room.door[0] + 0.5, y: room.door[1] + 0.5 }, direction = Iso.directionOf(door.x - unit.x, door.y - unit.y);
+    var turnCost = turnCostTo(unit, door);
+    if (turnCost && direction >= 0 && unit.timeUnits >= turnCost + COST.kneel) return { turn: direction, cost: turnCost };
+    var down = kneel();
+    if (down) return down;
+    return shootAt(weapon ? visibleTargets(unit).filter(function (entry) { return insidePoliceRoom(entry.unit); }) : [], 0);
+  }
   function policeDecide(unit) {
+    if (unit.holdout && MISSION && MISSION.policeRoom) return holdoutDecide(unit);
     var weapon = weaponOf(unit);
     var here = nodeKey(unit.col, unit.row, unit.level);
     var standCost = unit.kneeling ? COST.stand : 0;
@@ -4068,6 +4130,12 @@
     if (!unit) { startAlienPhase(); return; }
     var speed = Settings.values.aiSpeed;
     var decision = unit.aiMoves < 3 ? (unit.police ? policeDecide(unit) : staffDecide(unit)) : (unit.police && !unit.kneeling && unit.timeUnits >= COST.kneel ? { kneel: true } : null);
+    if (decision && decision.turn !== undefined) {
+      unit.timeUnits -= decision.cost;
+      unit.direction = decision.turn;
+      staffWaitUntil = now + 150 / speed;
+      return;
+    }
     if (decision && decision.kneel) {
       unit.timeUnits -= COST.kneel;
       unit.kneeling = true;
