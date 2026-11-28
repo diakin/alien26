@@ -2554,7 +2554,7 @@
         // общий отсвет вокруг портала
         var glowRadius = cell * 3.2;
         var glow = context.createRadialGradient(x, y - cell, 0, x, y - cell, glowRadius);
-        glow.addColorStop(0, 'rgba(220, 200, 255, ' + 0.35 * light + ')'); glow.addColorStop(1, 'rgba(140, 80, 255, 0)');
+        glow.addColorStop(0, 'rgba(220, 200, 255, ' + 0.15 * light + ')'); glow.addColorStop(1, 'rgba(140, 80, 255, 0)');
         context.fillStyle = glow;
         context.beginPath(); context.ellipse(x, y - cell, glowRadius, glowRadius * 0.8, 0, 0, Math.PI * 2); context.fill();
         for (var bolt = 0; bolt < bolts; bolt++) {
@@ -2563,21 +2563,21 @@
           var angle = random() * Math.PI * 2, distance = cell * (1 + random() * 2);
           var endX = x + Math.cos(angle) * distance, endY = y + Math.sin(angle) * distance * 35 / 61;
           var path = lightningPath(random, startX, startY, endX, endY);
-          strokePath(path, cell * 0.16, 'rgba(150, 90, 255, ' + 0.3 * light + ')');
-          strokePath(path, cell * 0.06, 'rgba(210, 190, 255, ' + 0.75 * light + ')');
-          strokePath(path, Math.max(1, cell * 0.02), 'rgba(255, 255, 255, ' + light + ')');
+          strokePath(path, cell * 0.08, 'rgba(150, 90, 255, ' + 0.16 * light + ')');
+          strokePath(path, cell * 0.03, 'rgba(210, 190, 255, ' + 0.4 * light + ')');
+          strokePath(path, Math.max(0.8, cell * 0.01), 'rgba(255, 255, 255, ' + 0.6 * light + ')');
           // ответвление от случайной точки молнии
           if (random() < 0.6) {
             var from = path[4 + Math.floor(random() * (path.length - 8))], branchAngle = angle + (random() - 0.5) * 1.6, branchLength = distance * (0.3 + random() * 0.4);
             var branch = lightningPath(random, from[0], from[1], from[0] + Math.cos(branchAngle) * branchLength, from[1] + Math.abs(Math.sin(branchAngle)) * branchLength * 0.6);
-            strokePath(branch, cell * 0.08, 'rgba(170, 120, 255, ' + 0.3 * light + ')');
-            strokePath(branch, Math.max(1, cell * 0.015), 'rgba(240, 230, 255, ' + 0.8 * light + ')');
+            strokePath(branch, cell * 0.04, 'rgba(170, 120, 255, ' + 0.14 * light + ')');
+            strokePath(branch, Math.max(0.6, cell * 0.008), 'rgba(240, 230, 255, ' + 0.45 * light + ')');
           }
           // вспышка в точке удара
-          var hit = context.createRadialGradient(endX, endY, 0, endX, endY, cell * 0.6);
-          hit.addColorStop(0, 'rgba(255, 250, 255, ' + 0.7 * light + ')'); hit.addColorStop(1, 'rgba(160, 100, 255, 0)');
+          var hit = context.createRadialGradient(endX, endY, 0, endX, endY, cell * 0.4);
+          hit.addColorStop(0, 'rgba(255, 250, 255, ' + 0.35 * light + ')'); hit.addColorStop(1, 'rgba(160, 100, 255, 0)');
           context.fillStyle = hit;
-          context.beginPath(); context.ellipse(endX, endY, cell * 0.6, cell * 0.6 * 35 / 61, 0, 0, Math.PI * 2); context.fill();
+          context.beginPath(); context.ellipse(endX, endY, cell * 0.4, cell * 0.4 * 35 / 61, 0, 0, Math.PI * 2); context.fill();
         }
       });
     });
