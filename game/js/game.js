@@ -2230,8 +2230,9 @@
     var side = 0;
     sidePortals.forEach(function (gate) { side += spawnWave(gate, gate.wave, gate.elites).length; gate.openedAt = now; });
     setCombat(true);
-    Sound.play('impact', 0);
-    say('Портал вспыхнул: прибыли ' + main.length + ' пришельцев' + (side ? '; второй портал' + (sidePortals[0].name ? ' ' + sidePortals[0].name : '') + ' — ещё ' + side : ''));
+    Sound.play('portal', 0);
+    // сколько пришельцев и сколько порталов — не сообщается
+    say('Обнаружено появление пришельцев');
     // страж-элита главного портала сразу ставит купол-щит вокруг него
     var keeper = main.filter(function (unit) { return unit.elite && unit.domeCharges > 0 && !unit.dead; })[0];
     if (keeper) raiseDome(keeper);
@@ -2405,8 +2406,8 @@
     if (!glow.stage || glow.stage === portalStageSaid) return;
     portalStageSaid = glow.stage;
     var left = 6 - glow.stage;
-    var count = 1 + sidePortals.length, what = count > 1 ? 'Порталы разгораются' : 'Портал разгорается';
-    say(glow.stage === 1 ? (count > 1 ? 'Появились круги порталов (' + count + ')' : 'Появился круг портала') + ': до открытия ' + left + ' мин' : what + ': до открытия ' + left + ' мин');
+    // о боковых порталах не говорится: игрок узнаёт о них, только если увидит
+    say(glow.stage === 1 ? 'Появился круг портала: до открытия ' + left + ' мин' : 'Портал разгорается: до открытия ' + left + ' мин');
   }
   function drawPortal(now) {
     if (!portal) return;

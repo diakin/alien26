@@ -114,6 +114,55 @@ var Sound = (function () {
   }
   function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
 
+  // открытие портала (около 4 с): нарастающий свист с подъёмом фильтра, на 0,55 с — вспышка (низкий удар,
+  // хлопок, треск разрядов), затем мерцающий расстроенный аккорд, который уходит вниз, и гул вихря
+  function portalOpen(far) {
+    var time = audio.currentTime + timeOffset, flash = time + 0.55;
+    // свист: шум через узкий фильтр 300 Гц → 3,5 кГц
+    var rush = audio.createBufferSource(); rush.buffer = noiseBuffer;
+    var rushFilter = audio.createBiquadFilter(); rushFilter.type = 'bandpass'; rushFilter.Q.value = 6;
+    rushFilter.frequency.setValueAtTime(300, time);
+    rushFilter.frequency.exponentialRampToValueAtTime(3500, flash);
+    var rushGain = audio.createGain();
+    rushGain.gain.setValueAtTime(0.0001, time);
+    rushGain.gain.exponentialRampToValueAtTime(0.9 * far, flash - 0.02);
+    rushGain.gain.exponentialRampToValueAtTime(0.0001, flash + 0.25);
+    rush.connect(rushFilter); rushFilter.connect(rushGain); rushGain.connect(effectsGain);
+    rush.start(time, Math.random(), 0.9);
+    // восходящий тон под свистом
+    tone('sine', 110, 880, 0.55, 0.25 * far);
+    // вспышка
+    tone('sine', 70, 24, 1.4, 1.0 * far, 0.55);
+    noise(0.9, 'lowpass', 420, 1.1 * far, 0.004, 0.75, 0.55);
+    noise(0.3, 'bandpass', 1800, 0.9 * far, 0.002, 0.2, 0.55);
+    for (var crack = 0; crack < 9; crack++) noise(0.03, 'highpass', jitter(5000, 0.4), jitter(0.35, 0.5) * far, 0.001, 0.02, 0.58 + crack * jitter(0.13, 0.6));
+    // мерцающий аккорд: три пары расстроенных пил через фильтр, дрожание громкости 7 Гц
+    var shimmer = audio.createGain();
+    shimmer.gain.setValueAtTime(0.0001, flash);
+    shimmer.gain.exponentialRampToValueAtTime(0.16 * far, flash + 0.08);
+    shimmer.gain.exponentialRampToValueAtTime(0.0001, flash + 3.2);
+    var shimmerFilter = audio.createBiquadFilter(); shimmerFilter.type = 'lowpass';
+    shimmerFilter.frequency.setValueAtTime(5000, flash);
+    shimmerFilter.frequency.exponentialRampToValueAtTime(600, flash + 3.2);
+    var tremolo = audio.createOscillator(), tremoloGain = audio.createGain();
+    tremolo.frequency.value = 7; tremoloGain.gain.value = 0.06 * far;
+    tremolo.connect(tremoloGain); tremoloGain.connect(shimmer.gain);
+    shimmerFilter.connect(shimmer); shimmer.connect(effectsGain);
+    [440, 523, 659].forEach(function (pitch) {
+      [-6, 6].forEach(function (cents) {
+        var oscillator = audio.createOscillator();
+        oscillator.type = 'sawtooth'; oscillator.detune.value = cents;
+        oscillator.frequency.setValueAtTime(pitch, flash);
+        oscillator.frequency.exponentialRampToValueAtTime(pitch * 0.5, flash + 3.2);
+        oscillator.connect(shimmerFilter);
+        oscillator.start(flash); oscillator.stop(flash + 3.3);
+      });
+    });
+    tremolo.start(flash); tremolo.stop(flash + 3.3);
+    // гул вихря после вспышки
+    noise(1.9, 'bandpass', 160, 0.5 * far, 0.3, 1.6, 0.7);
+  }
+
   // ---------------- речь пришельцев ----------------
   // Фраза из слогов: согласная (щелчок, шипение, хрип) и гласная — пила через три полосовых фильтра-форманты,
   // высота скользит вверх или вниз, у части слогов раскатистое «р» (дрожание громкости ~30 Гц). Половина сигнала
@@ -267,6 +316,8 @@ var Sound = (function () {
       noise(0.2, 'bandpass', 1400, 1.4 * far, 0.002, 0.12);
       noise(0.08, 'highpass', 3500, 0.5 * far, 0.001, 0.05);
       tone('sine', 120, 40, 0.3, 0.7 * far);
+    } else if (kind === 'portal') {
+      portalOpen(far);
     } else if (kind === 'impact') {
       noise(0.12, 'highpass', 2500, 0.25 * far, 0.002, 0.06);
     } else if (kind === 'explosion') {
