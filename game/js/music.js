@@ -3,7 +3,7 @@
 //   dawn    — «Рассвет»: общая, светлая, до мажор с лидийской IV ступенью;
 //   shade   — «Тень»: тактическая, фон без мелодии и ритма (как в UFO), 128 с по кругу; contact — она же с пульсом;
 //   landing — «Высадка», assault — «Штурм»: тактическая и при контакте, ля минор;
-//   gloom   — «Мрак»: мрачная, тихий гул с частой сменой тональности и редкие удары одного уровня; gloomContact — с пульсом;
+//   gloom   — «Мрак»: мрачная, тихий гул с частой сменой тональности, капли, всплески, ветер; gloomContact — с пульсом;
 //   probe, hive, mine — «Зонд», «Улей», «Шахта»: фон с повторяющимися звуками (как в тактике UFO);
 //            *Contact — их варианты при контакте: плотнее и резче;
 //   impulse, alarm, knock — «Импульс», «Тревога», «Стук»: фон с резкими акцентами около 4 раз в секунду;
@@ -446,6 +446,55 @@ var Music = (function () {
     voice.start(time); tremolo.start(time); voice.stop(end); tremolo.stop(end);
     route(kit, envelope, 0.4, 0.9, 0.4, pan);
   }
+  // капли: 2–5 коротких «плинков» с неровными промежутками — синус 1,1–2,6 кГц, высота за 25 мс взлетает в 1,7 раза
+  // (так звучит пузырёк в капле), затухание 60–110 мс; много эха и реверберации — как в пещере
+  function drips(kit, time, peak, pan) {
+    if (muted(kit, 'drip')) return;
+    var context = kit.context, count = 2 + Math.floor(Math.random() * 4), at = time;
+    for (var drop = 0; drop < count; drop++) {
+      var frequency = vary(1700, 0.7), envelope = context.createGain(), voice = oscillator(context, 'sine', frequency);
+      voice.frequency.setValueAtTime(frequency, at);
+      voice.frequency.exponentialRampToValueAtTime(frequency * 1.7, at + 0.025);
+      var end = percussiveEnvelope(envelope.gain, at, 0.002, vary(0.085, 0.5), peak * vary(1, 0.5));
+      voice.connect(envelope); voice.start(at); voice.stop(end);
+      route(kit, envelope, 0.5, 0.9, 0.6, pan + (Math.random() - 0.5) * 0.4);
+      at += vary(0.45, 0.9);
+    }
+  }
+  // всплеск: шум через полосу, которая за 0,4 с опускается с 3 до 0,9 кГц, плюс 3–6 мелких брызг (короткие щелчки высокого шума)
+  function splash(kit, time, peak, pan) {
+    if (muted(kit, 'drip')) return;
+    var context = kit.context;
+    var body = noiseSource(kit, time, 0.8), band = filter(context, 'bandpass', 3000, 1.4), envelope = context.createGain();
+    band.frequency.setValueAtTime(3000, time);
+    band.frequency.exponentialRampToValueAtTime(900, time + 0.4);
+    percussiveEnvelope(envelope.gain, time, 0.012, 0.6, peak);
+    body.connect(band); band.connect(envelope);
+    route(kit, envelope, 0.7, 0.7, 0.2, pan);
+    var count = 3 + Math.floor(Math.random() * 4);
+    for (var drop = 0; drop < count; drop++) {
+      var at = time + 0.08 + Math.random() * 0.7, spray = noiseSource(kit, at, 0.03), high = filter(context, 'highpass', vary(4500, 0.4), 0.8), level = context.createGain();
+      percussiveEnvelope(level.gain, at, 0.001, vary(0.02, 0.6), peak * vary(0.4, 0.6));
+      spray.connect(high); high.connect(level);
+      route(kit, level, 0.6, 0.5, 0.2, pan + (Math.random() - 0.5) * 0.6);
+    }
+  }
+  // порыв ветра: короткий (1,5–2,5 с) шум через полосу, которая поднимается и опускается, с присвистом сверху
+  function gust(kit, time, peak, pan) {
+    if (muted(kit, 'wind')) return;
+    var context = kit.context, duration = vary(2, 0.5);
+    var source = context.createBufferSource(); source.buffer = kit.noise; source.loop = true;
+    var band = filter(context, 'bandpass', 700, 2.5), top = vary(2600, 0.4);
+    band.frequency.setValueAtTime(700, time);
+    band.frequency.exponentialRampToValueAtTime(top, time + duration * 0.4);
+    band.frequency.exponentialRampToValueAtTime(900, time + duration);
+    var envelope = context.createGain();
+    envelope.gain.value = 0;
+    var end = sustainEnvelope(envelope.gain, time, duration * 0.35, duration * 0.1, duration * 0.55, peak);
+    source.connect(band); band.connect(envelope);
+    source.start(time, Math.random()); source.stop(end);
+    route(kit, envelope, 0.8, 0.6, 0, pan);
+  }
   // глухой пульс (как сердце): два низких удара с падением высоты — «тук-тук»
   function heartbeat(kit, time, peak) {
     if (muted(kit, 'heart')) return;
@@ -844,9 +893,9 @@ var Music = (function () {
   // ---------------- «Мрак» (мрачная) ----------------
   // 48 ударов, такт 5 с, 32 такта (160 с). Очень низкий гул, медленные кластеры с тритоном и малой секундой,
   // глухой мотив «рога» в нижнем регистре (до — ре-бемоль — соль), далёкий металл, ветер, редкий стеклянный призвук.
-  // Гул тихий, тональность меняется каждые 2 такта (10 с); поверх — редкие удары в неровных местах (GLOOM_STRIKES,
-  // раз в 2–3 такта): резкий аккорд-удар, диссонирующие колокола, рубленый высокий кластер с металлом — одного уровня.
-  // Низких вставок (удары по металлу в нижнем регистре, низкий барабан) нет.
+  // Гул тихий, тональность меняется каждые 2 такта (10 с); поверх — в неровных местах, раз в 1–3 такта (GLOOM_ACCENTS),
+  // негромкие звуки природы и высокие призвуки: капли, всплеск, порыв ветра, «сонар», стеклянный звон.
+  // Резких громких ударов и низких вставок нет.
   // Вариант при контакте — тот же фон и глухой пульс.
   var GLOOM_BLOCKS = [
     { bass: 24, notes: [43, 44, 48] },        // C: соль, ля-бемоль, до
@@ -865,25 +914,20 @@ var Music = (function () {
     [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.03, 0.4],
     [27, 0, 'draft', 110, 0.12, 460]
   ];
-  // [такт, доля, вид]: boom — низкий удар и медный аккорд кластера; stab — резкий аккорд-удар октавой выше;
-  // bell — два колокола через малую секунду; shriek — рубленый высокий кластер и удар по металлу
-  var GLOOM_STRIKES = [
-    [2, 2.5, 'stab'], [5, 1, 'bell'], [7, 3, 'stab'], [10, 0.5, 'shriek'], [14, 2, 'bell'],
-    [17, 1.5, 'stab'], [22, 3, 'shriek'], [25, 1, 'bell'], [30, 2.5, 'stab']
+  // [такт, доля, вид]: drips — капли, splash — всплеск, gust — порыв ветра, ping — «сонар», chime — стеклянный звон
+  var GLOOM_ACCENTS = [
+    [1, 2, 'drips'], [2, 3.5, 'ping'], [4, 1, 'splash'], [5, 2.5, 'drips'], [7, 0.5, 'gust'], [8, 3, 'chime'],
+    [9, 1.5, 'drips'], [12, 2, 'splash'], [13, 3, 'ping'], [14, 0.5, 'drips'], [16, 2.5, 'gust'], [18, 1, 'drips'],
+    [20, 3, 'chime'], [21, 1.5, 'splash'], [23, 0, 'drips'], [24, 2.5, 'ping'], [26, 1, 'gust'], [28, 2, 'drips'],
+    [29, 3.5, 'splash'], [31, 1, 'chime']
   ];
-  var GLOOM_STRIKE_LEVEL = { stab: 1.5, bell: 1, shriek: 0.68 };
-  function gloomStrike(kit, kind, at, block) {
-    // уровни подобраны так, чтобы удары звучали одинаково громко (GLOOM_STRIKE_LEVEL)
-    var level = GLOOM_STRIKE_LEVEL[kind];
-    if (kind === 'stab') {
-      stab(kit, block.notes.map(function (note) { return note + 24; }), at, 0.06 * level);
-    } else if (kind === 'bell') {
-      bell(kit, block.notes[0] + 36, at, 0.22 * level, -0.4);
-      bell(kit, block.notes[0] + 37, at + 0.05, 0.18 * level, 0.4);
-    } else if (kind === 'shriek') {
-      chop(kit, block.notes.map(function (note) { return note + 36; }), at, 0.06 * level, 0.2);
-      metal(kit, block.notes[1] + 12, at, 0.7 * level, -0.3);
-    }
+  function gloomAccent(kit, kind, at, block, barLength) {
+    var pan = Math.sin(at * 1.7) * 0.6;
+    if (kind === 'drips') drips(kit, at, 0.2, pan);
+    else if (kind === 'splash') splash(kit, at, 0.3, pan);
+    else if (kind === 'gust') gust(kit, at, 0.2, pan);
+    else if (kind === 'ping') ping(kit, block.notes[2] + 36, at, 0.13, pan);
+    else if (kind === 'chime') glass(kit, block.notes[0] + 48, at, barLength * 1.5, 0.085, pan);
   }
   function gloomTheme(name, contact) {
     return {
@@ -903,7 +947,7 @@ var Music = (function () {
           lead(kit, entry[2] + (bar >= 16 ? -12 : 0), time + entry[1] * beat, entry[3] * beat, { types: ['sawtooth', 'triangle'], peak: 0.04, cutoff: 650, attack: 0.6, release: 1.6, vibrato: 0.002, reverb: 0.7, echo: 0.2 });
         });
         GLOOM_EVENTS.forEach(function (entry) { if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength); });
-        GLOOM_STRIKES.forEach(function (entry) { if (entry[0] === bar) gloomStrike(kit, entry[2], time + entry[1] * beat, block); });
+        GLOOM_ACCENTS.forEach(function (entry) { if (entry[0] === bar) gloomAccent(kit, entry[2], time + entry[1] * beat, block, barLength); });
         if (contact) { heartbeat(kit, time, 0.3); heartbeat(kit, time + 2 * beat, bar % 4 === 3 ? 0.36 : 0.26); }
       }
     };
