@@ -2709,7 +2709,9 @@
   //   evac    — эвакуация (кнопка «ЭВАКУАЦИЯ», X): улетают те, кто стоит в зоне эвакуации (на большой карте — салон
   //             и рампа конвертоплана, MAP.extraction; на других картах — клетки в 2 шагах от точек высадки отряда),
   //             остальные остаются в зоне и считаются потерянными. Результат по обстановке: «хорошо», если уничтожено
-  //             не меньше половины пришельцев и потери отряда (погибшие и оставленные) меньше числа убитых пришельцев.
+  //             не меньше половины пришельцев и потери отряда (погибшие и оставленные) меньше числа убитых пришельцев;
+  //   abort   — «Завершить миссию» в окне эвакуации: задание прерывается без итогов — на базу ничего не передаётся
+  //             (артефакты, спасённые, потери, K7), память пришельцев не сохраняется; результат «ПРЕРВАНО».
   // Окно итогов (js/results.js) открывается, когда долетели пули и проиграно падение.
   // Артефакты — предметы пришельцев (Items: alien) и тела пришельцев. При зачистке вывозится всё: земля, снаряжение
   // выживших, тела; при эвакуации — только снаряжение улетевших; при гибели отряда — ничего.
@@ -2717,7 +2719,7 @@
   function endMission(kind, delay) {
     if (mission.over) return;
     mission.over = true; mission.kind = kind;
-    if (combat) { alienIntel.battles = (alienIntel.battles || 0) + 1; saveIntel(true); }   // память пришельцев — сразу в браузер
+    if (combat && kind !== 'abort') { alienIntel.battles = (alienIntel.battles || 0) + 1; saveIntel(true); }   // память пришельцев — сразу в браузер
     mission.endAt = performance.now() + (delay === undefined ? 2200 : delay);
     aiming = false; throwing = null; aimTarget = null;
     mission.result = missionSummary().result;
@@ -2763,7 +2765,7 @@
     return true;
   }
   function evacuationPlan() {
-    var squad = units.filter(function (unit) { return unit.side === 'squad'; });
+    var squad = units.filter(function (unit) { return unit.side === 'squad' && !unit.police; });   // полиция остаётся в городе
     return { aboard: squad.filter(aboard), left: squad.filter(function (unit) { return !aboard(unit); }) };
   }
   var showExtraction = false;          // подсветка зоны, пока открыто подтверждение
@@ -2787,6 +2789,7 @@
     Results.confirmEvacuation({ aboard: plan.aboard.map(person), left: plan.left.map(person) }, function (answer) {
       showExtraction = false;
       if (answer === 'gather') startGather(plan.left);
+      else if (answer === 'abort') { say('Миссия завершена'); endMission('abort', 300); }
       else if (answer) evacuate();
     });
   }
@@ -3051,6 +3054,7 @@
       result = !keyRescued ? 'bad' : soldiersLostCount * 2 < soldiersCount ? 'good' : 'satisfactory';
       if (result === 'good' && civiliansRescued.length === civilians.length && soldiersLostCount < RESCUE_EXCELLENT_LOSSES) result = 'excellent';
     }
+    if (kind === 'abort') result = 'aborted';
     var counts = {}, order = [];
     var count = function (name) { if (!counts[name]) { counts[name] = 0; order.push(name); } counts[name]++; };
     var lists = [];

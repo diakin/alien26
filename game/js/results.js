@@ -1,5 +1,5 @@
 // Окно итогов задания: открывается из game.js (updateMission), когда задание кончилось.
-// summary: { result: 'excellent'|'good'|'satisfactory'|'bad', map, turn, aliensKilled, aliensTotal, artifacts: [{ name, count }],
+// summary: { result: 'excellent'|'good'|'satisfactory'|'bad'|'aborted' (kind 'abort' — «Завершить миссию»), map, turn, aliensKilled, aliensTotal, artifacts: [{ name, count }],
 //            soldiersLost: [{ callsign, name, rank }], soldiersTotal, robotsLost: [...], robotsTotal }
 var Results = (function () {
   'use strict';
@@ -21,6 +21,8 @@ var Results = (function () {
     '#results .verdict .value { font: bold 26px Consolas, "DejaVu Sans Mono", monospace; letter-spacing: 2px; }',
     '#results .verdict.good .value { color: #9fe07a; } #results .verdict.bad .value { color: #ff6a55; }',
     '#results .verdict.excellent .value { color: #ffd24a; } #results .verdict.satisfactory .value { color: #e8b84a; }',
+    '#results .verdict.aborted .value { color: #a8b8b0; }',
+    '#results button.danger { border-color: #8a4a3c; color: #ffb0a0; } #results button.danger:hover { border-color: #ff8a70; color: #ffd0c4; }',
     '#results .verdict .note { margin-left: auto; font-size: 12px; color: #a8c8a8; }',
     '#results table { border-collapse: collapse; margin: 0 12px; width: calc(100% - 24px); }',
     '#results td { border-bottom: 1px solid #22382c; padding: 7px 8px; vertical-align: top; }',
@@ -80,6 +82,7 @@ var Results = (function () {
   }
 
   function verdictNote(summary) {
+    if (summary.kind === 'abort') return 'Миссия завершена досрочно, итоги не сохраняются';
     var rescue = summary.rescue;
     if (rescue) {
       var vipText = rescue.vipRescued ? 'учёный доставлен на базу' : rescue.vipDead ? 'учёный погиб' : 'учёный не спасён';
@@ -115,15 +118,16 @@ var Results = (function () {
     return row('ПАМЯТЬ ПРИШЕЛЬЦЕВ', hard, null, notes + '<div class="none">трудных целей: пришельцы против них осторожны, нападают группой</div>');
   }
   function show(summary) {
-    if (window.BaseStore) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
-    if (window.BaseStore && summary.fromBase && BaseStore.receiveMech) BaseStore.receiveMech(summary);   // K7 потеряна / собрана новая
+    var aborted = summary.kind === 'abort';                     // «Завершить миссию»: на базу ничего не передаётся
+    if (window.BaseStore && !aborted) BaseStore.receiveMission(summary);    // артефакты — на склад базы, спасённый учёный — в персонал
+    if (window.BaseStore && !aborted && summary.fromBase && BaseStore.receiveMech) BaseStore.receiveMech(summary);   // K7 потеряна / собрана новая
     var good = summary.result === 'good' || summary.result === 'excellent' || summary.result === 'satisfactory';
     var artifactCount = summary.artifacts.reduce(function (sum, item) { return sum + item.count; }, 0);
     root.innerHTML =
       '<div class="sheet">' +
         '<div class="head"><b>ИТОГИ ЗАДАНИЯ</b><span>' + escape(summary.map) + ' · ХОД ' + summary.turn + '</span></div>' +
         '<div class="verdict ' + summary.result + '"><span class="label">РЕЗУЛЬТАТ</span>' +
-          '<span class="value">' + ({ excellent: 'ОТЛИЧНО', good: 'ХОРОШО', satisfactory: 'УДОВЛЕТВОРИТЕЛЬНО' }[summary.result] || 'ПЛОХО') + '</span>' +
+          '<span class="value">' + ({ excellent: 'ОТЛИЧНО', good: 'ХОРОШО', satisfactory: 'УДОВЛЕТВОРИТЕЛЬНО', aborted: 'ПРЕРВАНО' }[summary.result] || 'ПЛОХО') + '</span>' +
           '<span class="note">' + verdictNote(summary) + '</span></div>' +
         '<table>' +
           (summary.rescue ? rescueRows(summary.rescue) : '') +
@@ -168,6 +172,11 @@ var Results = (function () {
     if (button.dataset.action === 'cancel') closeConfirm(false);
     if (button.dataset.action === 'takeoff') closeConfirm(true);
     if (button.dataset.action === 'gather') closeConfirm('gather');
+    // «Завершить миссию»: первый щелчок просит подтверждения, второй — завершает
+    if (button.dataset.action === 'abort') {
+      if (button.dataset.armed) closeConfirm('abort');
+      else { button.dataset.armed = '1'; button.textContent = 'ТОЧНО ЗАВЕРШИТЬ?'; }
+    }
   });
   // окно перехватывает клавиши и колесо, чтобы под ним ничего не происходило
   ['keydown', 'wheel'].forEach(function (name) {
@@ -178,7 +187,8 @@ var Results = (function () {
     }, true);
   });
 
-  // Подтверждение эвакуации: кто на борту, кто останется. done(true) — взлёт, done(false) — отмена.
+  // Подтверждение эвакуации: кто на борту, кто останется. done(true) — взлёт, done(false) — отмена,
+  // done('gather') — перевести в зону, done('abort') — завершить миссию без итогов (кнопка слева, два щелчка).
   var pending = null;
   function confirmEvacuation(plan, done) {
     pending = done;
@@ -197,6 +207,7 @@ var Results = (function () {
             ? 'Вне зоны эвакуации: ' + plan.left.length + '. Они останутся на месте и будут считаться потерянными. Вывозится только снаряжение тех, кто в зоне. Задание закончится.'
             : 'Все в зоне эвакуации. Вывозится только снаряжение тех, кто в зоне. Задание закончится.') + '</div>' +
         '<div class="buttons">' +
+          '<button class="left danger" data-action="abort" title="Прервать задание без итогов: на базу ничего не передаётся">ЗАВЕРШИТЬ МИССИЮ</button>' +
           '<button data-action="cancel">ОТМЕНА</button>' +
           (plan.left.length ? '<button data-action="gather">ПЕРЕВЕСТИ В ЗОНУ ЭВАКУАЦИИ</button>' : '') +
           (canLeave ? '<button class="main" data-action="takeoff">ПОДТВЕРДИТЬ ЭВАКУАЦИЮ</button>' : '') +
