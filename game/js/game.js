@@ -3319,10 +3319,24 @@
     setPhaseLabel();
     units.forEach(function (unit) { if (unit.side === 'aliens') { unit.timeUnits = turnTimeUnits(unit); unit.aiMoves = 0; unit.aiShots = 0; } });
     rechargeShields();
+    regenerateAliens();
     approachField = null; soldierField = null;     // отряд мог переместиться: поля путей строятся заново
     aiQueue = units.filter(function (unit) { return unit.side === 'aliens'; });
     aiWaitUntil = performance.now() + 500;
     say(combat ? 'Ход пришельцев' : 'Ход пришельцев: мирная обстановка');
+  }
+  // Раненые пришельцы в начале своего хода восстанавливают здоровье: зелёные — 5 % от полного, серебристые — 6 %,
+  // золотые — 7 % (не выше полного). Число «+N» над пришельцем — только если его видит отряд.
+  var ALIEN_REGEN = { green: 0.05, silver: 0.06, gold: 0.07 };
+  function regenerateAliens() {
+    var now = performance.now();
+    units.forEach(function (unit) {
+      if (unit.side !== 'aliens' || unit.dead || unit.kind === 'mech' || !(unit.health > 0) || unit.health >= unit.maxHealth) return;
+      var rate = ALIEN_REGEN[unit.elite] || ALIEN_REGEN.green;
+      var gain = Math.min(unit.maxHealth - unit.health, Math.max(1, Math.round(unit.maxHealth * rate)));
+      unit.health += gain;
+      if (isSeen(unit)) flashes.push({ text: '+' + gain, heal: true, point: { x: unit.x, y: unit.y, h: unit.elevation + unit.height + 0.2 }, start: now, until: now + 1300 });
+    });
   }
   function finishAlienPhase() {
     phase = 'squad';
@@ -4579,7 +4593,7 @@
         context.font = 'bold 15px Arial, sans-serif'; context.textAlign = 'center';
         context.fillStyle = 'rgba(0, 0, 0, ' + (0.7 * (1 - age)) + ')';
         context.fillText(flash.text, screen.x + 1, screen.y - age * 26 + 1);
-        context.fillStyle = 'rgba(255, 90, 70, ' + (1 - age) + ')';
+        context.fillStyle = (flash.heal ? 'rgba(120, 230, 110, ' : 'rgba(255, 90, 70, ') + (1 - age) + ')';
         context.fillText(flash.text, screen.x, screen.y - age * 26);
         return;
       }
