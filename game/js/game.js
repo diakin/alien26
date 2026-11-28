@@ -2747,7 +2747,8 @@
   // Досягаемость: клетки текущего уровня, куда выбранный боец дойдёт за оставшиеся ОД (reachable — те же шаги и цены,
   // что у поиска пути; юниты мешают). Жёлтая сплошная граница — все ОД, голубая пунктирная — после хода останется
   // на самый дешёвый выстрел. Пересчёт — когда боец, его ОД, уровень обзора, двери или юниты сменились.
-  // Под огнём: клетки текущего уровня, по стоящему на которых может выстрелить хоть один замеченный пришелец —
+  // Под огнём: клетки текущего уровня в пределах хода отряда (куда дойдёт хоть один юнит отряда за свои ОД: в ход
+  // отряда — за оставшиеся, в ход пришельцев — за полные), по стоящему на которых может выстрелить замеченный пришелец —
   // в пределах дальности его оружия и при свободной линии огня от его ствола до корпуса (как при выборе цели:
   // стены, предметы и юниты на линии заслоняют). Считается частями, не больше FIRE_BUDGET мс за кадр; пока юниты
   // идут, показывается прежняя картина.
@@ -2782,17 +2783,30 @@
     if (!debugOn('debugFire') || mission.over) { fireOverlay.cells = null; fireOverlay.key = ''; fireOverlay.jobs = null; return; }
     if (units.some(function (unit) { return unit.path.length > 0; }) || shots.length) return;
     var shooters = units.filter(function (unit) { return unit.side === 'aliens' && !unit.dead && isSeen(unit) && weaponOf(unit); });
-    var key = shooters.map(function (unit) { return units.indexOf(unit); }).join(',') + '|' + view.level + '|' + unitsSignature() + '|' + losDoorKey();
+    var movers = units.filter(function (unit) { return unit.side === 'squad' && !unit.dead; });
+    var budgetOf = function (unit) { return phase === 'squad' ? unit.timeUnits : unit.maxTimeUnits; };
+    var key = shooters.map(function (unit) { return units.indexOf(unit); }).join(',') + '|' + view.level + '|' + unitsSignature() + '|' + losDoorKey() +
+      '|' + movers.map(budgetOf).join(',');
     if (key !== fireOverlay.key) {
       fireOverlay.key = key;
       fireOverlay.building = {}; fireOverlay.index = 0;
+      // пределы хода отряда на текущем уровне (у K7 — клетки всего его следа)
+      var withinMove = {};
+      if (shooters.length) movers.forEach(function (unit) {
+        var reach = reachable(unit, budgetOf(unit));
+        reach.keys.forEach(function (nodeKeyValue) {
+          var node = keyNode(nodeKeyValue);
+          if (node.level !== view.level) return;
+          for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) withinMove[(node.row + deltaRow) * GRID + node.col + deltaCol] = 1;
+        });
+      });
       // задания: пары «пришелец — клетка» в пределах дальности, клетка проходима и не закрыта по сетке обзора
       var jobs = [];
       shooters.forEach(function (shooter) {
         var weapon = weaponOf(shooter), radius = Math.ceil(weapon.range / combatWorld.tile) + 1;
         for (var row = Math.max(0, shooter.row - radius); row <= Math.min(GRID - 1, shooter.row + radius); row++) {
           for (var col = Math.max(0, shooter.col - radius); col <= Math.min(GRID - 1, shooter.col + radius); col++) {
-            if (!walkable(col, row, view.level) || !mayHaveSight(shooter, col, row, view.level)) continue;
+            if (!withinMove[row * GRID + col] || !mayHaveSight(shooter, col, row, view.level)) continue;
             jobs.push({ shooter: shooter, col: col, row: row });
           }
         }
