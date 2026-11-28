@@ -523,14 +523,16 @@
     }
     return false;
   }
+  // pathIgnore — юниты, которые при прокладке пути не считаются препятствием (группа, идущая вместе: они уйдут с дороги)
+  var pathIgnore = [];
   function isFreeFor(mover) {
     var size = mover ? mover.size : 1;
     return function (col, row, level) {
       if (mover && mover.groundOnly && level !== 0) return false;
       for (var dy = 0; dy < size; dy++) {
         for (var dx = 0; dx < size; dx++) {
-          var cellCol = col + dx, cellRow = row + dy;
-          if (!walkable(cellCol, cellRow, level) || unitAt(cellCol, cellRow, level, mover) || wreckAt(cellCol, cellRow, level)) return false;
+          var cellCol = col + dx, cellRow = row + dy, blocker = unitAt(cellCol, cellRow, level, mover);
+          if (!walkable(cellCol, cellRow, level) || (blocker && pathIgnore.indexOf(blocker) < 0) || wreckAt(cellCol, cellRow, level)) return false;
           if (mover && mover.side === 'aliens' && inShelter(cellCol, cellRow, level)) return false;
           if (size > 1 && stairRun(cellCol, cellRow, level)) return false;       // на лестничный марш большой юнит не встаёт
           // внутри площадки большого юнита не должно быть стен
@@ -1524,7 +1526,10 @@
 
   // ---------------- действия ----------------
   // после итогов задания (кнопка ОК) можно ходить по карте: mission.roam
-  function busy() { return (mission.over && !mission.roam) || !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad'; }
+  function busy() {
+    return (mission.over && !mission.roam) || !selected || selected.path.length > 0 || shots.length > 0 || throws.length > 0 || phase !== 'squad' ||
+      group.some(function (unit) { return unit.path.length > 0; });
+  }
 
   function moveSelectedTo(tile) {
     if (busy() || !tile) return;
@@ -1539,6 +1544,101 @@
     selected.path = path;
     rememberSighted(selected);
     if (steps < fullLength) say('ОД хватит только на часть пути');
+  }
+
+  // ---------------- группа (Shift+ПКМ рамкой или щелчком) ----------------
+  // group — выделенные вместе юниты отряда (2 и больше); selected — ведущий, его показывает панель.
+  // ЛКМ по свободной клетке ведёт всю группу: каждый идёт в клетку со своим смещением от ведущего (строй
+  // сохраняется), занятая или непроходимая клетка заменяется ближайшей свободной (до GROUP_SEARCH клеток).
+  // Пути прокладываются сквозь членов группы; в пути идущий ждёт, пока товарищ освободит клетку
+  // (до BLOCK_WAIT с), иначе останавливается, неистраченные ОД возвращаются.
+  var group = [], GROUP_SEARCH = 4, BLOCK_WAIT = 1.5;
+  var boxSelect = null;                                     // рамка выделения: { startX, startY } в пикселях карты
+  function controllable(unit) { return unit.side === 'squad' && !unit.dead && (!unit.ai || unit.manualTurn === turn); }
+  function setGroup(list) {
+    list = list.filter(controllable);
+    if (list.length < 2) { group = []; if (list.length) selectUnit(list[0], false); return; }
+    group = list;
+    selectUnit(list.indexOf(selected) >= 0 ? selected : list[0], false, true);
+    say('Группа: ' + list.length);
+  }
+  function unitScreenPoint(unit) {
+    var point = Iso.toScreen(unit.x, unit.y, unit.elevation + (unit.height || 1.8) / 2);
+    return { x: point.x - camera.x, y: point.y - camera.y };
+  }
+  function finishBoxSelect() {
+    var box = boxSelect;
+    boxSelect = null;
+    var left = Math.min(box.startX, mouse.x), right = Math.max(box.startX, mouse.x), top = Math.min(box.startY, mouse.y), bottom = Math.max(box.startY, mouse.y);
+    var current = group.length ? group.slice() : selected ? [selected] : [];
+    if (right - left < 4 && bottom - top < 4) {
+      // щелчок: юнит отряда под курсором добавляется в группу или убирается из неё
+      var tile = tileUnderMouse(), clicked = tile ? unitAt(tile.col, tile.row, tile.level) : null;
+      if (!clicked || !controllable(clicked)) return;
+      var at = current.indexOf(clicked);
+      if (at >= 0) current.splice(at, 1); else current.push(clicked);
+      setGroup(current);
+      return;
+    }
+    setGroup(units.filter(function (unit) {
+      if (!controllable(unit) || unit.level > view.level) return false;
+      var point = unitScreenPoint(unit);
+      return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+    }));
+  }
+  function drawBoxSelect() {
+    if (!boxSelect) return;
+    var left = Math.min(boxSelect.startX, mouse.x), top = Math.min(boxSelect.startY, mouse.y);
+    var width = Math.abs(mouse.x - boxSelect.startX), height = Math.abs(mouse.y - boxSelect.startY);
+    context.save();
+    context.setLineDash([5 / zoom, 4 / zoom]);
+    context.strokeStyle = '#ffd23a'; context.lineWidth = 1 / zoom;
+    context.fillStyle = 'rgba(255, 210, 58, 0.08)';
+    context.fillRect(left, top, width, height);
+    context.strokeRect(left, top, width, height);
+    context.restore();
+  }
+  // свободна ли площадка юнита в клетке, с учётом уже назначенных другим членам группы
+  function groupSpotFree(unit, col, row, level, taken) {
+    for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) if (taken[nodeKey(col + deltaCol, row + deltaRow, level)]) return false;
+    return isFreeFor(unit)(col, row, level);
+  }
+  function moveGroupTo(tile) {
+    if (busy() || !tile) return;
+    var leader = selected, members = group.filter(controllable), taken = {}, moved = 0, short = 0, failed = [];
+    pathIgnore = members;
+    // ведущий — первым: ему достаётся выбранная клетка
+    members.sort(function (first, second) { return (first === leader ? -1 : 0) - (second === leader ? -1 : 0); });
+    members.forEach(function (unit) {
+      var wantCol = tile.col + unit.col - leader.col, wantRow = tile.row + unit.row - leader.row, spot = null;
+      for (var radius = 0; radius <= GROUP_SEARCH && !spot; radius++) {
+        for (var deltaRow = -radius; deltaRow <= radius && !spot; deltaRow++) for (var deltaCol = -radius; deltaCol <= radius && !spot; deltaCol++) {
+          if (Math.max(Math.abs(deltaRow), Math.abs(deltaCol)) !== radius) continue;
+          var col = wantCol + deltaCol, row = wantRow + deltaRow;
+          if (col < 0 || row < 0 || col + unit.size > GRID || row + unit.size > GRID) continue;
+          if (groupSpotFree(unit, col, row, tile.level, taken)) spot = { col: col, row: row, level: tile.level };
+        }
+      }
+      if (!spot) { failed.push(unit); return; }
+      var path = findPath(unit, spot);
+      if (!path || !path.length) { if (!path) failed.push(unit); return; }
+      var steps = affordableSteps(unit, path);
+      if (steps === 0) { failed.push(unit); return; }
+      if (steps < path.length) short++;
+      path = path.slice(0, steps);
+      var end = path[path.length - 1];
+      for (var takenRow = 0; takenRow < unit.size; takenRow++) for (var takenCol = 0; takenCol < unit.size; takenCol++) taken[nodeKey(end.col + takenCol, end.row + takenRow, end.level)] = true;
+      unit.timeUnits -= pathCost(unit, path);
+      unit.kneeling = false;
+      unit.path = path;
+      unit.waited = 0;
+      rememberSighted(unit);
+      moved++;
+    });
+    pathIgnore = [];
+    if (!moved) say('Группе туда не пройти или не хватает ОД');
+    else if (failed.length) say('Не идут: ' + failed.map(function (unit) { return unit.callsign; }).join(', '));
+    else if (short) say('Части группы ОД хватит только на часть пути');
   }
 
   // поворот лицом к точке; 1 ОД за каждые 45 градусов
@@ -1801,8 +1901,9 @@
     startStaffPhase();
   }
 
-  function selectUnit(unit, center) {
+  function selectUnit(unit, center, keepGroup) {
     if (unit && unit.side !== 'squad') return;
+    if (!keepGroup) group = [];
     // персонал базы: выбранный щелчком в этот ход действует по командам игрока, ИИ его пропускает
     if (unit && unit.ai && unit.manualTurn !== turn && combat) { unit.manualTurn = turn; say(unit.callsign + ': управление вручную до конца хода'); }
     inspected = null;
@@ -4309,6 +4410,10 @@
   canvas.addEventListener('mousedown', function (event) {
     mouse.x = event.clientX / zoom; mouse.y = event.clientY / zoom; mouse.overView = true;
     if (ARRIVAL && event.button === 0) return;                // финальный кадр демо: только осмотр
+    if (event.button === 2 && event.shiftKey && phase === 'squad' && !aiming && !throwing) {
+      boxSelect = { startX: mouse.x, startY: mouse.y };       // Shift+ПКМ: рамка выделения группы
+      return;
+    }
     if (event.button === 2 || event.button === 1) {
       mouse.dragging = true; mouse.moved = false;
       mouse.dragStartX = event.clientX; mouse.dragStartY = event.clientY;
@@ -4344,7 +4449,7 @@
       }
       return;
     }
-    moveSelectedTo(tile);
+    if (group.length > 1) moveGroupTo(tile); else moveSelectedTo(tile);
     updateHover();
   });
   window.addEventListener('mousemove', function (event) {
@@ -4359,6 +4464,7 @@
     updateHover();
   });
   window.addEventListener('mouseup', function (event) {
+    if (boxSelect && event.button === 2) { finishBoxSelect(); return; }
     if (mouse.dragging && !mouse.moved && event.button === 2 && (aiming || throwing)) { mouse.dragging = false; throwing = null; cancelAim(); return; }
     if (mouse.dragging && !mouse.moved && event.button === 2 && selected && phase === 'squad') {
       // поворот к центру рамки курсора: у робота рамка 2x2, и если она стоит на нём самом — не поворачиваться
@@ -4414,6 +4520,14 @@
     if (phase !== 'aliens' || unit.side !== 'aliens' || !Settings.values.followAliens || shotView || !isSeen(unit)) return;
     if (!frameFor(unit.x, unit.y, unit.elevation, unit.height || 2).inside) watchUnit(unit);
   }
+  // кто занимает площадку юнита в следующей клетке (у K7 — 2x2)
+  function footprintBlocker(unit, next) {
+    for (var deltaRow = 0; deltaRow < unit.size; deltaRow++) for (var deltaCol = 0; deltaCol < unit.size; deltaCol++) {
+      var other = unitAt(next.col + deltaCol, next.row + deltaRow, next.level, unit);
+      if (other) return other;
+    }
+    return null;
+  }
   function updateUnit(unit, seconds) {
     if (!unit.path.length) return;
     // под ответным огнём идущий стоит на клетке, пока летят пули
@@ -4440,12 +4554,17 @@
       }
       return;
     }
-    // перед входом в новую клетку проверить, что она свободна
-    if ((unit.col !== next.col || unit.row !== next.row || unit.level !== next.level) && unitAt(next.col, next.row, next.level, unit)) {
-      unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.x = unit.col + unit.size / 2; unit.y = unit.row + unit.size / 2;
+    // перед входом в новую клетку проверить, что она свободна; если её занимает идущий свой — подождать (BLOCK_WAIT),
+    // иначе остановиться и вернуть ОД за непройденные шаги
+    var blocker = (unit.col !== next.col || unit.row !== next.row || unit.level !== next.level) ? footprintBlocker(unit, next) : null;
+    if (blocker) {
+      if (blocker.path.length && blocker.side === unit.side && (unit.waited || 0) < BLOCK_WAIT) { unit.waited = (unit.waited || 0) + seconds; return; }
+      if (unit.side === 'squad') unit.path.forEach(function (step) { unit.timeUnits += step.cost || 0; });
+      unit.path = []; unit.segmentLength = 0; unit.walked = 0; unit.waited = 0; unit.x = unit.col + unit.size / 2; unit.y = unit.row + unit.size / 2;
       unit.elevation = elevationOf(unit.col, unit.row, unit.level);
       return;
     }
+    unit.waited = 0;
     var targetX = next.col + unit.size / 2, targetY = next.row + unit.size / 2;
     var deltaX = targetX - unit.x, deltaY = targetY - unit.y;
     var distanceTiles = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -4814,16 +4933,22 @@
     context.restore();
   }
 
-  function drawSelectionMarker(unit) {
-    var position = drawPosition(unit);
+  // маркер над выбранным; у остальных членов группы — меньше и бледнее; рамка выделения группы — поверх
+  function drawSelectionMarkers() {
+    group.forEach(function (unit) { if (unit !== selected && !unit.dead && unit.level <= view.level) drawSelectionMarker(unit, true); });
+    if (selected && selected.level <= view.level) drawSelectionMarker(selected, false);
+    drawBoxSelect();
+  }
+  function drawSelectionMarker(unit, member) {
+    var position = drawPosition(unit), size = member ? 6 : 9;
     var head = Iso.toScreen(position.x, position.y, position.elevation + (unit.kneeling && !unit.path.length ? 1.6 : unit.height + 0.3));
     var x = head.x - camera.x, y = head.y - camera.y + Math.sin(Date.now() / 220) * 2;
     context.save();
-    context.fillStyle = '#ffd23a';
+    context.fillStyle = member ? 'rgba(255, 210, 58, 0.7)' : '#ffd23a';
     context.strokeStyle = '#4a3200';
     context.lineWidth = 1.5;
     context.beginPath();
-    context.moveTo(x - 9, y - 10); context.lineTo(x + 9, y - 10); context.lineTo(x, y);
+    context.moveTo(x - size, y - size - 1); context.lineTo(x + size, y - size - 1); context.lineTo(x, y);
     context.closePath(); context.fill(); context.stroke();
     context.restore();
   }
@@ -4919,7 +5044,7 @@
     drawList.sort(function (first, second) { return first.depth - second.depth; });
     drawList.forEach(safeDraw);
 
-    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
+    drawSelectionMarkers();
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
@@ -4996,7 +5121,7 @@
 
     var hover = hoverStyle();
     drawPath();
-    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
+    drawSelectionMarkers();
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'back', hover.size, hover.width); drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
@@ -5076,7 +5201,7 @@
     drawDebugZones();                          // отладка: под туманом (по земле, в том числе перед юнитами)
     if (fogEnabled()) drawFogOverlay();
     drawPath();
-    if (selected && selected.level <= view.level) drawSelectionMarker(selected);
+    drawSelectionMarkers();
     drawPathLabel();
     if (hover) { drawBox(hover.tile, hover.color, 'front', hover.size, hover.width); drawDropLine(hover.tile); drawEnemyHover(hover); }
     drawExtraction();
@@ -5324,6 +5449,7 @@
     soldierProfiles: function () { return soldierProfiles().map(function (profile) { return { callsign: profile.callsign, name: profile.name, rank: profile.rank, role: profile.role }; }); },
     highlightArea: highlightArea,
     debugOverlays: function () { return { reach: reachOverlay, fire: fireOverlay }; },
+    get group() { return group; }, setGroup: function (list) { setGroup(list); }, moveGroupTo: function (col, row, level) { moveGroupTo({ col: col, row: row, level: level }); },
     missionClock: missionClock, get portal() { return portal; }, fog: fog, updateFogNow: function () { computeFog(); }, isSeen: function (unit) { return isSeen(unit); },
     doors: doors, gates: gates, setView: setView, findPath: function (index, col, row, level) { return findPath(units[index], { col: col, row: row, level: level }); },
     centerOn: centerOn, rotateView: rotateView, viewTurns: function () { return viewTurns; }, get gl3d() { return glActive() ? gl3d : null; }, get glProgress() { return glProgress; }, variantReady: function () { if (TILESET) return tileImages.every(Assets.ready); var variant = variants[variantKey(view.level, view.cut)]; return !!(variant && variant.ready); }
