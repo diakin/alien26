@@ -163,27 +163,31 @@ var Sound = (function () {
     // шелест сверху
     vortexLayer(bus, time, 'highpass', 0.7, [[0, 5000], [peakAt, 3500], [10, 6000]], 0.12, peakAt, 0.9, total);
     // треск электрических разрядов: громкие редкие потрескивания с 3-й секунды, к пику чаще, после пика редеют
-    var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(3.0, peakAt, 9.0);
+    var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(3.0, peakAt, 9.0, CRACKLE_SPEED);
+    crackle.playbackRate.value = CRACKLE_SPEED;
     var crackleFilter = audio.createBiquadFilter(), crackleLevel = audio.createGain();
-    crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 40;
-    crackleLevel.gain.value = 1.8;
+    crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 450;
+    crackleLevel.gain.value = 1.6;
     crackle.connect(crackleFilter); crackleFilter.connect(crackleLevel); crackleLevel.connect(bus);
     crackle.start(time + 3.0);
   }
   // треск: редкие громкие потрескивания — отдельные резкие щелчки (всплеск шума с затуханием 0,05–0,6 мс, коротким
-  // «телом» 2–5 мс и низким ударом 60–160 Гц с глухим шумом, 12–40 мс), по 1–4 подряд через 3–30 мс; между ними у пика 0,12–0,5 с, в начале — до 1,2 с.
-  // Частота и громкость растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука
-  function crackleBuffer(from, peak, to) {
-    var rate = audio.sampleRate, length = Math.ceil((to - from) * rate), buffer = audio.createBuffer(1, length, rate);
+  // «телом» 2–5 мс), по 1–4 подряд через 3–30 мс; между ними у пика 0,12–0,5 с, в начале — до 1,2 с.
+  // Частота и громкость растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука.
+  // speed — скорость воспроизведения буфера (CRACKLE_SPEED): медленнее — ниже и длиннее каждый щелчок; паузы
+  // между потрескиваниями в буфере умножены на speed, чтобы при воспроизведении они остались прежними
+  var CRACKLE_SPEED = 0.5;
+  function crackleBuffer(from, peak, to, speed) {
+    var rate = audio.sampleRate, length = Math.ceil((to - from) * speed * rate), buffer = audio.createBuffer(1, length, rate);
     var data = buffer.getChannelData(0);
     var strength = function (second) {
-      var at = from + second;
+      var at = from + second / speed;
       return at < peak ? Math.pow((at - from) / (peak - from), 1.5) : Math.pow(Math.max(0, 1 - (at - peak) / (to - peak)), 2);
     };
     var cursor = 0;
     while (cursor < length) {
       var level = strength(cursor / rate);
-      cursor += Math.floor(rate * (0.12 + Math.random() * (0.38 + 0.7 * (1 - level))));
+      cursor += Math.floor(rate * speed * (0.12 + Math.random() * (0.38 + 0.7 * (1 - level))));
       if (cursor >= length) break;
       level = strength(cursor / rate);
       if (level < 0.02) continue;
@@ -196,16 +200,6 @@ var Sound = (function () {
         data[at] += amplitude * 2.5 * (Math.random() < 0.5 ? -1 : 1);                       // фронт щелчка
         for (var index = 0; index < span; index++) {
           data[at + index] += (Math.random() * 2 - 1) * amplitude * (2.2 * Math.exp(-index / snap) + 0.35 * Math.exp(-index / body));
-        }
-        // низ: удар 60–160 Гц и глухой шум (сглаженный до ~350 Гц), затухание 12–40 мс
-        if (click === 0) {
-          var thump = rate * (0.012 + Math.random() * 0.028), pitch = 60 + Math.random() * 100, smooth = 1 - Math.exp(-2 * Math.PI * 350 / rate), rumble = 0;
-          var lowSpan = Math.min(length - at, Math.ceil(thump * 5));
-          for (var low = 0; low < lowSpan; low++) {
-            rumble += smooth * ((Math.random() * 2 - 1) - rumble);
-            var fall = Math.exp(-low / thump);
-            data[at + low] += amplitude * fall * (0.6 * Math.sin(2 * Math.PI * pitch * low / rate) + 1.3 * rumble);
-          }
         }
         at += Math.floor(rate * (0.003 + Math.random() * 0.027));
       }
