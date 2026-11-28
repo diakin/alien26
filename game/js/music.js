@@ -336,7 +336,13 @@ var Music = (function () {
 
   // ---------------- фоновые инструменты (тема «Тень») ----------------
   // глубокий гул: синус и чуть расстроенный треугольник, долгий подъём и спад, фильтр медленно «дышит»
-  function deepDrone(kit, note, time, duration, peak) {
+  // midCut — на сколько дБ приглушить середину (широкий провал около 330 Гц: 150–700 Гц): «Тень»
+  function midDip(context, midCut) {
+    var dip = filter(context, 'peaking', 330, 0.6);
+    dip.gain.value = -midCut;
+    return dip;
+  }
+  function deepDrone(kit, note, time, duration, peak, midCut) {
     if (muted(kit, 'bass')) return;
     peak *= HUM_DEEP;
     var context = kit.context, frequency = midiFrequency(note);
@@ -355,11 +361,12 @@ var Music = (function () {
       source.start(time); source.stop(end);
     });
     breathe.start(time); breathe.stop(end);
-    lowpass.connect(envelope);
+    if (midCut) { var dip = midDip(context, midCut); lowpass.connect(dip); dip.connect(envelope); }
+    else lowpass.connect(envelope);
     route(kit, envelope, 1, 0.25, 0, 0);
   }
   // тёмный кластер: тихие синусы и треугольники с медленной атакой, без чёткой атаки; ноты разведены по панораме
-  function shade(kit, notes, time, duration, peak) {
+  function shade(kit, notes, time, duration, peak, midCut) {
     if (muted(kit, 'pad')) return;
     peak *= HUM_SHADE;
     var context = kit.context;
@@ -378,7 +385,8 @@ var Music = (function () {
         source.start(time); source.stop(end);
       });
       wobble.start(time); wobble.stop(end);
-      lowpass.connect(envelope);
+      if (midCut) { var dip = midDip(context, midCut); lowpass.connect(dip); dip.connect(envelope); }
+      else lowpass.connect(envelope);
       route(kit, envelope, 0.7, 0.8, 0, (index - (notes.length - 1) / 2) * 0.5);
     });
   }
@@ -550,6 +558,7 @@ var Music = (function () {
   // Каждые 4 такта — новый тёмный кластер над гулом ми (малая секунда, тритон, увеличенное трезвучие); гул тихий,
   // поверх — громче: «сонар», ветер в шахтах, стеклянные призвуки (низких ударов по металлу нет).
   // Вариант «Контакт» (враг рядом или стрельба): тот же фон плюс глухой пульс, чаще удары и нарастание к смене части.
+  var SHADE_MID_CUT = 12;
   var SHADE_BLOCKS = [
     { bass: 28, notes: [47, 52, 53] },        // E: си, ми, фа — малая секунда
     { bass: 28, notes: [47, 52, 55] },        // E: ми минор
@@ -588,8 +597,9 @@ var Music = (function () {
         // гул и кластер — на 4 такта с перекрытием; при входе в тему с середины блока — сразу, на остаток блока
         if (bar % 4 === 0 || absoluteBar === 0) {
           var length = (4 - bar % 4) * barLength + 2;
-          deepDrone(kit, block.bass + 12, time, length, contact ? 0.1 : 0.085);
-          shade(kit, block.notes, time, length, contact ? 0.05 : 0.044);
+          // середина гула приглушена на SHADE_MID_CUT дБ
+          deepDrone(kit, block.bass + 12, time, length, contact ? 0.1 : 0.085, SHADE_MID_CUT);
+          shade(kit, block.notes, time, length, contact ? 0.05 : 0.044, SHADE_MID_CUT);
         }
         SHADE_EVENTS.concat(contact ? CONTACT_EVENTS : []).forEach(function (entry) {
           if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength);
