@@ -2752,7 +2752,7 @@
   // в пределах дальности его оружия и при свободной линии огня от его ствола до корпуса (как при выборе цели:
   // стены, предметы и юниты на линии заслоняют). Считается частями, не больше FIRE_BUDGET мс за кадр; пока юниты
   // идут, показывается прежняя картина.
-  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12, FIRE_LINE = 1.2;
+  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12, FIRE_LINE = 0.7;
   var reachOverlay = { key: '', far: null, near: null, at: 0 };
   var fireOverlay = { key: '', cells: null, building: null, jobs: null, index: 0 };
   function debugOn(key) { return !!(window.Settings && Settings.values[key]); }
