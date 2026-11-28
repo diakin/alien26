@@ -114,8 +114,10 @@ var Sound = (function () {
   }
   function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
 
-  // открытие портала (около 5 с) — в духе заставки при включении компьютера: мягкий аккорд нарастает
-  // и раскрывается фильтром, поверх — восходящие стеклянные колокольчики, всё в длинном отзвуке
+  // открытие портала (около 10 с) — в духе заставки при включении компьютера: мягкий аккорд долго нарастает
+  // и раскрывается фильтром, поверх — медленный восходящий перебор стеклянных колокольчиков; под ним —
+  // гудящий низ с биениями, электрическое жужжание и шум вихря; всё в длинном отзвуке
+  var PORTAL_SOUND = 11.5;                 // до полной тишины; слышно около 10 с
   function reverbTail(seconds) {
     var length = Math.ceil(audio.sampleRate * seconds), response = audio.createBuffer(2, length, audio.sampleRate);
     for (var channel = 0; channel < 2; channel++) {
@@ -126,57 +128,91 @@ var Sound = (function () {
     convolver.buffer = response;
     return convolver;
   }
+  // огибающая: нарастание до peak за attack, держится до hold, потом плавно гаснет (постоянная времени fade, с)
+  function envelope(gain, time, peak, attack, hold, fade) {
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(peak, time + attack);
+    gain.gain.setValueAtTime(peak, time + hold);
+    gain.gain.setTargetAtTime(0.0001, time + hold, fade);
+  }
   function portalOpen(far) {
-    var time = audio.currentTime + timeOffset;
-    var dry = audio.createGain(), wet = audio.createGain(), reverb = reverbTail(2.8);
-    dry.gain.value = 0.7 * far; wet.gain.value = 0.45 * far;
+    var time = audio.currentTime + timeOffset, total = PORTAL_SOUND;
+    var dry = audio.createGain(), wet = audio.createGain(), reverb = reverbTail(4);
+    dry.gain.value = 0.55 * far; wet.gain.value = 0.42 * far;
     dry.connect(effectsGain); reverb.connect(wet); wet.connect(effectsGain);
     var bus = audio.createGain(); bus.connect(dry); bus.connect(reverb);
+    var oscillators = [];
+    var oscillator = function (type, pitch, cents, target) {
+      var node = audio.createOscillator();
+      node.type = type; node.frequency.value = pitch; node.detune.value = cents || 0;
+      node.connect(target); oscillators.push(node);
+      return node;
+    };
     // аккорд-подушка: ре, ля, ми, фа-диез (ре мажор с ноной), по две слегка расстроенные пилы на ноту
     var pad = audio.createGain(), padFilter = audio.createBiquadFilter();
-    padFilter.type = 'lowpass'; padFilter.Q.value = 0.8;
-    padFilter.frequency.setValueAtTime(250, time);
-    padFilter.frequency.exponentialRampToValueAtTime(2600, time + 1.4);
-    padFilter.frequency.exponentialRampToValueAtTime(900, time + 4.2);
-    pad.gain.setValueAtTime(0.0001, time);
-    pad.gain.exponentialRampToValueAtTime(0.09, time + 1.1);
-    pad.gain.setValueAtTime(0.09, time + 2.0);
-    pad.gain.exponentialRampToValueAtTime(0.0001, time + 4.4);
+    padFilter.type = 'lowpass'; padFilter.Q.value = 1.2;
+    padFilter.frequency.setValueAtTime(200, time);
+    padFilter.frequency.exponentialRampToValueAtTime(2800, time + 3.0);
+    padFilter.frequency.exponentialRampToValueAtTime(600, time + 10);
+    envelope(pad, time, 0.085, 2.2, 6.0, 1.1);
     padFilter.connect(pad); pad.connect(bus);
-    [146.83, 220.0, 329.63, 369.99].forEach(function (pitch) {
-      [-7, 7].forEach(function (cents) {
-        var oscillator = audio.createOscillator();
-        oscillator.type = 'sawtooth'; oscillator.frequency.value = pitch; oscillator.detune.value = cents;
-        oscillator.connect(padFilter);
-        oscillator.start(time); oscillator.stop(time + 4.5);
-      });
-    });
-    // низ: тихий синус на октаву ниже основного тона
-    var bass = audio.createOscillator(), bassGain = audio.createGain();
-    bass.type = 'sine'; bass.frequency.value = 73.42;
-    bassGain.gain.setValueAtTime(0.0001, time);
-    bassGain.gain.exponentialRampToValueAtTime(0.22, time + 1.0);
-    bassGain.gain.exponentialRampToValueAtTime(0.0001, time + 4.2);
-    bass.connect(bassGain); bassGain.connect(bus);
-    bass.start(time); bass.stop(time + 4.3);
+    [146.83, 220.0, 329.63, 369.99].forEach(function (pitch) { oscillator('sawtooth', pitch, -8, padFilter); oscillator('sawtooth', pitch, 8, padFilter); });
+    // гудящий низ: два синуса ре с разницей 1,5 Гц — медленные биения
+    var drone = audio.createGain();
+    envelope(drone, time, 0.2, 1.8, 6.0, 1.3);
+    drone.connect(bus);
+    oscillator('sine', 73.42, 0, drone); oscillator('sine', 74.92, 0, drone);
+    // жужжание: низкая пила через полосовой фильтр, громкость дрожит с частотой 23 Гц
+    var buzz = audio.createGain(), buzzFilter = audio.createBiquadFilter(), buzzLevel = audio.createGain();
+    buzzFilter.type = 'bandpass'; buzzFilter.Q.value = 3;
+    buzzFilter.frequency.setValueAtTime(300, time);
+    buzzFilter.frequency.exponentialRampToValueAtTime(900, time + 3.5);
+    buzzFilter.frequency.exponentialRampToValueAtTime(350, time + 10);
+    envelope(buzzLevel, time, 0.07, 2.5, 6.0, 1.0);
+    buzz.gain.value = 0.6;
+    var flutter = oscillator('sine', 23, 0, audio.createGain()), flutterDepth = audio.createGain();
+    flutter.disconnect(); flutterDepth.gain.value = 0.4;
+    flutter.connect(flutterDepth); flutterDepth.connect(buzz.gain);
+    oscillator('sawtooth', 110, -4, buzzFilter); oscillator('square', 55, 5, buzzFilter);
+    buzzFilter.connect(buzz); buzz.connect(buzzLevel); buzzLevel.connect(bus);
+    // шум вихря: полосовой фильтр медленно ходит вверх-вниз
+    var rush = audio.createBufferSource(); rush.buffer = noiseBuffer; rush.loop = true;
+    var rushFilter = audio.createBiquadFilter(), rushLevel = audio.createGain();
+    rushFilter.type = 'bandpass'; rushFilter.Q.value = 1.5;
+    rushFilter.frequency.setValueAtTime(400, time);
+    rushFilter.frequency.exponentialRampToValueAtTime(2200, time + 3.0);
+    rushFilter.frequency.exponentialRampToValueAtTime(500, time + 10);
+    var sweep = oscillator('sine', 0.35, 0, audio.createGain()), sweepDepth = audio.createGain();
+    sweep.disconnect(); sweepDepth.gain.value = 300;
+    sweep.connect(sweepDepth); sweepDepth.connect(rushFilter.frequency);
+    envelope(rushLevel, time, 0.16, 2.0, 6.0, 1.2);
+    rush.connect(rushFilter); rushFilter.connect(rushLevel); rushLevel.connect(bus);
+    rush.start(time, Math.random()); rush.stop(time + total + 0.1);
+    // верхний «воздух»
+    var air = audio.createBufferSource(); air.buffer = noiseBuffer; air.loop = true;
+    var airFilter = audio.createBiquadFilter(), airLevel = audio.createGain();
+    airFilter.type = 'highpass'; airFilter.frequency.value = 6000;
+    envelope(airLevel, time, 0.05, 2.5, 5.5, 0.9);
+    air.connect(airFilter); airFilter.connect(airLevel); airLevel.connect(bus);
+    air.start(time, Math.random()); air.stop(time + total);
+    oscillators.forEach(function (node) { node.start(time); node.stop(time + total + 0.1); });
     // колокольчик: основной тон и два верхних призвука, которые гаснут быстрее
-    var bell = function (pitch, when, peak) {
-      [[1, 1, 2.2], [2.01, 0.35, 1.1], [3.98, 0.12, 0.5]].forEach(function (partial) {
-        var oscillator = audio.createOscillator(), gain = audio.createGain(), at = time + when;
-        oscillator.type = 'sine'; oscillator.frequency.value = pitch * partial[0];
+    var bell = function (pitch, when, peak, length) {
+      [[1, 1, length], [2.01, 0.35, length * 0.5], [3.98, 0.12, length * 0.25]].forEach(function (partial) {
+        var node = audio.createOscillator(), gain = audio.createGain(), at = time + when;
+        node.type = 'sine'; node.frequency.value = pitch * partial[0];
         gain.gain.setValueAtTime(0.0001, at);
-        gain.gain.exponentialRampToValueAtTime(peak * partial[1], at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(peak * partial[1], at + 0.015);
         gain.gain.exponentialRampToValueAtTime(0.0001, at + partial[2]);
-        oscillator.connect(gain); gain.connect(bus);
-        oscillator.start(at); oscillator.stop(at + partial[2] + 0.05);
+        node.connect(gain); gain.connect(bus);
+        node.start(at); node.stop(at + partial[2] + 0.05);
       });
     };
-    // восходящий перебор по звукам аккорда и последний звук выше, громче и дольше
-    [[440.0, 0.55], [587.33, 0.78], [659.25, 1.0], [880.0, 1.22], [739.99, 1.44], [1174.66, 1.7]].forEach(function (note, index, list) {
-      bell(note[0], note[1], index === list.length - 1 ? 0.2 : 0.13);
+    // медленный восходящий перебор по звукам аккорда; последний звук выше, громче и дольше
+    [[440.0, 1.2], [587.33, 1.7], [659.25, 2.2], [880.0, 2.7], [739.99, 3.2], [1174.66, 3.8]].forEach(function (note, index, list) {
+      var last = index === list.length - 1;
+      bell(note[0], note[1], last ? 0.2 : 0.12, last ? 5.0 : 3.0);
     });
-    // лёгкий «воздух»: шум через высокий фильтр, нарастает к первому колокольчику
-    noise(1.6, 'highpass', 6000, 0.05 * far, 0.5, 1.0);
   }
 
   // ---------------- речь пришельцев ----------------
