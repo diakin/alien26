@@ -756,7 +756,8 @@
   // закрыты туманом (рисуется ниже, «туман на карте»). Клетка за стеной, в которую упёрся луч, тоже считается
   // разведанной — так видна сама стена (стена W/N принадлежит клетке за ней) и то, что у стены.
   // Работает на картах из тайлов в боевых заданиях; выключается в настройках («Туман войны»).
-  var VISION_CELLS = 24, FOG_RAYS = 360;
+  // полицейские (город) открывают туман вдвое ближе бойцов
+  var VISION_CELLS = 24, POLICE_VISION_CELLS = 12, FOG_RAYS = 360;
   var SIGHT_BLOCKS = [false, true, false, 'door', false, false, false, true, false];   // нет, стена, окно, дверь, перила, парапет, отбойник, обшивка, сетка
   // explored — разведанное; version растёт при каждом открытии клеток, по нему пересчитывается картинка тумана
   var fog = { visible: null, explored: null, version: 0, signature: '', checkAt: 0 };
@@ -847,7 +848,7 @@
   function computeFog() {
     var computeStart = performance.now();
     var next = newFogGrids(), touched = newFogGrids();
-    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next, null, null, touched); });
+    units.forEach(function (unit) { if (unit.side === 'squad' && !unit.dead) castVision(unit, next, unit.police ? POLICE_VISION_CELLS : null, null, touched); });
     fog.visible = next;
     // разведка: новые клетки открываются навсегда; куски карты, которые они задевают, перерисовываются
     var opened = false;
