@@ -2230,7 +2230,9 @@
     var side = 0;
     sidePortals.forEach(function (gate) { side += spawnWave(gate, gate.wave, gate.elites).length; gate.openedAt = now; });
     setCombat(true);
-    Sound.play('portal', 0);
+    // треск разрядов и молнии у порталов — по одному расписанию (sound.js, portalCrackles)
+    portalCracks = { start: now, events: Sound.portalCrackles ? Sound.portalCrackles() : [] };
+    Sound.play('portal', 0, portalCracks.events);
     // сколько пришельцев и сколько порталов — не сообщается
     say('Обнаружено появление пришельцев');
     // страж-элита главного портала сразу ставит купол-щит вокруг него
@@ -2392,6 +2394,7 @@
   }
 
   var PORTAL_GLOW_LEAD = 5 * 60 * 1000, PORTAL_FLASH = 1600, PORTAL_RADIUS = 2.4;
+  var portalCracks = null;             // { start: performance.now() открытия, events: расписание треска из sound.js }
   // ступень разгорания 0…5 (0 — круга ещё нет) и сила 0…1 с плавным переходом между ступенями
   function portalGlow() {
     if (!portal || portal.open) return { stage: 0, power: 0 };
@@ -2483,6 +2486,7 @@
       context.beginPath(); context.ellipse(x, y, size, size * 35 / 61, 0, now / 500, now / 500 + Math.PI * 1.6); context.stroke();
       context.beginPath(); context.moveTo(x, y); context.lineTo(x, y - cell * 3);
       context.strokeStyle = 'rgba(200, 140, 255, ' + (0.3 + 0.2 * Math.sin(now / 200)) + ')'; context.lineWidth = cell * 0.6; context.stroke();
+      drawPortalLightning(gate, x, y, cell, now);
       // вспышка открытия: расходящийся белый свет
       var flashAge = (now - gate.openedAt) / PORTAL_FLASH;
       if (flashAge < 1) {
@@ -2496,6 +2500,87 @@
         context.beginPath(); context.ellipse(x, y - cell * 0.6, flashRadius, flashRadius * 0.8, 0, 0, Math.PI * 2); context.fill();
       }
     }
+    context.restore();
+  }
+
+  // Молнии у открытого портала — одновременно с треском разрядов (portalCracks): на каждый щелчок — вспышка
+  // 1–4 ломаных молний из столба света над порталом в землю вокруг, гаснет за ~70 мс; у следующего щелчка
+  // той же пачки — новая форма. Форма задаётся зерном (номер разряда, щелчка и портала), поэтому не дрожит между кадрами.
+  var LIGHTNING_FADE = 70;
+  function seededRandom(seed) {
+    var state = seed >>> 0;
+    return function () {
+      state = (state + 0x6D2B79F5) >>> 0;
+      var mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+      mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+      return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // ломаная молния: делим отрезок пополам и сдвигаем середину поперёк на долю длины, 5 уровней
+  function lightningPath(random, fromX, fromY, toX, toY) {
+    var points = [[fromX, fromY], [toX, toY]];
+    var spread = Math.hypot(toX - fromX, toY - fromY) * 0.22;
+    for (var level = 0; level < 5; level++) {
+      var next = [points[0]];
+      for (var index = 1; index < points.length; index++) {
+        var first = points[index - 1], second = points[index];
+        var deltaX = second[0] - first[0], deltaY = second[1] - first[1], length = Math.hypot(deltaX, deltaY) || 1;
+        var shift = (random() - 0.5) * spread;
+        next.push([(first[0] + second[0]) / 2 - deltaY / length * shift, (first[1] + second[1]) / 2 + deltaX / length * shift], second);
+      }
+      points = next; spread *= 0.55;
+    }
+    return points;
+  }
+  function strokePath(points, width, color) {
+    context.beginPath(); context.moveTo(points[0][0], points[0][1]);
+    for (var index = 1; index < points.length; index++) context.lineTo(points[index][0], points[index][1]);
+    context.lineWidth = width; context.strokeStyle = color; context.stroke();
+  }
+  function drawPortalLightning(gate, x, y, cell, now) {
+    if (!portalCracks) return;
+    var elapsed = now - portalCracks.start, gateNumber = gate === portal ? 0 : 1 + sidePortals.indexOf(gate);
+    context.save();
+    context.globalCompositeOperation = 'lighter';
+    context.lineCap = 'round'; context.lineJoin = 'round';
+    portalCracks.events.forEach(function (event, eventIndex) {
+      event.clicks.forEach(function (click, clickIndex) {
+        var age = elapsed - (event.at + click.offset) * 1000;
+        if (age < 0 || age > LIGHTNING_FADE * 4) return;
+        var light = Math.min(1, click.amplitude * 1.2) * Math.exp(-age / LIGHTNING_FADE);
+        if (light < 0.03) return;
+        var random = seededRandom(eventIndex * 977 + clickIndex * 131 + gateNumber * 7919 + 17);
+        var bolts = 1 + Math.floor(event.strength * 3 * random() + random());
+        // общий отсвет вокруг портала
+        var glowRadius = cell * 3.2;
+        var glow = context.createRadialGradient(x, y - cell, 0, x, y - cell, glowRadius);
+        glow.addColorStop(0, 'rgba(220, 200, 255, ' + 0.35 * light + ')'); glow.addColorStop(1, 'rgba(140, 80, 255, 0)');
+        context.fillStyle = glow;
+        context.beginPath(); context.ellipse(x, y - cell, glowRadius, glowRadius * 0.8, 0, 0, Math.PI * 2); context.fill();
+        for (var bolt = 0; bolt < bolts; bolt++) {
+          // из столба над порталом — в землю на расстоянии 1–3 клеток
+          var startX = x + (random() - 0.5) * cell * 0.5, startY = y - cell * (1.2 + random() * 2.2);
+          var angle = random() * Math.PI * 2, distance = cell * (1 + random() * 2);
+          var endX = x + Math.cos(angle) * distance, endY = y + Math.sin(angle) * distance * 35 / 61;
+          var path = lightningPath(random, startX, startY, endX, endY);
+          strokePath(path, cell * 0.16, 'rgba(150, 90, 255, ' + 0.3 * light + ')');
+          strokePath(path, cell * 0.06, 'rgba(210, 190, 255, ' + 0.75 * light + ')');
+          strokePath(path, Math.max(1, cell * 0.02), 'rgba(255, 255, 255, ' + light + ')');
+          // ответвление от случайной точки молнии
+          if (random() < 0.6) {
+            var from = path[4 + Math.floor(random() * (path.length - 8))], branchAngle = angle + (random() - 0.5) * 1.6, branchLength = distance * (0.3 + random() * 0.4);
+            var branch = lightningPath(random, from[0], from[1], from[0] + Math.cos(branchAngle) * branchLength, from[1] + Math.abs(Math.sin(branchAngle)) * branchLength * 0.6);
+            strokePath(branch, cell * 0.08, 'rgba(170, 120, 255, ' + 0.3 * light + ')');
+            strokePath(branch, Math.max(1, cell * 0.015), 'rgba(240, 230, 255, ' + 0.8 * light + ')');
+          }
+          // вспышка в точке удара
+          var hit = context.createRadialGradient(endX, endY, 0, endX, endY, cell * 0.6);
+          hit.addColorStop(0, 'rgba(255, 250, 255, ' + 0.7 * light + ')'); hit.addColorStop(1, 'rgba(160, 100, 255, 0)');
+          context.fillStyle = hit;
+          context.beginPath(); context.ellipse(endX, endY, cell * 0.6, cell * 0.6 * 35 / 61, 0, 0, Math.PI * 2); context.fill();
+        }
+      });
+    });
     context.restore();
   }
 

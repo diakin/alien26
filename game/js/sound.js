@@ -143,7 +143,7 @@ var Sound = (function () {
     source.start(time, Math.random()); source.stop(time + total);
     return filter;
   }
-  function portalOpen(far) {
+  function portalOpen(far, crackles) {
     var time = audio.currentTime + timeOffset, total = PORTAL_SOUND, peakAt = 6.0;
     var dry = audio.createGain(), wet = audio.createGain(), reverb = reverbTail(4);
     dry.gain.value = 0.7 * far; wet.gain.value = 0.45 * far;
@@ -163,48 +163,59 @@ var Sound = (function () {
     // шелест сверху
     vortexLayer(bus, time, 'highpass', 0.7, [[0, 5000], [peakAt, 3500], [10, 6000]], 0.12, peakAt, 0.9, total);
     // треск электрических разрядов: громкие редкие потрескивания с 3-й секунды, к пику чаще, после пика редеют
-    var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(3.0, peakAt, 9.0, CRACKLE_SPEED);
+    var crackle = audio.createBufferSource(); crackle.buffer = crackleBuffer(crackles || portalCrackles());
     crackle.playbackRate.value = CRACKLE_SPEED;
     var crackleFilter = audio.createBiquadFilter(), crackleLevel = audio.createGain();
     crackleFilter.type = 'highpass'; crackleFilter.frequency.value = 450;
     crackleLevel.gain.value = 1.6;
     crackle.connect(crackleFilter); crackleFilter.connect(crackleLevel); crackleLevel.connect(bus);
-    crackle.start(time + 3.0);
+    crackle.start(time + CRACKLE_FROM);
   }
   // треск: редкие громкие потрескивания — отдельные резкие щелчки (всплеск шума с затуханием 0,05–0,6 мс, коротким
-  // «телом» 2–5 мс), по 1–4 подряд через 3–30 мс; между ними у пика 0,12–0,5 с, в начале — до 1,2 с.
-  // Частота и громкость растут от начала (from) к пику (peak) и падают к концу (to); секунды от начала звука.
-  // speed — скорость воспроизведения буфера (CRACKLE_SPEED): медленнее — ниже и длиннее каждый щелчок; паузы
-  // между потрескиваниями в буфере умножены на speed, чтобы при воспроизведении они остались прежними
-  var CRACKLE_SPEED = 0.5;
-  function crackleBuffer(from, peak, to, speed) {
-    var rate = audio.sampleRate, length = Math.ceil((to - from) * speed * rate), buffer = audio.createBuffer(1, length, rate);
-    var data = buffer.getChannelData(0);
-    var strength = function (second) {
-      var at = from + second / speed;
+  // «телом» 2–5 мс), по 1–4 подряд; между ними у пика 0,12–0,5 с, в начале — до 1,2 с.
+  // Частота и громкость растут от начала (CRACKLE_FROM) к пику (CRACKLE_PEAK) и падают к концу (CRACKLE_TO);
+  // секунды от начала звука портала. Буфер играет со скоростью CRACKLE_SPEED: медленнее — ниже и длиннее каждый щелчок.
+  // Расписание (portalCrackles) — отдельно от звука: по нему же game.js рисует молнии у портала, даже без звука.
+  var CRACKLE_SPEED = 0.5, CRACKLE_FROM = 3.0, CRACKLE_PEAK = 6.0, CRACKLE_TO = 9.0;
+  // [{ at: с от начала звука, strength: 0..1, clicks: [{ offset: с после at, amplitude, snap, body (доли секунды буфера) }] }]
+  function portalCrackles() {
+    var from = CRACKLE_FROM, peak = CRACKLE_PEAK, to = CRACKLE_TO, events = [];
+    var strength = function (at) {
       return at < peak ? Math.pow((at - from) / (peak - from), 1.5) : Math.pow(Math.max(0, 1 - (at - peak) / (to - peak)), 2);
     };
-    var cursor = 0;
-    while (cursor < length) {
-      var level = strength(cursor / rate);
-      cursor += Math.floor(rate * speed * (0.12 + Math.random() * (0.38 + 0.7 * (1 - level))));
-      if (cursor >= length) break;
-      level = strength(cursor / rate);
+    var cursor = from;
+    while (cursor < to) {
+      cursor += 0.12 + Math.random() * (0.38 + 0.7 * (1 - strength(cursor)));
+      if (cursor >= to) break;
+      var level = strength(cursor);
       if (level < 0.02) continue;
-      var clicks = 1 + Math.floor(Math.random() * (1 + 3 * level)), at = cursor;
+      var count = 1 + Math.floor(Math.random() * (1 + 3 * level)), offset = 0, clicks = [];
       var burstPeak = (0.5 + 0.5 * level) * (0.7 + Math.random() * 0.3);
-      for (var click = 0; click < clicks && at < length; click++) {
-        var amplitude = burstPeak * (click ? 0.5 + Math.random() * 0.5 : 1);
-        var snap = rate * (0.00005 + Math.random() * 0.00055), body = rate * (0.002 + Math.random() * 0.003);
+      for (var click = 0; click < count; click++) {
+        clicks.push({ offset: offset, amplitude: burstPeak * (click ? 0.5 + Math.random() * 0.5 : 1),
+                      snap: 0.00005 + Math.random() * 0.00055, body: 0.002 + Math.random() * 0.003 });
+        offset += (0.003 + Math.random() * 0.027) / CRACKLE_SPEED;       // в буфере 3–30 мс, при воспроизведении вдвое дольше
+      }
+      events.push({ at: cursor, strength: level, clicks: clicks });
+      cursor += offset;
+    }
+    return events;
+  }
+  function crackleBuffer(events) {
+    var speed = CRACKLE_SPEED, rate = audio.sampleRate, length = Math.ceil((CRACKLE_TO + 0.5 - CRACKLE_FROM) * speed * rate);
+    var buffer = audio.createBuffer(1, length, rate), data = buffer.getChannelData(0);
+    events.forEach(function (event) {
+      event.clicks.forEach(function (click) {
+        var at = Math.floor((event.at - CRACKLE_FROM + click.offset) * speed * rate);
+        if (at >= length) return;
+        var snap = rate * click.snap, body = rate * click.body, amplitude = click.amplitude;
         var span = Math.min(length - at, Math.ceil(body * 5));
         data[at] += amplitude * 2.5 * (Math.random() < 0.5 ? -1 : 1);                       // фронт щелчка
         for (var index = 0; index < span; index++) {
           data[at + index] += (Math.random() * 2 - 1) * amplitude * (2.2 * Math.exp(-index / snap) + 0.35 * Math.exp(-index / body));
         }
-        at += Math.floor(rate * (0.003 + Math.random() * 0.027));
-      }
-      cursor = at;
-    }
+      });
+    });
     for (var sample = 0; sample < length; sample++) data[sample] = Math.tanh(data[sample] * 2.5);   // жёсткость щелчка
     return buffer;
   }
@@ -345,7 +356,8 @@ var Sound = (function () {
   }
 
   // звук события; distance — расстояние от центра экрана в клетках: дальние тише
-  function play(kind, distance) {
+  // extra — для 'portal': расписание треска (portalCrackles), чтобы звук совпал с молниями
+  function play(kind, distance, extra) {
     if (!audio || volume('soundVolume') <= 0) return;
     var far = Math.max(0.25, 1 - (distance || 0) / 40);
     if (kind === 'bullet') {
@@ -364,7 +376,7 @@ var Sound = (function () {
       noise(0.08, 'highpass', 3500, 0.5 * far, 0.001, 0.05);
       tone('sine', 120, 40, 0.3, 0.7 * far);
     } else if (kind === 'portal') {
-      portalOpen(far);
+      portalOpen(far, extra);
     } else if (kind === 'impact') {
       noise(0.12, 'highpass', 2500, 0.25 * far, 0.002, 0.06);
     } else if (kind === 'explosion') {
@@ -453,5 +465,5 @@ var Sound = (function () {
     return offline.startRendering();
   }
 
-  return { play: play, alienTalk: alienTalk, start: start, renderOffline: renderOffline, get state() { return audio ? audio.state : 'none'; } };
+  return { play: play, portalCrackles: portalCrackles, alienTalk: alienTalk, start: start, renderOffline: renderOffline, get state() { return audio ? audio.state : 'none'; } };
 })();
