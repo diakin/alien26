@@ -2842,7 +2842,7 @@
         });
         context.closePath();
       });
-      context.strokeStyle = 'rgb(255, 40, 25)'; context.lineWidth = FIRE_LINE / zoom; context.lineJoin = 'round';
+      context.strokeStyle = 'rgba(255, 40, 25, 0.5)'; context.lineWidth = FIRE_LINE / zoom; context.lineJoin = 'round';
       context.stroke();
       context.restore();
     }
