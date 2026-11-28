@@ -114,9 +114,9 @@ var Sound = (function () {
   }
   function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
 
-  // открытие портала (около 10 с) — в духе заставки при включении компьютера: мягкий аккорд долго нарастает
-  // и раскрывается фильтром, поверх — медленный восходящий перебор стеклянных колокольчиков; под ним —
-  // гудящий низ с биениями, электрическое жужжание и шум вихря; всё в длинном отзвуке
+  // открытие портала (около 10 с). Впереди — нарастающий вихрь (шум с поднимающимся фильтром, кружение
+  // ускоряется, растёт вой) и электрические разряды (треск, щелчки-«зипы», гудящие дуги), к 6-й секунде
+  // всё гуще; на заднем плане — мягкий аккорд с колокольчиками, гудящий низ и жужжание; всё в длинном отзвуке
   var PORTAL_SOUND = 11.5;                 // до полной тишины; слышно около 10 с
   function reverbTail(seconds) {
     var length = Math.ceil(audio.sampleRate * seconds), response = audio.createBuffer(2, length, audio.sampleRate);
@@ -154,12 +154,12 @@ var Sound = (function () {
     padFilter.frequency.setValueAtTime(200, time);
     padFilter.frequency.exponentialRampToValueAtTime(2800, time + 3.0);
     padFilter.frequency.exponentialRampToValueAtTime(600, time + 10);
-    envelope(pad, time, 0.085, 2.2, 6.0, 1.1);
+    envelope(pad, time, 0.03, 2.2, 6.0, 1.1);
     padFilter.connect(pad); pad.connect(bus);
     [146.83, 220.0, 329.63, 369.99].forEach(function (pitch) { oscillator('sawtooth', pitch, -8, padFilter); oscillator('sawtooth', pitch, 8, padFilter); });
     // гудящий низ: два синуса ре с разницей 1,5 Гц — медленные биения
     var drone = audio.createGain();
-    envelope(drone, time, 0.2, 1.8, 6.0, 1.3);
+    envelope(drone, time, 0.05, 4.0, 6.0, 1.3);
     drone.connect(bus);
     oscillator('sine', 73.42, 0, drone); oscillator('sine', 74.92, 0, drone);
     // жужжание: низкая пила через полосовой фильтр, громкость дрожит с частотой 23 Гц
@@ -175,19 +175,98 @@ var Sound = (function () {
     flutter.connect(flutterDepth); flutterDepth.connect(buzz.gain);
     oscillator('sawtooth', 110, -4, buzzFilter); oscillator('square', 55, 5, buzzFilter);
     buzzFilter.connect(buzz); buzz.connect(buzzLevel); buzzLevel.connect(bus);
-    // шум вихря: полосовой фильтр медленно ходит вверх-вниз
+    // вихрь: шум через узкий полосовой фильтр, частота поднимается 180 Гц → 2,8 кГц к пику (6 с);
+    // кружение — колебание частоты фильтра, которое ускоряется с 0,6 до 7 Гц и становится шире
+    var peakAt = 6.0;
     var rush = audio.createBufferSource(); rush.buffer = noiseBuffer; rush.loop = true;
     var rushFilter = audio.createBiquadFilter(), rushLevel = audio.createGain();
-    rushFilter.type = 'bandpass'; rushFilter.Q.value = 1.5;
-    rushFilter.frequency.setValueAtTime(400, time);
-    rushFilter.frequency.exponentialRampToValueAtTime(2200, time + 3.0);
-    rushFilter.frequency.exponentialRampToValueAtTime(500, time + 10);
-    var sweep = oscillator('sine', 0.35, 0, audio.createGain()), sweepDepth = audio.createGain();
-    sweep.disconnect(); sweepDepth.gain.value = 300;
-    sweep.connect(sweepDepth); sweepDepth.connect(rushFilter.frequency);
-    envelope(rushLevel, time, 0.16, 2.0, 6.0, 1.2);
+    rushFilter.type = 'bandpass'; rushFilter.Q.value = 3.5;
+    rushFilter.frequency.setValueAtTime(180, time);
+    rushFilter.frequency.exponentialRampToValueAtTime(2800, time + peakAt);
+    rushFilter.frequency.exponentialRampToValueAtTime(450, time + 10);
+    var swirl = oscillator('sine', 0.6, 0, audio.createGain()), swirlDepth = audio.createGain();
+    swirl.disconnect();
+    swirl.frequency.setValueAtTime(0.6, time); swirl.frequency.exponentialRampToValueAtTime(7, time + peakAt);
+    swirl.frequency.exponentialRampToValueAtTime(1.5, time + 10);
+    swirlDepth.gain.setValueAtTime(60, time); swirlDepth.gain.exponentialRampToValueAtTime(1300, time + peakAt);
+    swirlDepth.gain.exponentialRampToValueAtTime(150, time + 10);
+    swirl.connect(swirlDepth); swirlDepth.connect(rushFilter.frequency);
+    rushLevel.gain.setValueAtTime(0.0001, time);
+    rushLevel.gain.exponentialRampToValueAtTime(0.03, time + 1.0);
+    rushLevel.gain.exponentialRampToValueAtTime(0.75, time + peakAt);
+    rushLevel.gain.setTargetAtTime(0.0001, time + peakAt + 0.3, 1.0);
     rush.connect(rushFilter); rushFilter.connect(rushLevel); rushLevel.connect(bus);
     rush.start(time, Math.random()); rush.stop(time + total + 0.1);
+    // низкий рёв вихря под ним
+    var roar = audio.createBufferSource(); roar.buffer = noiseBuffer; roar.loop = true;
+    var roarFilter = audio.createBiquadFilter(), roarLevel = audio.createGain();
+    roarFilter.type = 'lowpass'; roarFilter.Q.value = 2;
+    roarFilter.frequency.setValueAtTime(80, time);
+    roarFilter.frequency.exponentialRampToValueAtTime(420, time + peakAt);
+    roarFilter.frequency.exponentialRampToValueAtTime(120, time + 10);
+    roarLevel.gain.setValueAtTime(0.0001, time);
+    roarLevel.gain.exponentialRampToValueAtTime(0.9, time + peakAt);
+    roarLevel.gain.setTargetAtTime(0.0001, time + peakAt + 0.3, 1.1);
+    roar.connect(roarFilter); roarFilter.connect(roarLevel); roarLevel.connect(bus);
+    roar.start(time, Math.random()); roar.stop(time + total + 0.1);
+    // вой: пила 70 → 520 Гц через полосовой фильтр, к пику громче
+    var whine = audio.createGain(), whineFilter = audio.createBiquadFilter();
+    whineFilter.type = 'bandpass'; whineFilter.Q.value = 6;
+    whineFilter.frequency.setValueAtTime(300, time);
+    whineFilter.frequency.exponentialRampToValueAtTime(1600, time + peakAt);
+    whine.gain.setValueAtTime(0.0001, time);
+    whine.gain.exponentialRampToValueAtTime(0.06, time + peakAt);
+    whine.gain.setTargetAtTime(0.0001, time + peakAt, 0.6);
+    var whineTone = oscillator('sawtooth', 70, 0, whineFilter);
+    whineTone.frequency.setValueAtTime(70, time); whineTone.frequency.exponentialRampToValueAtTime(520, time + peakAt);
+    whineTone.frequency.exponentialRampToValueAtTime(260, time + 9);
+    whineFilter.connect(whine); whine.connect(bus);
+    // электрические разряды: чем ближе к пику, тем чаще и громче
+    var crackle = audio.createWaveShaper(), curve = new Float32Array(1024);
+    for (var point = 0; point < curve.length; point++) { var input = point / 511.5 - 1; curve[point] = Math.tanh(input * 6); }
+    crackle.curve = curve;
+    var crackleLevel = audio.createGain(); crackleLevel.gain.value = 0.5;
+    crackle.connect(crackleLevel); crackleLevel.connect(bus);
+    var discharge = function (at, strength) {
+      var kind = Math.random();
+      if (kind < 0.55) {
+        // треск: короткая пачка высокого шума
+        var burst = audio.createBufferSource(), burstFilter = audio.createBiquadFilter(), burstGain = audio.createGain();
+        var length = jitter(0.04, 0.8);
+        burst.buffer = noiseBuffer; burstFilter.type = 'highpass'; burstFilter.frequency.value = jitter(3500, 0.5);
+        burstGain.gain.setValueAtTime(0.0001, at); burstGain.gain.exponentialRampToValueAtTime(0.5 * strength, at + 0.002);
+        burstGain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+        burst.connect(burstFilter); burstFilter.connect(burstGain); burstGain.connect(crackle);
+        burst.start(at, Math.random() * 1.5, length + 0.02);
+      } else if (kind < 0.85) {
+        // «зип»: пила быстро падает с 2–4 кГц, через перегруз
+        var zap = audio.createOscillator(), zapGain = audio.createGain(), zapLength = jitter(0.09, 0.6);
+        zap.type = 'sawtooth';
+        zap.frequency.setValueAtTime(jitter(3000, 0.6), at); zap.frequency.exponentialRampToValueAtTime(jitter(180, 0.5), at + zapLength);
+        zapGain.gain.setValueAtTime(0.0001, at); zapGain.gain.exponentialRampToValueAtTime(0.3 * strength, at + 0.003);
+        zapGain.gain.exponentialRampToValueAtTime(0.0001, at + zapLength);
+        zap.connect(zapGain); zapGain.connect(crackle);
+        zap.start(at); zap.stop(at + zapLength + 0.02);
+      } else {
+        // дуга: гудящий разряд 0,2–0,5 с — меандр 90–140 Гц, высокие частоты, громкость дрожит
+        var arc = audio.createOscillator(), arcFilter = audio.createBiquadFilter(), arcGain = audio.createGain(), arcLength = jitter(0.35, 0.8);
+        arc.type = 'square'; arc.frequency.value = jitter(115, 0.4);
+        arcFilter.type = 'highpass'; arcFilter.frequency.value = 900;
+        arcGain.gain.setValueAtTime(0.0001, at); arcGain.gain.exponentialRampToValueAtTime(0.22 * strength, at + 0.01);
+        arcGain.gain.setValueAtTime(0.22 * strength, at + arcLength * 0.7);
+        arcGain.gain.exponentialRampToValueAtTime(0.0001, at + arcLength);
+        arc.connect(arcFilter); arcFilter.connect(arcGain); arcGain.connect(crackle);
+        arc.start(at); arc.stop(at + arcLength + 0.02);
+      }
+    };
+    var count = 70;
+    for (var spark = 0; spark < count; spark++) {
+      var share = spark / count;
+      // плотность растёт к пику: время по корню; после пика — несколько редких разрядов
+      var when = 0.8 + (peakAt - 0.6) * Math.pow(share, 0.55) + (Math.random() - 0.5) * 0.12;
+      discharge(time + when, 0.25 + 0.75 * share * jitter(1, 0.6));
+    }
+    for (var after = 0; after < 8; after++) discharge(time + peakAt + 0.2 + after * jitter(0.45, 0.6), jitter(0.6, 0.5) * (1 - after / 9));
     // верхний «воздух»
     var air = audio.createBufferSource(); air.buffer = noiseBuffer; air.loop = true;
     var airFilter = audio.createBiquadFilter(), airLevel = audio.createGain();
@@ -211,7 +290,7 @@ var Sound = (function () {
     // медленный восходящий перебор по звукам аккорда; последний звук выше, громче и дольше
     [[440.0, 1.2], [587.33, 1.7], [659.25, 2.2], [880.0, 2.7], [739.99, 3.2], [1174.66, 3.8]].forEach(function (note, index, list) {
       var last = index === list.length - 1;
-      bell(note[0], note[1], last ? 0.2 : 0.12, last ? 5.0 : 3.0);
+      bell(note[0], note[1], last ? 0.07 : 0.04, last ? 5.0 : 3.0);
     });
   }
 
