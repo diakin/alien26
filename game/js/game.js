@@ -2574,10 +2574,12 @@
             strokePath(branch, Math.max(0.6, cell * 0.008), 'rgba(240, 230, 255, ' + 0.45 * light + ')');
           }
           // вспышка в точке удара
-          var hit = context.createRadialGradient(endX, endY, 0, endX, endY, cell * 0.4);
-          hit.addColorStop(0, 'rgba(255, 250, 255, ' + 0.35 * light + ')'); hit.addColorStop(1, 'rgba(160, 100, 255, 0)');
+          var hit = context.createRadialGradient(endX, endY, 0, endX, endY, cell * 0.75);
+          hit.addColorStop(0, 'rgba(255, 252, 255, ' + Math.min(1, 1.1 * light) + ')');
+          hit.addColorStop(0.25, 'rgba(225, 200, 255, ' + 0.6 * light + ')');
+          hit.addColorStop(1, 'rgba(160, 100, 255, 0)');
           context.fillStyle = hit;
-          context.beginPath(); context.ellipse(endX, endY, cell * 0.4, cell * 0.4 * 35 / 61, 0, 0, Math.PI * 2); context.fill();
+          context.beginPath(); context.ellipse(endX, endY, cell * 0.75, cell * 0.75 * 35 / 61, 0, 0, Math.PI * 2); context.fill();
         }
       });
     });
