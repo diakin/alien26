@@ -114,53 +114,69 @@ var Sound = (function () {
   }
   function jitter(value, amount) { return value * (1 + (Math.random() - 0.5) * amount); }
 
-  // открытие портала (около 4 с): нарастающий свист с подъёмом фильтра, на 0,55 с — вспышка (низкий удар,
-  // хлопок, треск разрядов), затем мерцающий расстроенный аккорд, который уходит вниз, и гул вихря
+  // открытие портала (около 5 с) — в духе заставки при включении компьютера: мягкий аккорд нарастает
+  // и раскрывается фильтром, поверх — восходящие стеклянные колокольчики, всё в длинном отзвуке
+  function reverbTail(seconds) {
+    var length = Math.ceil(audio.sampleRate * seconds), response = audio.createBuffer(2, length, audio.sampleRate);
+    for (var channel = 0; channel < 2; channel++) {
+      var data = response.getChannelData(channel);
+      for (var index = 0; index < length; index++) data[index] = (Math.random() * 2 - 1) * Math.pow(1 - index / length, 3);
+    }
+    var convolver = audio.createConvolver();
+    convolver.buffer = response;
+    return convolver;
+  }
   function portalOpen(far) {
-    var time = audio.currentTime + timeOffset, flash = time + 0.55;
-    // свист: шум через узкий фильтр 300 Гц → 3,5 кГц
-    var rush = audio.createBufferSource(); rush.buffer = noiseBuffer;
-    var rushFilter = audio.createBiquadFilter(); rushFilter.type = 'bandpass'; rushFilter.Q.value = 6;
-    rushFilter.frequency.setValueAtTime(300, time);
-    rushFilter.frequency.exponentialRampToValueAtTime(3500, flash);
-    var rushGain = audio.createGain();
-    rushGain.gain.setValueAtTime(0.0001, time);
-    rushGain.gain.exponentialRampToValueAtTime(0.9 * far, flash - 0.02);
-    rushGain.gain.exponentialRampToValueAtTime(0.0001, flash + 0.25);
-    rush.connect(rushFilter); rushFilter.connect(rushGain); rushGain.connect(effectsGain);
-    rush.start(time, Math.random(), 0.9);
-    // восходящий тон под свистом
-    tone('sine', 110, 880, 0.55, 0.25 * far);
-    // вспышка
-    tone('sine', 70, 24, 1.4, 1.0 * far, 0.55);
-    noise(0.9, 'lowpass', 420, 1.1 * far, 0.004, 0.75, 0.55);
-    noise(0.3, 'bandpass', 1800, 0.9 * far, 0.002, 0.2, 0.55);
-    for (var crack = 0; crack < 9; crack++) noise(0.03, 'highpass', jitter(5000, 0.4), jitter(0.35, 0.5) * far, 0.001, 0.02, 0.58 + crack * jitter(0.13, 0.6));
-    // мерцающий аккорд: три пары расстроенных пил через фильтр, дрожание громкости 7 Гц
-    var shimmer = audio.createGain();
-    shimmer.gain.setValueAtTime(0.0001, flash);
-    shimmer.gain.exponentialRampToValueAtTime(0.16 * far, flash + 0.08);
-    shimmer.gain.exponentialRampToValueAtTime(0.0001, flash + 3.2);
-    var shimmerFilter = audio.createBiquadFilter(); shimmerFilter.type = 'lowpass';
-    shimmerFilter.frequency.setValueAtTime(5000, flash);
-    shimmerFilter.frequency.exponentialRampToValueAtTime(600, flash + 3.2);
-    var tremolo = audio.createOscillator(), tremoloGain = audio.createGain();
-    tremolo.frequency.value = 7; tremoloGain.gain.value = 0.06 * far;
-    tremolo.connect(tremoloGain); tremoloGain.connect(shimmer.gain);
-    shimmerFilter.connect(shimmer); shimmer.connect(effectsGain);
-    [440, 523, 659].forEach(function (pitch) {
-      [-6, 6].forEach(function (cents) {
+    var time = audio.currentTime + timeOffset;
+    var dry = audio.createGain(), wet = audio.createGain(), reverb = reverbTail(2.8);
+    dry.gain.value = 0.7 * far; wet.gain.value = 0.45 * far;
+    dry.connect(effectsGain); reverb.connect(wet); wet.connect(effectsGain);
+    var bus = audio.createGain(); bus.connect(dry); bus.connect(reverb);
+    // аккорд-подушка: ре, ля, ми, фа-диез (ре мажор с ноной), по две слегка расстроенные пилы на ноту
+    var pad = audio.createGain(), padFilter = audio.createBiquadFilter();
+    padFilter.type = 'lowpass'; padFilter.Q.value = 0.8;
+    padFilter.frequency.setValueAtTime(250, time);
+    padFilter.frequency.exponentialRampToValueAtTime(2600, time + 1.4);
+    padFilter.frequency.exponentialRampToValueAtTime(900, time + 4.2);
+    pad.gain.setValueAtTime(0.0001, time);
+    pad.gain.exponentialRampToValueAtTime(0.09, time + 1.1);
+    pad.gain.setValueAtTime(0.09, time + 2.0);
+    pad.gain.exponentialRampToValueAtTime(0.0001, time + 4.4);
+    padFilter.connect(pad); pad.connect(bus);
+    [146.83, 220.0, 329.63, 369.99].forEach(function (pitch) {
+      [-7, 7].forEach(function (cents) {
         var oscillator = audio.createOscillator();
-        oscillator.type = 'sawtooth'; oscillator.detune.value = cents;
-        oscillator.frequency.setValueAtTime(pitch, flash);
-        oscillator.frequency.exponentialRampToValueAtTime(pitch * 0.5, flash + 3.2);
-        oscillator.connect(shimmerFilter);
-        oscillator.start(flash); oscillator.stop(flash + 3.3);
+        oscillator.type = 'sawtooth'; oscillator.frequency.value = pitch; oscillator.detune.value = cents;
+        oscillator.connect(padFilter);
+        oscillator.start(time); oscillator.stop(time + 4.5);
       });
     });
-    tremolo.start(flash); tremolo.stop(flash + 3.3);
-    // гул вихря после вспышки
-    noise(1.9, 'bandpass', 160, 0.5 * far, 0.3, 1.6, 0.7);
+    // низ: тихий синус на октаву ниже основного тона
+    var bass = audio.createOscillator(), bassGain = audio.createGain();
+    bass.type = 'sine'; bass.frequency.value = 73.42;
+    bassGain.gain.setValueAtTime(0.0001, time);
+    bassGain.gain.exponentialRampToValueAtTime(0.22, time + 1.0);
+    bassGain.gain.exponentialRampToValueAtTime(0.0001, time + 4.2);
+    bass.connect(bassGain); bassGain.connect(bus);
+    bass.start(time); bass.stop(time + 4.3);
+    // колокольчик: основной тон и два верхних призвука, которые гаснут быстрее
+    var bell = function (pitch, when, peak) {
+      [[1, 1, 2.2], [2.01, 0.35, 1.1], [3.98, 0.12, 0.5]].forEach(function (partial) {
+        var oscillator = audio.createOscillator(), gain = audio.createGain(), at = time + when;
+        oscillator.type = 'sine'; oscillator.frequency.value = pitch * partial[0];
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(peak * partial[1], at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + partial[2]);
+        oscillator.connect(gain); gain.connect(bus);
+        oscillator.start(at); oscillator.stop(at + partial[2] + 0.05);
+      });
+    };
+    // восходящий перебор по звукам аккорда и последний звук выше, громче и дольше
+    [[440.0, 0.55], [587.33, 0.78], [659.25, 1.0], [880.0, 1.22], [739.99, 1.44], [1174.66, 1.7]].forEach(function (note, index, list) {
+      bell(note[0], note[1], index === list.length - 1 ? 0.2 : 0.13);
+    });
+    // лёгкий «воздух»: шум через высокий фильтр, нарастает к первому колокольчику
+    noise(1.6, 'highpass', 6000, 0.05 * far, 0.5, 1.0);
   }
 
   // ---------------- речь пришельцев ----------------
