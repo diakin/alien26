@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Aliens26 — микшер музыки</title>
+<style>
+  html, body { margin: 0; background: #0d1012; color: #e4e8ea; font: 13px Arial, sans-serif; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 16px 20px 110px; }
+  h1 { font-size: 18px; letter-spacing: 1px; margin: 0 0 6px; }
+  h2 { font-size: 11px; letter-spacing: 1.5px; color: #8fd18a; margin: 18px 0 6px; }
+  .hint { color: #8a959c; line-height: 18px; margin: 0 0 12px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; background: #12181b; border: 1px solid #2f373c; margin: 0 0 10px; }
+  .bar label, .caption { color: #8a959c; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+  select, input[type=number], input[type=text] { background: #0a0d0f; color: #e4e8ea; border: 1px solid #3a454b; font: 12px Arial, sans-serif; padding: 4px 5px; }
+  input[type=number] { width: 52px; }
+  input[type=range] { width: 110px; vertical-align: middle; }
+  button { background: #161b1e; border: 1px solid #3a454b; color: #cfd8dc; font: bold 11px Arial, sans-serif; letter-spacing: 1px; padding: 6px 10px; cursor: pointer; }
+  button:hover { border-color: #e8a33a; color: #ffd28a; }
+  button.on { background: #3a2a10; border-color: #e8a33a; color: #ffd28a; }
+  button.small { padding: 3px 7px; font-size: 10px; }
+  button.danger { border-color: #8a3e2e; color: #ffb09a; }
+  #play.playing { background: #1d2614; border-color: #8fd18a; color: #c8f0c0; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: #56636a; font-size: 10px; letter-spacing: 1px; font-weight: bold; padding: 4px 6px; border-bottom: 1px solid #2f373c; }
+  td { border-bottom: 1px solid #1e262a; padding: 5px 6px; vertical-align: middle; white-space: nowrap; }
+  td.name { font-weight: bold; width: 170px; white-space: normal; }
+  td.name small { display: block; color: #56636a; font: 10px Consolas, monospace; font-weight: normal; }
+  .value { display: inline-block; width: 52px; color: #c8d0d4; font: 11px Consolas, monospace; text-align: right; }
+  tr.changed td.name { color: #ffd28a; }
+  tr.muted td { opacity: 0.45; }
+  .steps { display: inline-flex; gap: 2px; }
+  .steps b { width: 17px; height: 22px; background: #0a0d0f; border: 1px solid #2f373c; cursor: pointer; box-sizing: border-box; }
+  .steps b:nth-child(4n+1) { border-left-color: #6a767c; }
+  .steps b.half { background: #6b4e1c; }
+  .steps b.full { background: #e8a33a; }
+  .steps b.now { outline: 2px solid #8fd18a; outline-offset: -1px; }
+  .gen { display: inline-flex; gap: 4px; align-items: center; }
+  .empty { color: #56636a; padding: 10px 6px; }
+  .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #12181b; border-top: 1px solid #4a555c; }
+  .footer .inner { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 12px; }
+  .status { flex: 1; color: #a8c8a8; line-height: 17px; min-height: 17px; }
+  .status.error { color: #ff8a75; }
+  .status.warn { color: #e8c070; }
+  #save { border-color: #4a8a3e; color: #c8f0c0; padding: 9px 16px; }
+  #custom-settings { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>МИКШЕР МУЗЫКИ</h1>
+  <p class="hint">
+    Тема игры раскладывается на дорожки — по одной на каждый инструмент. У каждой дорожки: громкость, перенос по частоте
+    (в полутонах), скорость воспроизведения (как у семпла: быстрее — выше и короче), выключить (M) и слушать отдельно (S).
+    Поверх темы можно добавить ритмические дорожки: инструмент, нота, рисунок из 16 шагов на такт — из набора ритмических
+    основ или сгенерированный. «Новая тема» — своя тема только из ритмических дорожек. Изменения слышны сразу
+    (громкость) или со следующего такта. «Сохранить в игру» записывает файл <b>game/js/music_mix.js</b>, игра читает его при запуске.
+  </p>
+  <div class="bar">
+    <label>ТЕМА</label> <select id="theme"></select>
+    <button id="play" title="Слушать тему по кругу">▶ СЛУШАТЬ</button>
+    <label>ГРОМКОСТЬ</label> <input id="volume" type="range" min="0" max="100" value="80">
+    <button id="new-theme">НОВАЯ ТЕМА</button>
+    <button id="reset-theme" class="danger" title="Вернуть теме исходное звучание">СБРОСИТЬ ТЕМУ</button>
+    <button id="delete-theme" class="danger">УДАЛИТЬ СВОЮ ТЕМУ</button>
+  </div>
+  <div class="bar" id="custom-settings">
+    <label>НАЗВАНИЕ</label> <input id="custom-title" type="text" size="18">
+    <label>ТЕМП</label> <input id="custom-tempo" type="number" min="30" max="220"> <span class="caption">уд/мин</span>
+    <label>ТАКТОВ</label> <input id="custom-bars" type="number" min="1" max="64">
+    <label>ОБСТАНОВКА</label>
+    <select id="custom-group">
+      <option value="calm">мирная</option><option value="tactical">бой без контакта</option><option value="battle">контакт или стрельба</option>
+    </select>
+  </div>
+  <div id="base-section">
+    <h2>ДОРОЖКИ ТЕМЫ</h2>
+    <table id="base-tracks"></table>
+  </div>
+  <h2>РИТМИЧЕСКИЕ ДОРОЖКИ</h2>
+  <table id="pattern-tracks"></table>
+  <p><button id="add-track">+ ДОРОЖКА</button></p>
+</div>
+<div class="footer"><div class="inner">
+  <div class="status" id="status"></div>
+  <button id="save">СОХРАНИТЬ В ИГРУ</button>
+</div></div>
+<script src="js/music_mix.js"></script>
+<script src="js/music.js"></script>
+<script src="js/musicmixer.js"></script>
+</body>
+</html>
