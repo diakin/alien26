@@ -3705,9 +3705,9 @@
   }
   // Сколько бойцов видят пришельца на клетке (свободна прямая линия огня от их ствола, в пределах дальности)
   // и по кому он сам сможет стрелять оттуда.
-  function exposureAt(alien, node) {
+  function exposureAt(alien, node, kneeling) {
     var elevation = elevationOf(node.col, node.row, node.level);
-    var body = { x: node.col + 0.5, y: node.row + 0.5, h: elevation + alien.height * 0.62 };
+    var body = { x: node.col + 0.5, y: node.row + 0.5, h: elevation + (kneeling ? 0.75 : alien.height * 0.62) };
     var seen = 0, seenByMech = 0, seenByHard = 0, shootable = [];
     var ownWeapon = weaponOf(alien);
     units.forEach(function (unit) {
@@ -3947,13 +3947,111 @@
     if (exposed) return moveTo(hideSpot(unit.timeUnits));
     return null;
   }
+  // Полиция (unit.police): воюет из укрытий.
+  //   1) раз за ход — позиция: клетка в пределах ОД, откуда видна хотя бы одна замеченная цель (линия огня с колена
+  //      свободна), с лучшей суммой «укрытие со стороны врага × 4 − сколько пришельцев видят сидящего × 3 − цена пути»;
+  //      если ни откуда не выстрелить — клетка, где сидящего никто не видит, лучше с укрытием;
+  //   2) приседает (4 ОД): сидящий ниже — стойки, столы и низкие стены закрывают его, по нему труднее попасть;
+  //   3) стреляет (не больше двух выстрелов), оставляя ОД, чтобы отойти;
+  //   4) если сидящего видят, а укрытия со стороны врага нет, — отходит туда, где его не видят, и снова приседает;
+  //   раненый (здоровье меньше половины) или без патронов — сразу отходит из обзора и приседает.
+  // Замеченные цели — пришельцы, видимые отряду (isSeen). Без них полицейский стоит на месте.
+  function policeDecide(unit) {
+    var weapon = weaponOf(unit);
+    var here = nodeKey(unit.col, unit.row, unit.level);
+    var standCost = unit.kneeling ? COST.stand : 0;
+    var budget = unit.timeUnits - standCost;
+    var threats = units.filter(function (other) { return isEnemyOf(unit, other) && !other.dead && isSeen(other); });
+    var kneel = function () { return !unit.kneeling && unit.timeUnits >= COST.kneel ? { kneel: true } : null; };
+    if (!threats.length) return null;
+    var reach = reachable(unit, Math.max(0, budget));
+    var cache = {};
+    var info = function (key) {
+      if (!cache[key]) {
+        var node = keyNode(key);
+        cache[key] = { key: key, node: node, seen: exposureAt(unit, node, true).seen, cover: coverAt(node, unit), cost: key === here ? 0 : (reach.cost[key] || 0) };
+      }
+      return cache[key];
+    };
+    // с клетки (сидя) видна цель: свободна линия от ствола до корпуса пришельца в пределах дальности
+    var canShootFrom = function (node) {
+      if (!weapon) return false;
+      var elevation = elevationOf(node.col, node.row, node.level);
+      return threats.some(function (target) {
+        var point = targetPointOf(target);
+        var deltaX = point.x - node.col - 0.5, deltaY = point.y - node.row - 0.5, length = Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1;
+        var from = { x: node.col + 0.5 + deltaX / length * 0.32 / Iso.tileMeters, y: node.row + 0.5 + deltaY / length * 0.32 / Iso.tileMeters, h: elevation + 1.0 };
+        var distance = Combat.distanceMeters(combatWorld, from, point);
+        if (distance > weapon.range) return false;
+        var line = Combat.trace(combatWorld, from, point, distance + 0.3, unit);
+        return line.kind === 'unit' && line.unit === target;
+      });
+    };
+    var candidates = function (limit) {
+      return [here].concat(reach.keys.filter(function (key) { return key !== here && reach.cost[key] <= limit; })
+        .sort(function (first, second) { return reach.cost[first] - reach.cost[second]; }).slice(0, 140));
+    };
+    // ближайшая клетка, где сидящего никто не видит; при близкой цене — с укрытием
+    var hideSpot = function () {
+      var best = null;
+      candidates(budget - COST.kneel).forEach(function (key) {
+        var item = info(key);
+        if (item.seen > 0) return;
+        if (!best || item.cost + 3 - item.cover * 3 < best.cost + 3 - best.cover * 3) best = item;
+      });
+      return best;
+    };
+    var moveTo = function (item) { return item && item.key !== here ? { move: reach.path(item.key) } : null; };
+    var current = info(here);
+    var hurt = unit.health < unit.maxHealth * 0.5, empty = !weapon || (unit.ammo <= 0 && unit.reserve <= 0);
+    if (hurt || empty) {
+      if (current.seen > 0 && !unit.aiHidden) { unit.aiHidden = true; var retreat = moveTo(hideSpot()); if (retreat) return retreat; }
+      return kneel();
+    }
+    if (weapon && unit.ammo <= 0 && unit.reserve > 0 && !unit.aiReloaded && unit.timeUnits >= COST.reload + 8) return { reload: true };
+    var aimedCost = weapon ? weapon.modes[0].cost : 0;
+    // 1) позиция
+    if (!unit.aiPositioned) {
+      unit.aiPositioned = true;
+      var best = null, bestScore = -Infinity;
+      candidates(budget - COST.kneel - aimedCost).forEach(function (key) {
+        var item = info(key);
+        if (!canShootFrom(item.node)) return;
+        var score = item.cover * 4 - item.seen * 3 - item.cost * 0.08 + (key === here ? 1 : 0);
+        if (score > bestScore) { bestScore = score; best = item; }
+      });
+      if (!best) best = hideSpot();
+      var move = moveTo(best);
+      if (move) return move;
+    }
+    // 2) присесть
+    var down = kneel();
+    if (down) return down;
+    // 3) стрельба: сидя, с запасом ОД на отход
+    var targets = weapon && unit.ammo > 0 && (unit.aiShots || 0) < 2 ? visibleTargets(unit) : [];
+    if (targets.length) {
+      var target = null;
+      targets.forEach(function (entry) {
+        var value = targetValue(unit, entry, weapon.modes[0]);
+        if (!target || value > target.value) target = { entry: entry, value: value };
+      });
+      var turnCost = turnCostTo(unit, target.entry.point);
+      var reserve = current.seen > 0 && current.cover === 0 ? COST.stand + 8 : 0;
+      for (var index = 0; index < 2; index++) {
+        if (weapon.modes[index] && unit.timeUnits - weapon.modes[index].cost - turnCost >= reserve) return { fire: { unit: target.entry.unit, point: target.entry.point }, mode: index };
+      }
+    }
+    // 4) на виду без укрытия — отойти
+    if (current.seen > 0 && current.cover === 0 && !unit.aiHidden) { unit.aiHidden = true; var away = moveTo(hideSpot()); if (away) return away; }
+    return null;
+  }
   var staffQueue = [], staffWaitUntil = 0;
   function startStaffPhase() {
     staffQueue = combat ? units.filter(function (unit) { return unit.ai && !unit.dead && unit.manualTurn !== turn; }) : [];
     if (!staffQueue.length) { startAlienPhase(); return; }
     phase = 'staff';
     setPhaseLabel();
-    staffQueue.forEach(function (unit) { unit.aiShots = 0; unit.aiMoves = 0; unit.aiReloaded = false; });
+    staffQueue.forEach(function (unit) { unit.aiShots = 0; unit.aiMoves = 0; unit.aiReloaded = false; unit.aiPositioned = false; unit.aiHidden = false; });
     staffWaitUntil = performance.now() + 300;
     say(staffQueue.every(function (unit) { return unit.police; }) ? 'Полиция' : 'Персонал базы');
   }
@@ -3964,7 +4062,13 @@
     var unit = staffQueue[0];
     if (!unit) { startAlienPhase(); return; }
     var speed = Settings.values.aiSpeed;
-    var decision = unit.aiMoves < 3 ? staffDecide(unit) : null;
+    var decision = unit.aiMoves < 3 ? (unit.police ? policeDecide(unit) : staffDecide(unit)) : (unit.police && !unit.kneeling && unit.timeUnits >= COST.kneel ? { kneel: true } : null);
+    if (decision && decision.kneel) {
+      unit.timeUnits -= COST.kneel;
+      unit.kneeling = true;
+      staffWaitUntil = now + 200 / speed;
+      return;
+    }
     if (decision && decision.reload) {
       unit.aiReloaded = true;
       reloadUnit(unit);
@@ -3979,6 +4083,7 @@
     }
     if (decision && decision.move && decision.move.length) {
       unit.timeUnits -= pathCost(unit, decision.move);
+      unit.kneeling = false;                       // с колена — встаёт (COST.stand уже в pathCost)
       unit.path = decision.move;
       unit.aiMoves++;
       staffWaitUntil = now + 200 / speed;
