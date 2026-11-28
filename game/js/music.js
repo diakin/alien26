@@ -1560,15 +1560,17 @@ var Music = (function () {
   // шестнадцатую такта, every — звучит в каждом N-м такте (1, 2, 4), gain, transpose, speed, pan, mute }.
   // Тянущиеся инструменты (гул, кластер, нарастание) звучат от удара до следующего удара дорожки.
   var SAMPLES = {
-    blip: { title: 'Блип', note: 64, play: function (kit, note, time, level, pan) { blip(kit, note, time, 0.12 * level, pan, 0.45); } },
-    snap: { title: 'Спиккато', note: 60, play: function (kit, note, time, level, pan) { snap(kit, note, time, 0.09 * level, pan, 0.5); } },
-    pluck: { title: 'Щипок', note: 62, play: function (kit, note, time, level, pan) { pluck(kit, note, time, { peak: 0.2 * level, decay: 0.55, cutoff: 2600, reverb: 0.35, echo: 0.3, pan: pan }); } },
+    lead: { title: 'Мелодия: синтезатор', note: 64, sustain: true, melodic: true, play: function (kit, note, time, level, pan, length) { lead(kit, note, time, length, { types: ['sawtooth', 'triangle'], peak: 0.05 * level, cutoff: 1500, attack: 0.04, release: 0.35, vibrato: 0.004, reverb: 0.45, echo: 0.25 }); } },
+    flute: { title: 'Мелодия: мягкий тон', note: 72, sustain: true, melodic: true, play: function (kit, note, time, level, pan, length) { lead(kit, note, time, length, { types: ['triangle', 'sine'], peak: 0.06 * level, cutoff: 2200, attack: 0.08, release: 0.5, vibrato: 0.006, reverb: 0.55, echo: 0.2 }); } },
+    blip: { title: 'Блип', note: 64, melodic: true, play: function (kit, note, time, level, pan) { blip(kit, note, time, 0.12 * level, pan, 0.45); } },
+    snap: { title: 'Спиккато', note: 60, melodic: true, play: function (kit, note, time, level, pan) { snap(kit, note, time, 0.09 * level, pan, 0.5); } },
+    pluck: { title: 'Щипок', note: 62, melodic: true, play: function (kit, note, time, level, pan) { pluck(kit, note, time, { peak: 0.2 * level, decay: 0.55, cutoff: 2600, reverb: 0.35, echo: 0.3, pan: pan }); } },
     clack: { title: 'Щелчок', note: 100, play: function (kit, note, time, level, pan) { clack(kit, time, 0.08 * level, pan, plainFrequency(note)); } },
-    throb: { title: 'Вом (низкий пульс)', note: 40, sustain: true, play: function (kit, note, time, level, pan, length) { throb(kit, note, time, length, 0.12 * level); } },
-    metal: { title: 'Металл', note: 52, play: function (kit, note, time, level, pan) { metal(kit, note, time, 0.3 * level, pan); } },
-    ping: { title: 'Сонар', note: 88, play: function (kit, note, time, level, pan) { ping(kit, note, time, 0.1 * level, pan); } },
-    bell: { title: 'Колокол', note: 84, play: function (kit, note, time, level, pan) { bell(kit, note, time, 0.2 * level, pan); } },
-    glass: { title: 'Стеклянный звон', note: 96, sustain: true, play: function (kit, note, time, level, pan, length) { glass(kit, note, time, length, 0.05 * level, pan); } },
+    throb: { title: 'Вом (низкий пульс)', note: 40, sustain: true, melodic: true, play: function (kit, note, time, level, pan, length) { throb(kit, note, time, length, 0.12 * level); } },
+    metal: { title: 'Металл', note: 52, melodic: true, play: function (kit, note, time, level, pan) { metal(kit, note, time, 0.3 * level, pan); } },
+    ping: { title: 'Сонар', note: 88, melodic: true, play: function (kit, note, time, level, pan) { ping(kit, note, time, 0.1 * level, pan); } },
+    bell: { title: 'Колокол', note: 84, melodic: true, play: function (kit, note, time, level, pan) { bell(kit, note, time, 0.2 * level, pan); } },
+    glass: { title: 'Стеклянный звон', note: 96, sustain: true, melodic: true, play: function (kit, note, time, level, pan, length) { glass(kit, note, time, length, 0.05 * level, pan); } },
     drum: { title: 'Литавра', note: 31, play: function (kit, note, time, level, pan) { drum(kit, time, plainFrequency(note), 0.5 * level, 0.6, pan); } },
     snare: { title: 'Малый барабан', note: 60, play: function (kit, note, time, level, pan) { snare(kit, time, 0.3 * level, pan); } },
     cymbal: { title: 'Тарелка', note: 60, play: function (kit, note, time, level) { cymbal(kit, time, 0.2 * level); } },
@@ -1590,11 +1592,24 @@ var Music = (function () {
     throb: 'Вом (низкий пульс)', snap: 'Спиккато', chop: 'Рубленый кластер', wail: 'Вой', choir: 'Хор', cymbal: 'Тарелка',
     snare: 'Малый барабан'
   };
+  // Мелодическая дорожка (type: 'melody'): фраза из bars тактов, notes — [такт, шаг, нота, длина в шагах, сила];
+  // такт фразы — номер такта с начала звучания по кругу фразы. Мелодию сочиняет генератор утилиты music_mixer.html.
+  function playMelody(kit, track, sample, sixteenth, absoluteBar, time) {
+    var bar = absoluteBar % (track.bars || 1);
+    (track.notes || []).forEach(function (entry) {
+      if (entry[0] !== bar) return;
+      kit.override = 'x:' + track.id;
+      selectTrack(kit, null);
+      sample.play(kit, entry[2], time + entry[1] * sixteenth, entry[4] === undefined ? 1 : entry[4], track.pan || 0, Math.max(1, entry[3] || 1) * sixteenth);
+      kit.override = null;
+    });
+  }
   function playPatterns(kit, tracks, tempo, absoluteBar, time) {
     if (!tracks || !tracks.length) return;
     var sixteenth = 60 / tempo / 4;
     tracks.forEach(function (track) {
       var sample = SAMPLES[track.instrument], steps = track.steps || [];
+      if (sample && track.type === 'melody') { playMelody(kit, track, sample, sixteenth, absoluteBar, time); return; }
       if (!sample || absoluteBar % (track.every || 1) !== 0) return;
       for (var step = 0; step < 16; step++) {
         if (!(steps[step] > 0)) continue;

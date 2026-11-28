@@ -43,6 +43,8 @@
   .status.warn { color: #e8c070; }
   #save { border-color: #4a8a3e; color: #c8f0c0; padding: 9px 16px; }
   #custom-settings { display: none; }
+  .melody-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 6px; }
+  canvas.roll { display: block; border: 1px solid #2f373c; cursor: crosshair; image-rendering: pixelated; }
 </style>
 </head>
 <body>
@@ -52,7 +54,8 @@
     Тема игры раскладывается на дорожки — по одной на каждый инструмент. У каждой дорожки: громкость, перенос по частоте
     (в полутонах), скорость воспроизведения (как у семпла: быстрее — выше и короче), выключить (M) и слушать отдельно (S).
     Поверх темы можно добавить ритмические дорожки: инструмент, нота, рисунок из 16 шагов на такт — из набора ритмических
-    основ или сгенерированный. «Новая тема» — своя тема только из ритмических дорожек. Изменения слышны сразу
+    основ или сгенерированный, — и мелодии: генератор сочиняет фразу по ладу, тонике, диапазону, плотности и скачкам,
+    ноты можно поправить щелчком по нотной ленте. «Новая тема» — своя тема только из ритмических дорожек. Изменения слышны сразу
     (громкость) или со следующего такта. «Сохранить в игру» записывает файл <b>game/js/music_mix.js</b>, игра читает его при запуске.
   </p>
   <div class="bar">
@@ -76,9 +79,9 @@
     <h2>ДОРОЖКИ ТЕМЫ</h2>
     <table id="base-tracks"></table>
   </div>
-  <h2>РИТМИЧЕСКИЕ ДОРОЖКИ</h2>
+  <h2>РИТМИЧЕСКИЕ ДОРОЖКИ И МЕЛОДИИ</h2>
   <table id="pattern-tracks"></table>
-  <p><button id="add-track">+ ДОРОЖКА</button></p>
+  <p><button id="add-track">+ РИТМИЧЕСКАЯ ДОРОЖКА</button> <button id="add-melody">+ МЕЛОДИЯ</button></p>
 </div>
 <div class="footer"><div class="inner">
   <div class="status" id="status"></div>
@@ -86,6 +89,7 @@
 </div></div>
 <script src="js/music_mix.js"></script>
 <script src="js/music.js"></script>
+<script src="js/melodygen.js"></script>
 <script src="js/musicmixer.js"></script>
 </body>
 </html>

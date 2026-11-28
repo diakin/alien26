@@ -138,11 +138,12 @@
   // ---------------- ритмические дорожки ----------------
   function renderPatterns() {
     var list = patterns(current, false);
-    if (!list.length) { patternTable.innerHTML = '<tr><td class="empty">Ритмических дорожек нет — «+ ДОРОЖКА» добавит.</td></tr>'; return; }
+    if (!list.length) { patternTable.innerHTML = '<tr><td class="empty">Дорожек нет — «+ РИТМИЧЕСКАЯ ДОРОЖКА» или «+ МЕЛОДИЯ» добавят.</td></tr>'; return; }
     var instrumentOptions = Object.keys(samples).map(function (key) { return '<option value="' + key + '">' + escapeHtml(samples[key].title) + '</option>'; }).join('');
     var rhythmOptions = '<option value="">основа…</option>' + RHYTHMS.map(function (rhythm, index) { return '<option value="' + index + '">' + escapeHtml(rhythm.title) + '</option>'; }).join('');
     var html = '';
     list.forEach(function (track) {
+      if (track.type === 'melody') { html += melodyRow(track); return; }
       var key = 'x:' + track.id, note = track.note === undefined ? samples[track.instrument].note : track.note;
       var steps = '';
       for (var step = 0; step < 16; step++) {
@@ -165,6 +166,97 @@
         '<tr class="' + (track.mute ? 'muted' : '') + '"><td class="name"></td>' + trackControls(key, '', '', track, true).replace(/^<td class="name">.*?<\/td>/, '') + '</tr>';
     });
     patternTable.innerHTML = html;
+    list.forEach(function (track) { if (track.type === 'melody') drawRoll(track); });
+  }
+
+  // ---------------- мелодические дорожки (генератор — js/melodygen.js) ----------------
+  var TONICS = ['до', 'до♯', 'ре', 'ре♯', 'ми', 'фа', 'фа♯', 'соль', 'соль♯', 'ля', 'ля♯', 'си'];
+  function melodyOptions(track) {
+    var root = (track.octave + 1) * 12 + track.tonic;
+    return { root: root, scale: track.scale, low: root - 3, high: root - 3 + track.range, bars: track.bars, density: track.density, leaps: track.leaps, seed: track.seed };
+  }
+  function compose(track) { track.notes = MelodyGen.generate(melodyOptions(track)); }
+  function select(data, value, options) {
+    return '<select data-' + data + '>' + options.map(function (option) {
+      return '<option value="' + option[0] + '"' + (String(option[0]) === String(value) ? ' selected' : '') + '>' + escapeHtml(option[1]) + '</option>';
+    }).join('') + '</select>';
+  }
+  function melodyRow(track) {
+    var key = 'x:' + track.id, id = track.id;
+    var melodic = Object.keys(samples).filter(function (name) { return samples[name].melodic; }).map(function (name) { return [name, samples[name].title]; });
+    var scales = Object.keys(MelodyGen.SCALES).map(function (name) { return [name, MelodyGen.SCALES[name].title]; });
+    return '<tr class="' + (track.mute ? 'muted' : '') + '" data-row="' + key + '">' +
+      '<td class="name">МЕЛОДИЯ<small>' + select('melody-instrument="' + id + '"', track.instrument, melodic) + '</small></td>' +
+      '<td colspan="5"><div class="melody-controls">' +
+      '<span class="caption">ЛАД</span> ' + select('melody-scale="' + id + '"', track.scale, scales) +
+      ' <span class="caption">ТОНИКА</span> ' + select('melody-tonic="' + id + '"', track.tonic, TONICS.map(function (name, index) { return [index, name]; })) +
+      ' <span class="caption">ОКТАВА</span> ' + select('melody-octave="' + id + '"', track.octave, [[2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']]) +
+      ' <span class="caption">ДИАПАЗОН</span> ' + select('melody-range="' + id + '"', track.range, [[7, 'квинта'], [12, 'октава'], [19, 'полторы октавы'], [24, 'две октавы']]) +
+      ' <span class="caption">ТАКТОВ</span> ' + select('melody-bars="' + id + '"', track.bars, [[1, '1'], [2, '2'], [4, '4'], [8, '8']]) +
+      ' <span class="caption">ПЛОТНОСТЬ</span> <input type="range" min="0" max="100" value="' + Math.round(track.density * 100) + '" data-melody-density="' + id + '" style="width:80px">' +
+      ' <span class="caption">СКАЧКИ</span> <input type="range" min="0" max="100" value="' + Math.round(track.leaps * 100) + '" data-melody-leaps="' + id + '" style="width:80px">' +
+      ' <button class="small" data-compose="' + id + '" title="Новая мелодия с теми же настройками">СОЧИНИТЬ</button>' +
+      ' <button class="small" data-vary="' + id + '" title="Тот же ритм, часть нот сдвинута">ВАРИАЦИЯ</button>' +
+      ' <span class="caption">ВАРИАНТ ' + track.seed + '</span>' +
+      ' <span class="caption">ПАН.</span> <input type="range" min="-100" max="100" value="' + Math.round((track.pan || 0) * 100) + '" data-pan="' + id + '" style="width:60px">' +
+      ' <button class="small danger" data-remove="' + id + '" title="Удалить дорожку">✕</button></div>' +
+      '<canvas class="roll" data-roll="' + id + '" title="Щелчок — поставить или убрать ноту (длина 2 шага)"></canvas></td></tr>' +
+      '<tr class="' + (track.mute ? 'muted' : '') + '"><td class="name"></td>' + trackControls(key, '', '', track, true).replace(/^<td class="name">.*?<\/td>/, '') + '</tr>';
+  }
+  // нотная лента: по горизонтали шаги (16 на такт), по вертикали звуки диапазона; звуки лада — светлее
+  var ROLL_ROW = 7;
+  function rollGeometry(track) {
+    var options = melodyOptions(track), columns = track.bars * 16;
+    var cell = Math.max(5, Math.min(14, Math.floor(1000 / columns)));
+    return { options: options, columns: columns, cell: cell, rows: options.high - options.low + 1 };
+  }
+  function drawRoll(track, playStep) {
+    var canvas = document.querySelector('canvas[data-roll="' + track.id + '"]');
+    if (!canvas) return;
+    var geometry = rollGeometry(track), width = geometry.columns * geometry.cell, height = geometry.rows * ROLL_ROW;
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    var context = canvas.getContext('2d'), steps = MelodyGen.SCALES[track.scale].steps;
+    context.fillStyle = '#080b0d'; context.fillRect(0, 0, width, height);
+    for (var row = 0; row < geometry.rows; row++) {
+      var note = geometry.options.high - row, inScale = steps.indexOf(((note - geometry.options.root) % 12 + 12) % 12) >= 0;
+      if (inScale) { context.fillStyle = (note - geometry.options.root) % 12 === 0 ? '#1d2a1c' : '#12191c'; context.fillRect(0, row * ROLL_ROW, width, ROLL_ROW - 1); }
+    }
+    for (var column = 0; column <= geometry.columns; column++) {
+      context.fillStyle = column % 16 === 0 ? '#5a666c' : column % 4 === 0 ? '#2a3338' : '#161d21';
+      context.fillRect(column * geometry.cell, 0, 1, height);
+    }
+    if (playStep >= 0) { context.fillStyle = 'rgba(143, 209, 138, 0.25)'; context.fillRect(playStep * geometry.cell, 0, geometry.cell, height); }
+    (track.notes || []).forEach(function (entry) {
+      var row = geometry.options.high - entry[2];
+      if (row < 0 || row >= geometry.rows) return;
+      var position = entry[0] * 16 + entry[1];
+      context.fillStyle = 'rgba(232, 163, 58, ' + (0.45 + 0.55 * (entry[4] === undefined ? 1 : entry[4])) + ')';
+      context.fillRect(position * geometry.cell + 1, row * ROLL_ROW, Math.max(2, entry[3] * geometry.cell - 2), ROLL_ROW - 1);
+    });
+  }
+  function rollClick(canvas, event) {
+    var track = trackById(canvas.dataset.roll);
+    if (!track) return;
+    var geometry = rollGeometry(track), box = canvas.getBoundingClientRect();
+    var column = Math.floor((event.clientX - box.left) / (box.width / geometry.columns));
+    var row = Math.floor((event.clientY - box.top) / (box.height / geometry.rows));
+    var bar = Math.floor(column / 16), step = column % 16, note = geometry.options.high - row;
+    var existing = track.notes.filter(function (entry) { return entry[0] === bar && entry[1] === step; });
+    track.notes = track.notes.filter(function (entry) { return !(entry[0] === bar && entry[1] === step); });
+    if (!existing.some(function (entry) { return entry[2] === note; })) {
+      track.notes.push([bar, step, note, 2, step % 4 === 0 ? 0.9 : 0.7]);
+      track.notes.sort(function (first, second) { return first[0] * 16 + first[1] - second[0] * 16 - second[1]; });
+    }
+    markDirty();
+    drawRoll(track);
+  }
+  function addMelody() {
+    var list = patterns(current, true);
+    var track = { id: nextId(list), type: 'melody', instrument: 'pluck', scale: 'minor', tonic: 9, octave: 4, range: 19, bars: 4,
+      density: 0.5, leaps: 0.35, seed: 1 + Math.floor(Math.random() * 9999), every: 1, gain: 1, transpose: 0, speed: 1, pan: 0, notes: [] };
+    compose(track);
+    list.push(track);
+    markDirty(); renderPatterns();
   }
   function trackById(id) { return patterns(current, false).filter(function (track) { return track.id === id; })[0]; }
   function addTrack() {
@@ -188,6 +280,8 @@
     }
     var track;
     if (data.pan && (track = trackById(data.pan))) { track.pan = Number(target.value) / 100; markDirty(); }
+    if (data.melodyDensity && (track = trackById(data.melodyDensity))) { track.density = Number(target.value) / 100; compose(track); markDirty(); drawRoll(track); }
+    if (data.melodyLeaps && (track = trackById(data.melodyLeaps))) { track.leaps = Number(target.value) / 100; compose(track); markDirty(); drawRoll(track); }
     if (data.note && (track = trackById(data.note))) { track.note = Math.max(12, Math.min(120, Number(target.value) || 60)); markDirty(); }
     if (target.id === 'custom-title') { MIX.custom[current].title = target.value; themes[current].title = target.value; markDirty(); }
     if (target.id === 'custom-tempo') { MIX.custom[current].tempo = Math.max(30, Math.min(220, Number(target.value) || 90)); markDirty(); }
@@ -199,6 +293,15 @@
     if (data.note) renderPatterns();
     if (data.rhythm !== undefined && target.value !== '' && (track = trackById(data.rhythm))) { track.steps = RHYTHMS[Number(target.value)].steps.slice(); markDirty(); renderPatterns(); }
     if (data.every && (track = trackById(data.every))) { track.every = Number(target.value); markDirty(); }
+    // мелодия: смена настроек — та же мелодия (то же зерно), пересчитанная под них
+    var melodyFields = { melodyInstrument: 'instrument', melodyScale: 'scale', melodyTonic: 'tonic', melodyOctave: 'octave', melodyRange: 'range', melodyBars: 'bars' };
+    Object.keys(melodyFields).forEach(function (field) {
+      if (!data[field] || !(track = trackById(data[field]))) return;
+      var property = melodyFields[field];
+      track[property] = property === 'instrument' || property === 'scale' ? target.value : Number(target.value);
+      if (property !== 'instrument') compose(track);
+      markDirty(); renderPatterns();
+    });
     if (data.hits && (track = trackById(data.hits))) track.hits = Number(target.value);
     if (data.rotation && (track = trackById(data.rotation))) track.rotation = Number(target.value);
     if (target.id === 'custom-group') { MIX.custom[current].group = target.value; themes[current].group = target.value; markDirty(); fillThemes(current); }
@@ -220,6 +323,9 @@
     if (data.remove) { var list = patterns(current, false); list.splice(list.indexOf(trackById(data.remove)), 1); markDirty(); renderPatterns(); return; }
     if (data.euclid && (track = trackById(data.euclid))) { track.steps = euclid(track.hits || 5, track.rotation || 0); markDirty(); renderPatterns(); return; }
     if (data.random && (track = trackById(data.random))) { track.steps = randomRhythm(0.35); markDirty(); renderPatterns(); return; }
+    if (data.compose && (track = trackById(data.compose))) { track.seed = 1 + Math.floor(Math.random() * 9999); compose(track); markDirty(); renderPatterns(); return; }
+    if (data.vary && (track = trackById(data.vary))) { track.seed = 1 + Math.floor(Math.random() * 9999); track.notes = MelodyGen.vary(melodyOptions(track), track.notes); markDirty(); renderPatterns(); return; }
+    if (data.roll) { rollClick(target, event); return; }
   }
   function rerender() { renderBase(); renderPatterns(); }
   document.addEventListener('input', onInput);
@@ -255,6 +361,7 @@
     document.querySelectorAll('.steps b.now').forEach(function (cell) { cell.classList.remove('now'); });
     if (step < 0) return;
     patterns(current, false).forEach(function (track) {
+      if (track.type === 'melody') { drawRoll(track, (player.playingBar % track.bars) * 16 + step); return; }
       if (player.playingBar % (track.every || 1) !== 0) return;
       var cell = document.querySelector('b[data-step="' + track.id + ':' + step + '"]');
       if (cell) cell.classList.add('now');
@@ -308,6 +415,7 @@
     markDirty();
   });
   document.getElementById('add-track').addEventListener('click', addTrack);
+  document.getElementById('add-melody').addEventListener('click', addMelody);
 
   // ---------------- сохранение ----------------
   // убрать нейтральные настройки (громкость 1, перенос 0, скорость 1) и пустые записи тем
@@ -323,7 +431,7 @@
         if (settings.mute) clean.mute = true;
         if (Object.keys(clean).length) tracks[key] = clean;
       });
-      var extra = (entry.extra || []).filter(function (track) { return track.steps.some(function (value) { return value > 0; }); });
+      var extra = (entry.extra || []).filter(function (track) { return track.type === 'melody' ? track.notes && track.notes.length : track.steps.some(function (value) { return value > 0; }); });
       if (Object.keys(tracks).length || extra.length) result.themes[name] = { tracks: tracks, extra: extra };
     });
     Object.keys(MIX.custom).forEach(function (name) { result.custom[name] = MIX.custom[name]; });
@@ -339,6 +447,7 @@
   function compactJson(value) {
     return JSON.stringify(value, null, 1)
       .replace(/\[\s*((?:-?[\d.]+,\s*)*-?[\d.]+)\s*\]/g, function (match, body) { return '[' + body.replace(/\s+/g, '') + ']'; })
+      .replace(/\[\s*((?:\[[\d.,-]+\],\s*)*\[[\d.,-]+\])\s*\]/g, function (match, body) { return '[' + body.replace(/\s+/g, '') + ']'; })
       .replace(/\{\s*("(?:gain|transpose|speed|mute)":[^{}\[\]]*?)\s*\}/g, function (match, body) { return '{ ' + body.replace(/\s*\n\s*/g, ' ') + ' }'; });
   }
   function stamp() {
@@ -397,5 +506,5 @@
   setStatus('Выберите тему и нажмите «Слушать». Настройки из music_mix.js загружены.');
 
   // для проверки из консоли и тестов
-  window.MusicMixer = { RHYTHMS: RHYTHMS, euclid: euclid, randomRhythm: randomRhythm, fileText: fileText, selectTheme: selectTheme, addTrack: addTrack, get player() { return player; } };
+  window.MusicMixer = { RHYTHMS: RHYTHMS, euclid: euclid, randomRhythm: randomRhythm, fileText: fileText, selectTheme: selectTheme, addTrack: addTrack, addMelody: addMelody, get player() { return player; } };
 })();
