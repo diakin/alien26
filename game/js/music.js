@@ -3,7 +3,7 @@
 //   dawn    — «Рассвет»: общая, светлая, до мажор с лидийской IV ступенью;
 //   shade   — «Тень»: тактическая, фон без мелодии и ритма (как в UFO), 128 с по кругу; contact — она же с пульсом;
 //   landing — «Высадка», assault — «Штурм»: тактическая и при контакте, ля минор;
-//   gloom   — «Мрак»: мрачная, низкие кластеры и далёкие удары; gloomContact — с пульсом;
+//   gloom   — «Мрак»: мрачная, тихий гул с частой сменой тональности и редкие удары одного уровня; gloomContact — с пульсом;
 //   probe, hive, mine — «Зонд», «Улей», «Шахта»: фон с повторяющимися звуками (как в тактике UFO);
 //            *Contact — их варианты при контакте: плотнее и резче;
 //   impulse, alarm, knock — «Импульс», «Тревога», «Стук»: фон с резкими акцентами около 4 раз в секунду;
@@ -498,8 +498,8 @@ var Music = (function () {
   // @theme-begin shade,contact
   // ---------------- тема «Тень» (тактическая, фон) ----------------
   // Фон для боя, как в UFO: без мелодии и ритма, 60 ударов в минуту, такт 4 с, 32 такта (128 с по кругу).
-  // Каждые 4 такта — новый тёмный кластер над гулом ми (малая секунда, тритон, увеличенное трезвучие);
-  // поверх — редкие далёкие удары по металлу, «сонар», ветер в шахтах, стеклянные призвуки.
+  // Каждые 4 такта — новый тёмный кластер над гулом ми (малая секунда, тритон, увеличенное трезвучие); гул тихий,
+  // поверх — громче: «сонар», ветер в шахтах, стеклянные призвуки (низких ударов по металлу нет).
   // Вариант «Контакт» (враг рядом или стрельба): тот же фон плюс глухой пульс, чаще удары и нарастание к смене части.
   var SHADE_BLOCKS = [
     { bass: 28, notes: [47, 52, 53] },        // E: си, ми, фа — малая секунда
@@ -513,20 +513,20 @@ var Music = (function () {
   ];
   // события по тактам: [такт, доля, вид, нота, громкость, панорама]
   var SHADE_EVENTS = [
-    [1, 2.5, 'ping', 88, 0.1, 0.5], [2, 1, 'metal', 43, 0.48, -0.6], [3, 0, 'draft', 300, 0.14, 1100],
-    [5, 3, 'metal', 40, 0.39, 0.7], [6, 1.5, 'glass', 83, 0.03, -0.4], [7, 2, 'ping', 91, 0.08, -0.5],
-    [9, 0.5, 'metal', 46, 0.36, 0.3], [10, 2, 'draft', 220, 0.12, 900], [11, 3.5, 'metal', 41, 0.45, -0.7],
-    [13, 1, 'glass', 84, 0.025, 0.5], [14, 2.5, 'ping', 86, 0.08, 0.3], [15, 0, 'swell', 0, 0.07, 0],
-    [17, 2, 'metal', 44, 0.42, 0.6], [18, 0, 'draft', 260, 0.14, 1300], [19, 3, 'glass', 79, 0.03, -0.3],
-    [21, 1.5, 'ping', 89, 0.09, -0.6], [22, 3, 'metal', 39, 0.48, -0.4], [24, 0, 'glass', 83, 0.025, 0.4],
-    [25, 2.5, 'metal', 45, 0.36, 0.7], [26, 0, 'draft', 200, 0.12, 800], [27, 1, 'ping', 87, 0.08, 0.6],
-    [29, 3, 'metal', 42, 0.45, -0.6], [30, 1.5, 'glass', 84, 0.027, -0.5], [31, 0, 'swell', 0, 0.07, 0]
+    [1, 2.5, 'ping', 88, 0.18, 0.5], [3, 0, 'draft', 300, 0.24, 1100],
+    [6, 1.5, 'glass', 83, 0.055, -0.4], [7, 2, 'ping', 91, 0.15, -0.5],
+    [10, 2, 'draft', 220, 0.22, 900],
+    [13, 1, 'glass', 84, 0.045, 0.5], [14, 2.5, 'ping', 86, 0.15, 0.3], [15, 0, 'swell', 0, 0.07, 0],
+    [18, 0, 'draft', 260, 0.24, 1300], [19, 3, 'glass', 79, 0.055, -0.3],
+    [21, 1.5, 'ping', 89, 0.16, -0.6], [24, 0, 'glass', 83, 0.045, 0.4],
+    [26, 0, 'draft', 200, 0.22, 800], [27, 1, 'ping', 87, 0.15, 0.6],
+    [30, 1.5, 'glass', 84, 0.05, -0.5], [31, 0, 'swell', 0, 0.07, 0]
   ];
   // дополнительные события варианта «Контакт»
   var CONTACT_EVENTS = [
-    [0, 3, 'metal', 38, 0.36, 0.4], [4, 1.5, 'metal', 47, 0.3, -0.5], [7, 0, 'swell', 0, 0.084, 0], [8, 2.5, 'ping', 84, 0.1, -0.4],
-    [12, 0.5, 'metal', 40, 0.39, 0.6], [16, 3, 'metal', 43, 0.33, -0.3], [20, 1, 'ping', 86, 0.1, 0.5], [23, 0, 'swell', 0, 0.084, 0],
-    [24, 2.5, 'metal', 37, 0.39, -0.6], [28, 1, 'metal', 46, 0.3, 0.5]
+    [4, 1.5, 'ping', 92, 0.14, -0.5], [7, 0, 'swell', 0, 0.084, 0], [8, 2.5, 'ping', 84, 0.18, -0.4],
+    [12, 0.5, 'glass', 86, 0.05, 0.6], [16, 3, 'draft', 240, 0.2, 1000], [20, 1, 'ping', 86, 0.18, 0.5], [23, 0, 'swell', 0, 0.084, 0],
+    [28, 1, 'ping', 90, 0.14, 0.5]
   ];
   function shadeTheme(name, contact) {
     return {
@@ -539,8 +539,8 @@ var Music = (function () {
         // гул и кластер — на 4 такта с перекрытием; при входе в тему с середины блока — сразу, на остаток блока
         if (bar % 4 === 0 || absoluteBar === 0) {
           var length = (4 - bar % 4) * barLength + 2;
-          deepDrone(kit, block.bass + 12, time, length, contact ? 0.16 : 0.14);
-          shade(kit, block.notes, time, length, contact ? 0.068 : 0.06);
+          deepDrone(kit, block.bass + 12, time, length, contact ? 0.1 : 0.085);
+          shade(kit, block.notes, time, length, contact ? 0.05 : 0.044);
         }
         SHADE_EVENTS.concat(contact ? CONTACT_EVENTS : []).forEach(function (entry) {
           if (entry[0] === bar) shadeEvent(kit, entry, time + entry[1] * beat, barLength);
@@ -844,8 +844,9 @@ var Music = (function () {
   // ---------------- «Мрак» (мрачная) ----------------
   // 48 ударов, такт 5 с, 32 такта (160 с). Очень низкий гул, медленные кластеры с тритоном и малой секундой,
   // глухой мотив «рога» в нижнем регистре (до — ре-бемоль — соль), далёкий металл, ветер, редкий стеклянный призвук.
-  // Гул тихий; поверх него — редкие громкие удары в неровных местах (GLOOM_STRIKES, раз в 2–3 такта, 10–15 с):
-  // низкий удар с медным аккордом, резкий аккорд-удар, диссонирующие колокола, рубленый высокий кластер с металлом.
+  // Гул тихий, тональность меняется каждые 2 такта (10 с); поверх — редкие удары в неровных местах (GLOOM_STRIKES,
+  // раз в 2–3 такта): резкий аккорд-удар, диссонирующие колокола, рубленый высокий кластер с металлом — одного уровня.
+  // Низких вставок (удары по металлу в нижнем регистре, низкий барабан) нет.
   // Вариант при контакте — тот же фон и глухой пульс.
   var GLOOM_BLOCKS = [
     { bass: 24, notes: [43, 44, 48] },        // C: соль, ля-бемоль, до
@@ -859,30 +860,29 @@ var Music = (function () {
   ];
   var GLOOM_HORN = [[0, 0, 48, 2], [0, 2, 49, 2], [1, 0, 43, 4]];      // [такт от начала фразы, доля, нота, длительность]
   var GLOOM_EVENTS = [
-    [1, 1, 'metal', 33, 0.4, -0.5], [3, 0, 'draft', 120, 0.13, 480], [5, 2.5, 'metal', 31, 0.42, 0.6], [6, 1, 'glass', 76, 0.02, -0.3],
-    [9, 0.5, 'metal', 35, 0.36, 0.4], [11, 0, 'draft', 100, 0.12, 420], [13, 3, 'metal', 30, 0.45, -0.6], [15, 0, 'swell', 0, 0.07, 0],
-    [17, 2, 'metal', 34, 0.38, 0.5], [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.02, 0.4], [22, 3, 'metal', 32, 0.42, -0.4],
-    [25, 0.5, 'metal', 36, 0.36, 0.6], [27, 0, 'draft', 110, 0.12, 460], [29, 2, 'metal', 31, 0.44, -0.5], [31, 0, 'swell', 0, 0.07, 0]
+    [3, 0, 'draft', 120, 0.13, 480], [6, 1, 'glass', 76, 0.03, -0.3],
+    [11, 0, 'draft', 100, 0.12, 420],
+    [19, 0, 'draft', 130, 0.13, 520], [21, 1.5, 'glass', 74, 0.03, 0.4],
+    [27, 0, 'draft', 110, 0.12, 460]
   ];
   // [такт, доля, вид]: boom — низкий удар и медный аккорд кластера; stab — резкий аккорд-удар октавой выше;
   // bell — два колокола через малую секунду; shriek — рубленый высокий кластер и удар по металлу
   var GLOOM_STRIKES = [
-    [0, 0, 'boom'], [2, 2.5, 'stab'], [5, 1, 'bell'], [7, 3, 'boom'], [10, 0.5, 'shriek'], [12, 0, 'boom'], [14, 2, 'bell'],
-    [17, 1.5, 'stab'], [20, 0, 'boom'], [22, 3, 'shriek'], [25, 1, 'bell'], [28, 0, 'boom'], [30, 2.5, 'stab']
+    [2, 2.5, 'stab'], [5, 1, 'bell'], [7, 3, 'stab'], [10, 0.5, 'shriek'], [14, 2, 'bell'],
+    [17, 1.5, 'stab'], [22, 3, 'shriek'], [25, 1, 'bell'], [30, 2.5, 'stab']
   ];
+  var GLOOM_STRIKE_LEVEL = { stab: 1.5, bell: 1, shriek: 0.68 };
   function gloomStrike(kit, kind, at, block) {
-    if (kind === 'boom') {
-      drum(kit, at, 44, 0.6, 1.8, 0);
-      stab(kit, block.notes.map(function (note) { return note + 12; }), at, 0.075);
-    } else if (kind === 'stab') {
-      stab(kit, block.notes.map(function (note) { return note + 24; }), at, 0.06);
-      drum(kit, at, 62, 0.32, 0.6, 0.3);
+    // уровни подобраны так, чтобы удары звучали одинаково громко (GLOOM_STRIKE_LEVEL)
+    var level = GLOOM_STRIKE_LEVEL[kind];
+    if (kind === 'stab') {
+      stab(kit, block.notes.map(function (note) { return note + 24; }), at, 0.06 * level);
     } else if (kind === 'bell') {
-      bell(kit, block.notes[0] + 36, at, 0.22, -0.4);
-      bell(kit, block.notes[0] + 37, at + 0.05, 0.18, 0.4);
+      bell(kit, block.notes[0] + 36, at, 0.22 * level, -0.4);
+      bell(kit, block.notes[0] + 37, at + 0.05, 0.18 * level, 0.4);
     } else if (kind === 'shriek') {
-      chop(kit, block.notes.map(function (note) { return note + 36; }), at, 0.06, 0.2);
-      metal(kit, block.notes[1] + 12, at, 0.7, -0.3);
+      chop(kit, block.notes.map(function (note) { return note + 36; }), at, 0.06 * level, 0.2);
+      metal(kit, block.notes[1] + 12, at, 0.7 * level, -0.3);
     }
   }
   function gloomTheme(name, contact) {
@@ -890,12 +890,12 @@ var Music = (function () {
       name: name, tempo: 48, bars: 32, echo: 1.25, level: 1.3,
       scheduleBar: function (kit, bar, absoluteBar, time) {
         var beat = 60 / this.tempo, barLength = beat * 4;
-        var block = GLOOM_BLOCKS[Math.floor(bar / 4)];
-        if (bar % 4 === 0 || absoluteBar === 0) {
-          var length = (4 - bar % 4) * barLength + 2;
-          deepDrone(kit, block.bass + 12, time, length, 0.1);            // с HUM_DEEP — втрое тише прежнего
-          deepDrone(kit, block.bass + 6, time + 1, length, 0.031);         // тритон под гулом, еле слышно
-          shade(kit, block.notes, time, length, 0.05);
+        var block = GLOOM_BLOCKS[Math.floor(bar / 2) % GLOOM_BLOCKS.length];   // тональность гула — каждые 2 такта
+        if (bar % 2 === 0 || absoluteBar === 0) {
+          var length = (2 - bar % 2) * barLength + 2;
+          deepDrone(kit, block.bass + 12, time, length, 0.06);
+          deepDrone(kit, block.bass + 6, time + 1, length, 0.019);         // тритон под гулом, еле слышно
+          shade(kit, block.notes, time, length, 0.038);
         }
         // мотив «рога» в тактах 2–3 каждых восьми
         if (bar % 8 === 2 || bar % 8 === 3) GLOOM_HORN.forEach(function (entry) {
@@ -963,7 +963,9 @@ var Music = (function () {
   // (меняется только высота от блока к блоку), как механическое «дыхание» чужого корабля. Вариант при контакте
   // плотнее: добавляются низкие «вомы», металл и пульс.
   // «Зонд»: 72 удара. Узор из восьми «блипов» по восьмым (ми, ми октавой выше, фа, ...), долгое эхо делает из него сетку.
-  var PROBE_BLOCKS = [{ root: 28, notes: [47, 52, 53] }, { root: 24, notes: [48, 51, 55] }, { root: 29, notes: [48, 53, 56] }, { root: 28, notes: [46, 52, 55] }];
+  // «Зонд» меняет тональность каждые 4 такта (8 блоков), остальные — каждые 8
+  var PROBE_BLOCKS = [{ root: 28, notes: [47, 52, 53] }, { root: 24, notes: [48, 51, 55] }, { root: 29, notes: [48, 53, 56] }, { root: 26, notes: [45, 50, 53] },
+                      { root: 28, notes: [46, 52, 55] }, { root: 31, notes: [50, 55, 58] }, { root: 27, notes: [46, 51, 54] }, { root: 29, notes: [47, 53, 56] }];
   var PROBE_PATTERN = [[0, 0, 0.11], [1, 12, 0.06], [2, 1, 0.09], [3, 12, 0.05], [4, 0, 0.1], [5, 7, 0.06], [6, 1, 0.08], [7, 10, 0.05]];
   // «Улей»: 80 ударов. Низкий «вом» на два тона через полутон раз в две доли; поверх — спиккато по шестнадцатым
   // (в 8 раз чаще «вомов») с акцентами в группах 3+3+2 и щелчками на сильных.
@@ -978,12 +980,13 @@ var Music = (function () {
       name: name, tempo: settings.tempo, bars: 32, echo: kind === 'probe' ? 0.75 * 60 / 72 : kind === 'hive' ? 0.5 * 60 / 80 : 1.5 * 60 / 90, level: 1.25,
       scheduleBar: function (kit, bar, absoluteBar, time) {
         var beat = 60 / this.tempo, barLength = beat * 4;
-        var block = settings.blocks[Math.floor(bar / 8)];
-        if (bar % 8 === 0 || absoluteBar === 0) {
-          var length = (8 - bar % 8) * barLength + 2;
-          // «Зонд» и «Улей» — гул ещё тише остальных
-          deepDrone(kit, block.root + 12, time, length, kind === 'mine' ? 0.14 : 0.08);
-          shade(kit, block.notes, time, length, (contact ? 0.06 : 0.05) * (kind === 'mine' ? 1 : 0.6));
+        var span = kind === 'probe' ? 4 : 8;
+        var block = settings.blocks[Math.floor(bar / span) % settings.blocks.length];
+        if (bar % span === 0 || absoluteBar === 0) {
+          var length = (span - bar % span) * barLength + 2;
+          // «Зонд» и «Улей» — гул ещё тише остальных, «Зонд» — тише всех
+          deepDrone(kit, block.root + 12, time, length, kind === 'mine' ? 0.14 : kind === 'probe' ? 0.05 : 0.08);
+          shade(kit, block.notes, time, length, (contact ? 0.06 : 0.05) * (kind === 'mine' ? 1 : kind === 'probe' ? 0.4 : 0.6));
         }
         var lift = contact ? 1.3 : 1;
         if (kind === 'probe') {
