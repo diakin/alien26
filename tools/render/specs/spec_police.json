@@ -1,0 +1,337 @@
+[
+{
+"name": "staffpolice_ease",
+"options": {
+"civilian": "police",
+"pose": "idle"
+}
+},
+{
+"name": "staffpolice_idle",
+"options": {
+"civilian": "police",
+"armed": true,
+"pose": "idle"
+}
+},
+{
+"name": "staffpolice_standAim",
+"options": {
+"civilian": "police",
+"armed": true,
+"pose": "standAim"
+}
+},
+{
+"name": "staffpolice_kneelAim",
+"options": {
+"civilian": "police",
+"armed": true,
+"pose": "kneelAim"
+}
+},
+{
+"name": "staffpolice_walk_f0",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.0
+}
+},
+{
+"name": "staffpolice_walk_f1",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.0625
+}
+},
+{
+"name": "staffpolice_walk_f2",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.125
+}
+},
+{
+"name": "staffpolice_walk_f3",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.1875
+}
+},
+{
+"name": "staffpolice_walk_f4",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.25
+}
+},
+{
+"name": "staffpolice_walk_f5",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.3125
+}
+},
+{
+"name": "staffpolice_walk_f6",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.375
+}
+},
+{
+"name": "staffpolice_walk_f7",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.4375
+}
+},
+{
+"name": "staffpolice_walk_f8",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.5
+}
+},
+{
+"name": "staffpolice_walk_f9",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.5625
+}
+},
+{
+"name": "staffpolice_walk_f10",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.625
+}
+},
+{
+"name": "staffpolice_walk_f11",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.6875
+}
+},
+{
+"name": "staffpolice_walk_f12",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.75
+}
+},
+{
+"name": "staffpolice_walk_f13",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.8125
+}
+},
+{
+"name": "staffpolice_walk_f14",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.875
+}
+},
+{
+"name": "staffpolice_walk_f15",
+"options": {
+"civilian": "police",
+"armed": true,
+"walkPhase": 0.9375
+}
+},
+{
+"name": "staffpolice_fall_f0",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.1429
+}
+},
+{
+"name": "staffpolice_fall_f1",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.2857
+}
+},
+{
+"name": "staffpolice_fall_f2",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.4286
+}
+},
+{
+"name": "staffpolice_fall_f3",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.5714
+}
+},
+{
+"name": "staffpolice_fall_f4",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.7143
+}
+},
+{
+"name": "staffpolice_fall_f5",
+"options": {
+"civilian": "police",
+"armed": true,
+"fall": 0.8571
+}
+},
+{
+"name": "staffpolice_dead",
+"options": {
+"civilian": "police",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffpolice_deadbare",
+"options": {
+"civilian": "police",
+"armed": true,
+"dead": true
+}
+},
+{
+"name": "staffpolice_ewalk_f0",
+"options": {
+"civilian": "police",
+"easePhase": 0.0
+}
+},
+{
+"name": "staffpolice_ewalk_f1",
+"options": {
+"civilian": "police",
+"easePhase": 0.0625
+}
+},
+{
+"name": "staffpolice_ewalk_f2",
+"options": {
+"civilian": "police",
+"easePhase": 0.125
+}
+},
+{
+"name": "staffpolice_ewalk_f3",
+"options": {
+"civilian": "police",
+"easePhase": 0.1875
+}
+},
+{
+"name": "staffpolice_ewalk_f4",
+"options": {
+"civilian": "police",
+"easePhase": 0.25
+}
+},
+{
+"name": "staffpolice_ewalk_f5",
+"options": {
+"civilian": "police",
+"easePhase": 0.3125
+}
+},
+{
+"name": "staffpolice_ewalk_f6",
+"options": {
+"civilian": "police",
+"easePhase": 0.375
+}
+},
+{
+"name": "staffpolice_ewalk_f7",
+"options": {
+"civilian": "police",
+"easePhase": 0.4375
+}
+},
+{
+"name": "staffpolice_ewalk_f8",
+"options": {
+"civilian": "police",
+"easePhase": 0.5
+}
+},
+{
+"name": "staffpolice_ewalk_f9",
+"options": {
+"civilian": "police",
+"easePhase": 0.5625
+}
+},
+{
+"name": "staffpolice_ewalk_f10",
+"options": {
+"civilian": "police",
+"easePhase": 0.625
+}
+},
+{
+"name": "staffpolice_ewalk_f11",
+"options": {
+"civilian": "police",
+"easePhase": 0.6875
+}
+},
+{
+"name": "staffpolice_ewalk_f12",
+"options": {
+"civilian": "police",
+"easePhase": 0.75
+}
+},
+{
+"name": "staffpolice_ewalk_f13",
+"options": {
+"civilian": "police",
+"easePhase": 0.8125
+}
+},
+{
+"name": "staffpolice_ewalk_f14",
+"options": {
+"civilian": "police",
+"easePhase": 0.875
+}
+},
+{
+"name": "staffpolice_ewalk_f15",
+"options": {
+"civilian": "police",
+"easePhase": 0.9375
+}
+}
+]

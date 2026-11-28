@@ -9,7 +9,7 @@ import { segment, ball, solveTwoBone, setShadows } from './lib.js';
 import { clothLimb, FOLDS, buildBoot } from './cloth.js';
 import { fabric, pvc, rubber } from './person.js';
 import { buildHumanBody, prepareHuman, restJoints } from './human.js';
-import { buildRifle } from './weapons.js';
+import { buildRifle, buildPistol } from './weapons.js';
 export { prepareHuman };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -36,6 +36,9 @@ export const CIVILIANS = {
   // cap — фуражка (crown, band), epaulets — погоны, tie — галстук, armband — повязка на левом плече (дежурный)
   commander: { uniform: true, eyes: 0x5a6a78, top: 0x3e4a30, legs: 0x3e4a30, shoes: 0x121212, hair: 0x6a6a66, skin: 0xc8987a, build: 1.04, hairStyle: 'short', cap: { crown: 0x3e4a30, band: 0x9a1c1c }, epaulets: 0xc8a040, tie: 0x2a2c20 },
   officer: { uniform: true, eyes: 0x4a3a28, top: 0x46523a, legs: 0x46523a, shoes: 0x121212, hair: 0x2a2018, skin: 0xc4967a, build: 1.02, hairStyle: 'short', epaulets: 0xc8a040, tie: 0x2a2c20, armband: 0xb01e1e },
+  // полицейский: тёмно-синяя форма, фуражка с красным околышем, погоны; в бою (armed) — тёмный бронежилет
+  // с белой полосой «ПОЛИЦИЯ» на груди поверх формы, фуражка остаётся, пистолет в обеих руках, кобура на правом бедре
+  police: { uniform: true, police: true, eyes: 0x4a3a28, top: 0x15264a, legs: 0x101c38, shoes: 0x0e0e0e, hair: 0x2a2018, skin: 0xc4967a, build: 1.03, hairStyle: 'short', cap: { crown: 0x0f1a34, band: 0x9a1c1c }, epaulets: 0xb8bcc0, tie: 0x0e1422, shirt: 0x9db4cc },
   // врач: голубой хирургический костюм, белый халат, фонендоскоп
   doctor: { top: 0x84b4cc, legs: 0x84b4cc, shoes: 0xdcdcd8, hair: 0x3a2c20, skin: 0xc89c80, build: 1, hairStyle: 'short', coat: 0xeeeeea, stethoscope: true, glasses: true },
   // хирург: зелёный костюм, шапочка, маска, перчатки
@@ -113,8 +116,9 @@ function materialsFor(kind) {
     materials.lace = rubber(0x121212);
   }
   // боевое снаряжение персонала: бронежилет и подсумки из кордуры, шлем матовый
-  materials.armor = cloth(0x4e4c36, 0.95, 'twill');
-  materials.armorDark = cloth(0x34352a, 0.95, 'twill');
+  materials.armor = cloth(look.police ? 0x24282d : 0x4e4c36, 0.95, 'twill');
+  materials.armorDark = cloth(look.police ? 0x15181b : 0x34352a, 0.95, 'twill');
+  if (look.police) materials.policeBand = new THREE.MeshStandardMaterial({ color: 0xe8e8e4, roughness: 0.5 });
   materials.armorHelmet = new THREE.MeshStandardMaterial({ color: 0x484c38, roughness: 0.8 });
   materials.button = new THREE.MeshStandardMaterial({ color: look.uniform ? 0xb89a48 : 0xe8e6e0, roughness: 0.35, metalness: look.uniform ? 0.7 : 0 });
   materials.seam = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0.25 });
@@ -217,12 +221,31 @@ function placeRifle(kind, spec, pelvis, torsoQuat) {
   return { rifle, hands, elbowPoles };
 }
 
+// пистолет по позе: в прицеле — на вытянутых руках у линии глаз перед грудью (хват двумя руками),
+// в готовности — внизу перед животом стволом вниз-вперёд
+function placePistol(kind, spec, pelvis, torsoQuat) {
+  const joints = restJoints(kind);
+  const posed = (name) => joints[name].clone().sub(joints.pelvis).applyQuaternion(torsoQuat).add(pelvis);
+  const middle = posed('upperarm_l').add(posed('upperarm_r')).multiplyScalar(0.5);
+  const pistol = buildPistol();
+  pistol.quaternion.setFromEuler(new THREE.Euler(-spec.aimPitch, 0, 0, 'YXZ'));
+  if (spec.ready === 'aim') pistol.position.copy(middle).add(V(0.03, -0.07, 0.47));
+  else pistol.position.copy(middle).add(V(0.03, -0.36, 0.25));
+  pistol.updateMatrixWorld(true);
+  const grip = pistol.localToWorld(pistol.userData.grip.clone());
+  const support = pistol.localToWorld(pistol.userData.grip.clone().add(V(-0.026, -0.012, 0.006)));
+  const elbowPoles = spec.ready === 'aim' ? [V(-1, -0.7, 0), V(1, -0.7, 0)] : [V(-0.7, -1, 0.1), V(0.7, -1, 0.1)];
+  return { rifle: pistol, hands: [support, grip], elbowPoles };
+}
+
 // ---------- модель ----------
 // armed — боевой вид персонала: бронежилет и каска поверх рабочей одежды (головные уборы снимаются), автомат в позах с ready
 export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {}) {
   const baseLook = CIVILIANS[kind];
-  const look = armed ? { ...baseLook, cap: null, chefHat: null, nurseCap: null, helmet: null, scrubCap: null, baseballCap: null, vest: null, tablet: null } : baseLook;
-  const spec = typeof pose === 'string' ? (armed && ARMED_POSES[pose] ? ARMED_POSES[pose] : CIVILIAN_POSES[pose]) : pose;
+  const look = armed ? { ...baseLook, cap: baseLook.police ? baseLook.cap : null, chefHat: null, nurseCap: null, helmet: null, scrubCap: null, baseballCap: null, vest: null, tablet: null } : baseLook;
+  let spec = typeof pose === 'string' ? (armed && ARMED_POSES[pose] ? ARMED_POSES[pose] : CIVILIAN_POSES[pose]) : pose;
+  // с пистолетом — фронтальная стойка: корпус почти не развёрнут
+  if (armed && look.police && spec.ready) spec = { ...spec, twist: spec.twist * 0.2 };
   const materials = materialsFor(kind);
   const person = new THREE.Group();
   const add = (object) => { person.add(object); return object; };
@@ -306,7 +329,7 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   const armorOffset = look.coat || look.hazmat ? 0.044 : 0.035;
   const topShape = look.coat ? coatShape : jacketShape;
   if (armed) layer('vest', materials.armor, armorOffset, { relax: topShape ? 40 : 12, loose: 0, trapezoid: topShape ? { ...topShape, ease: topShape.ease + 0.016 } : null });
-  const weapon = armed && spec.ready && !spec.limp ? placeRifle(kind, spec, pelvis, torsoQuat) : null;
+  const weapon = armed && spec.ready && !spec.limp ? (look.police ? placePistol(kind, spec, pelvis, torsoQuat) : placeRifle(kind, spec, pelvis, torsoQuat)) : null;
   const human = buildHumanBody({ kind, look, garments, baggy, trapezoid: topShape, hideHair: !!(look.hazmat || look.scrubCap), hairStyle: look.hairStyle }, {
     pelvis, pelvisQuat, torsoQuat, headQuat, hands: weapon ? weapon.hands : spec.handsOnHead ? null : spec.hands, handsOnHead: !!spec.handsOnHead, grip: !!weapon,
     elbowPoles: weapon ? weapon.elbowPoles : spec.elbowPoles, feet: spec.feet.map((foot) => foot.clone().add(V(0, 0.03, 0))), kneePole: spec.kneePole, footQuats,
@@ -523,7 +546,13 @@ export function buildCivilian({ kind = 'man', pose = 'idle', armed = false } = {
   }
 
   // ---- боевое снаряжение: подсумки на бронежилете, каска, автомат ----
-  if (armed) {
+  if (armed && look.police) {
+    // полиция: белая полоса «ПОЛИЦИЯ» на груди, рация слева, подсумок для магазина, кобура на правом бедре
+    placed(box(0.24, 0.05, 0.008, materials.policeBand, 0.003), front(0, chestY + 0.045, armorOffset + 0.006), torsoQuat);
+    placed(box(0.05, 0.1, 0.035, materials.armorDark, 0.01), front(-0.1, chestY - 0.05, armorOffset + 0.018), torsoQuat);
+    placed(box(0.06, 0.08, 0.035, materials.armorDark, 0.01), front(-0.06, waistY + 0.06, armorOffset + 0.018), torsoQuat);
+    placed(box(0.045, 0.14, 0.05, materials.dark, 0.01), human.torsoPoint(0.205, waistY - 0.11, 0.01), torsoQuat);
+  } else if (armed) {
     // три магазинных подсумка внизу спереди, радиостанция слева на груди, аптечка справа
     for (const x of [-0.085, 0, 0.085]) placed(box(0.072, 0.11, 0.045, materials.armor, 0.01), front(x, waistY + 0.07, armorOffset + 0.022), torsoQuat);
     placed(box(0.06, 0.12, 0.04, materials.armorDark, 0.01), front(-0.1, chestY + 0.02, armorOffset + 0.02), torsoQuat);

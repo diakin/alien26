@@ -12,6 +12,8 @@ var Items = (function () {
     plasmaRifle: { alien: true, name: 'ПЛАЗМЕННАЯ ВИНТОВКА', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 3, weight: 7, weapon: 'plasmaRifle', ammo: 'energyCell', crop: [24, 110, 332, 80], image: 'assets/ui/weapon_aliengold.png' },
     plasmaPistol: { alien: true, name: 'ПЛАЗМЕННЫЙ ПИСТОЛЕТ', note: 'ЭНЕРГОЯЧЕЙКА', w: 1, h: 2, weight: 4, weapon: 'plasmaPistol', ammo: 'energyCell', crop: [32, 60, 299, 185], image: 'assets/ui/weapon_alien.png' },
     carbineMag: { name: 'МАГАЗИН КС-9', note: 'ПАТРОНЫ 5,45', w: 1, h: 1, weight: 2, rounds: 30, draw: drawMagazine },
+    pistol: { name: 'ПИСТОЛЕТ ПЯ', note: 'СЛУЖЕБНЫЙ · 9×19', w: 1, h: 2, weight: 2, weapon: 'pistol', ammo: 'pistolMag', draw: drawPistol },
+    pistolMag: { name: 'МАГАЗИН ПЯ', note: 'ПАТРОНЫ 9×19', w: 1, h: 1, weight: 1, rounds: 17, draw: drawMagazine },
     energyCell: { alien: true, name: 'ЭНЕРГОЯЧЕЙКА', note: 'К ПЛАЗМЕННОМУ ОРУЖИЮ', w: 1, h: 1, weight: 2, rounds: 20, draw: drawCell },
     grenade: { name: 'ГРАНАТА РГ-7', note: 'ОСКОЛОЧНАЯ', w: 1, h: 1, weight: 3, draw: drawGrenade },
     medkit: { name: 'АПТЕЧКА', note: 'ПЕРЕВЯЗКА И ОБЕЗБОЛИВАНИЕ', w: 2, h: 1, weight: 5, draw: drawMedkit }
@@ -95,6 +97,27 @@ var Items = (function () {
     context.translate(x + width / 2, y + height / 2);
     if (vertical) context.rotate(-Math.PI / 2);
     context.drawImage(image, crop[0], crop[1], crop[2], crop[3], -crop[2] * scale / 2, -crop[3] * scale / 2, crop[2] * scale, crop[3] * scale);
+    context.restore();
+  }
+  // пистолет — силуэт сбоку: затвор, рамка, рукоять; в вертикальной ячейке — повёрнут на −90°
+  function drawPistol(context, width, height) {
+    var vertical = height > width, length = vertical ? height : width, thick = vertical ? width : height;
+    var scale = Math.min(length / 120, thick / 70);
+    context.save();
+    context.translate(width / 2, height / 2);
+    if (vertical) context.rotate(-Math.PI / 2);
+    context.scale(scale, scale);
+    context.fillStyle = '#26292c';                                   // рукоять
+    context.beginPath(); context.moveTo(-40, -2); context.lineTo(-18, -2); context.lineTo(-24, 34); context.lineTo(-48, 34); context.closePath(); context.fill();
+    context.fillStyle = '#1c1e20';                                   // рамка и скоба
+    context.fillRect(-42, -10, 84, 10);
+    context.strokeStyle = '#1c1e20'; context.lineWidth = 4;
+    context.beginPath(); context.arc(-6, 2, 9, 0, Math.PI); context.stroke();
+    context.fillStyle = '#3a3f44';                                   // затвор
+    context.fillRect(-46, -24, 98, 15);
+    context.fillStyle = '#5a6066'; context.fillRect(-46, -24, 98, 3);
+    context.fillStyle = '#23272a';
+    for (var notch = 0; notch < 5; notch++) context.fillRect(-42 + notch * 4, -21, 2, 10);
     context.restore();
   }
   function drawMagazine(context, width, height) {

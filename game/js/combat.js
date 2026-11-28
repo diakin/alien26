@@ -22,6 +22,14 @@ var Combat = (function () {
         { name: 'Очередь', cost: 26, accuracy: 0.4, shots: 3 }
       ]
     },
+    // служебный пистолет полиции: слабее и ближе карабина
+    pistol: {
+      damage: 24, range: 35, magazine: 17, projectile: 'bullet',
+      modes: [
+        { name: 'Прицельный', cost: 14, accuracy: 0.95, shots: 1 },
+        { name: 'Навскидку', cost: 8, accuracy: 0.6, shots: 1 }
+      ]
+    },
     plasmaPistol: {
       damage: 40, range: 45, magazine: 20, projectile: 'plasma',
       modes: [

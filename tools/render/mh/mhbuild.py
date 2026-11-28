@@ -29,6 +29,7 @@ KINDS = {
     'girl':        dict(gender=0, age=0.14, muscle=0.5, weight=0.5, seed=17, skin=(232, 192, 166), hair=(154, 106, 58), stubble=0, lips=(196, 110, 110)),
     'commander':   dict(gender=1, age=0.72, muscle=0.6, weight=0.56, seed=21, skin=(212, 160, 128), hair=(118, 116, 110), stubble=0.25),
     'officer':     dict(gender=1, age=0.54, muscle=0.62, weight=0.5, seed=22, skin=(208, 158, 126), hair=(44, 34, 26), stubble=0.3),
+    'police':      dict(gender=1, age=0.54, muscle=0.62, weight=0.5, seed=22, skin=(208, 158, 126), hair=(44, 34, 26), stubble=0.3),   # тело как у officer
     'doctor':      dict(gender=1, age=0.62, muscle=0.35, weight=0.12, seed=23, skin=(216, 168, 138), hair=(64, 48, 34), stubble=0.3),
     'surgeon':     dict(gender=1, age=0.56, muscle=0.55, weight=0.5, seed=24, skin=(210, 164, 134), hair=(46, 34, 26), stubble=0.4),
     'nurse':       dict(gender=0, age=0.5, muscle=0.45, weight=0.52, seed=25, skin=(230, 186, 160), hair=(126, 76, 44), stubble=0, lips=(178, 84, 88)),

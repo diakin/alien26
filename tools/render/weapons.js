@@ -211,6 +211,25 @@ export function buildPlasmaRifle() {
   return rifle;
 }
 
+// ---------------- служебный пистолет (полиция) ----------------
+// Затвор-кожух, полимерная рамка, рукоять с наклоном назад, спусковая скоба. Ствол вдоль +z,
+// userData.grip — середина рукояти (кисть), userData.muzzle — дульный срез.
+export function buildPistol() {
+  const material = getMaterials();
+  const pistol = new THREE.Group();
+  rounded(pistol, 0.03, 0.034, 0.2, material.steel, 0, 0.074, 0.07, 0.005);              // затвор
+  for (let notch = 0; notch < 6; notch++) rounded(pistol, 0.031, 0.026, 0.003, material.steelDark, 0, 0.074, -0.022 + notch * 0.006, 0.001);
+  rounded(pistol, 0.027, 0.022, 0.16, material.polymer, 0, 0.049, 0.06, 0.004);           // рамка
+  side(pistol, [[0.012, 0.046], [-0.036, 0.046], [-0.058, -0.072], [-0.016, -0.078], [0.006, 0.0]], 0.03, material.polymer, 0, 0.005);
+  const guard = shadowed(new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0035, 6, 16, Math.PI), material.polymer));
+  guard.rotation.set(0, Math.PI / 2, Math.PI); guard.position.set(0, 0.04, 0.03); pistol.add(guard);
+  rounded(pistol, 0.006, 0.018, 0.006, material.steelDark, 0, 0.03, 0.026, 0.002);       // спуск
+  rounded(pistol, 0.006, 0.008, 0.01, material.steelDark, 0, 0.094, 0.16, 0.002);        // мушка
+  pistol.userData.grip = V(0, -0.012, -0.022);
+  pistol.userData.muzzle = V(0, 0.078, 0.172);
+  return pistol;
+}
+
 export function buildPlasmaPistol() {
   const material = getMaterials();
   const pistol = new THREE.Group();

@@ -322,6 +322,19 @@
       loadout: [['carbine', 'rightHand', 30], ['carbineMag', 'belt'], ['carbineMag', 'belt']]
     };
   }
+  // Полиция (MISSION.police — дежурные в отделе): на стороне отряда, действуют сами (staffDecide — как персонал базы:
+  // стреляют по замеченным пришельцам, потом укрываются), игрок может взять под управление щелчком.
+  // Форма, бронежилет поверх, фуражка, служебный пистолет (спрайты staffpolice_*, tools/render/civilian.js: police).
+  function policeProfile(person, number) {
+    return {
+      kind: 'staff', name: person.name || 'Полицейский', camo: 'staffpolice', portrait: 'civpolice', side: 'squad', staff: true, ai: true, police: true,
+      callsign: 'ПОЛИЦИЯ-' + number, rank: person.rank || 'сержант полиции', role: 'ПОЛИЦИЯ',
+      subtitle: 'ПОЛИЦИЯ · ДЕЖУРНАЯ ЧАСТЬ', missions: 0,
+      accuracy: 46, reactions: 44, strength: 28, bravery: 50, throwing: 35, armor: 10,
+      maxTimeUnits: 54, health: 34, maxHealth: 34, stamina: 56, maxStamina: 56, morale: 60, optics: '—',
+      loadout: [['pistol', 'rightHand', 17], ['pistolMag', 'belt'], ['pistolMag', 'belt']]
+    };
+  }
   // снаряжение корабля с базы (basestore.js, «Снарядить корабль»): на заданиях с конвертопланом летят отмеченные
   // бойцы (по местам высадки в порядке посадки), K7 — если отмечен, груз лежит в ящике у отряда
   var SHIP = (function () {
@@ -362,6 +375,9 @@
         unit.kneeling = !person.hidden;
         list.push(unit);
       });
+    }
+    if (MISSION && MISSION.police && PAGE_MODE !== 'manage') {
+      MISSION.police.forEach(function (person, index) { list.push(makeUnit(policeProfile(person, index + 1), [person.col, person.row, person.level, person.dir])); });
     }
     return list;
   }
@@ -2142,7 +2158,7 @@
       if (rescuePending()) { if (!mission.awaitDelivery) { mission.awaitDelivery = true; say('Пришельцы уничтожены. Доставьте учёного и детей на конвертоплан'); } }
       else { say('Пришельцы уничтожены'); endMission('cleared'); }
     }
-    else if (!units.some(function (other) { return isFighter(other) && other.kind !== 'mech'; })) { say('Отряд погиб'); endMission('wiped'); }
+    else if (!units.some(function (other) { return isFighter(other) && other.kind !== 'mech' && !other.police; })) { say('Отряд погиб'); endMission('wiped'); }
   }
 
   // ---------------- гражданские: присоединение к отряду ----------------
@@ -2173,8 +2189,13 @@
   // ---------------- таймер портала ----------------
   // Часы задания идут в реальном времени, пока вкладка открыта и задание не кончилось. Когда время выходит,
   // открывается портал (MISSION.portal) и рядом с ним появляются крупные силы пришельцев.
+  // Вместе с главным открываются боковые порталы (MISSION.sidePortals: at — клетка, wave — сколько пришельцев,
+  // elites — номера элиты в волне по порядку появления, name — где он, для сообщений).
   var PORTAL_WAVE = 10;
   var portal = MISSION && MISSION.portal && MISSION.timeLimit ? { col: MISSION.portal[0], row: MISSION.portal[1], level: MISSION.portal[2] || 0, limit: MISSION.timeLimit * 1000, open: false, openedAt: 0 } : null;
+  var sidePortals = portal && MISSION.sidePortals ? MISSION.sidePortals.map(function (entry) {
+    return { col: entry.at[0], row: entry.at[1], level: entry.at[2] || 0, wave: entry.wave, elites: entry.elites || [], name: entry.name || '', open: false, openedAt: 0 };
+  }) : [];
   var missionClock = { elapsed: 0, last: performance.now() };
   function updateMissionClock(now) {
     var delta = now - missionClock.last;
@@ -2184,27 +2205,35 @@
     if (!portal.open && missionClock.elapsed >= portal.limit) openPortal(now);
     else announcePortal();
   }
-  function openPortal(now) {
-    portal.open = true; portal.openedAt = now;
-    var placed = 0, number = startUnits.filter(function (unit) { return unit.side === 'aliens'; }).length;
-    for (var radius = 0; radius < 8 && placed < PORTAL_WAVE; radius++) {
-      for (var deltaRow = -radius; deltaRow <= radius && placed < PORTAL_WAVE; deltaRow++) for (var deltaCol = -radius; deltaCol <= radius && placed < PORTAL_WAVE; deltaCol++) {
+  // волна у портала: count пришельцев по кольцам вокруг клетки портала; elites — номера элиты по порядку
+  function spawnWave(gate, count, elites) {
+    gate.open = true; gate.openedAt = performance.now();
+    var wave = [], number = startUnits.filter(function (unit) { return unit.side === 'aliens'; }).length;
+    for (var radius = 0; radius < 8 && wave.length < count; radius++) {
+      for (var deltaRow = -radius; deltaRow <= radius && wave.length < count; deltaRow++) for (var deltaCol = -radius; deltaCol <= radius && wave.length < count; deltaCol++) {
         if (Math.max(Math.abs(deltaCol), Math.abs(deltaRow)) !== radius) continue;
-        var col = portal.col + deltaCol, row = portal.row + deltaRow;
-        if (!inside(col, row) || !isFreeFor(null)(col, row, portal.level)) continue;
-        // двое из волны — элита (третий и шестой по порядку: у портала, но не в центре); в этом задании — серебристые
-        var elite = placed === 2 || placed === 5;
-        var alien = makeUnit(elite ? eliteAlienProfile(++number, (MISSION && MISSION.portalElite) || 'silver') : alienProfile(++number), [col, row, portal.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
+        var col = gate.col + deltaCol, row = gate.row + deltaRow;
+        if (!inside(col, row) || !isFreeFor(null)(col, row, gate.level)) continue;
+        var elite = elites.indexOf(wave.length) >= 0;
+        var alien = makeUnit(elite ? eliteAlienProfile(++number, (MISSION && MISSION.portalElite) || 'silver') : alienProfile(++number), [col, row, gate.level, (deltaCol + deltaRow) > 0 ? 1 : 5]);
         alien.timeUnits = 0;
         units.push(alien); startUnits.push(alien);
-        placed++;
+        wave.push(alien);
       }
     }
+    return wave;
+  }
+  function openPortal(now) {
+    // главный портал: двое из волны — элита (третий и шестой по порядку: у портала, но не в центре); в этом задании — серебристые
+    var main = spawnWave(portal, PORTAL_WAVE, [2, 5]);
+    portal.openedAt = now;
+    var side = 0;
+    sidePortals.forEach(function (gate) { side += spawnWave(gate, gate.wave, gate.elites).length; gate.openedAt = now; });
     setCombat(true);
     Sound.play('impact', 0);
-    say('Портал вспыхнул: прибыли ' + placed + ' пришельцев');
-    // страж-элита сразу ставит купол-щит вокруг портала
-    var keeper = units.filter(function (unit) { return unit.elite && unit.domeCharges > 0 && !unit.dead; })[0];
+    say('Портал вспыхнул: прибыли ' + main.length + ' пришельцев' + (side ? '; второй портал' + (sidePortals[0].name ? ' ' + sidePortals[0].name : '') + ' — ещё ' + side : ''));
+    // страж-элита главного портала сразу ставит купол-щит вокруг него
+    var keeper = main.filter(function (unit) { return unit.elite && unit.domeCharges > 0 && !unit.dead; })[0];
     if (keeper) raiseDome(keeper);
   }
   function timerText() {
@@ -2376,16 +2405,22 @@
     if (!glow.stage || glow.stage === portalStageSaid) return;
     portalStageSaid = glow.stage;
     var left = 6 - glow.stage;
-    say(glow.stage === 1 ? 'Появился круг портала: до открытия ' + left + ' мин' : 'Портал разгорается: до открытия ' + left + ' мин');
+    var count = 1 + sidePortals.length, what = count > 1 ? 'Порталы разгораются' : 'Портал разгорается';
+    say(glow.stage === 1 ? (count > 1 ? 'Появились круги порталов (' + count + ')' : 'Появился круг портала') + ': до открытия ' + left + ' мин' : what + ': до открытия ' + left + ' мин');
   }
   function drawPortal(now) {
-    if (!portal || portal.level > view.level) return;
-    var center = Iso.toScreen(portal.col + 0.5, portal.row + 0.5, elevationOf(portal.col, portal.row, portal.level) + 0.05);
+    if (!portal) return;
+    drawPortalAt(portal, now);
+    sidePortals.forEach(function (gate) { drawPortalAt(gate, now); });
+  }
+  function drawPortalAt(gate, now) {
+    if (!portal || gate.level > view.level) return;
+    var center = Iso.toScreen(gate.col + 0.5, gate.row + 0.5, elevationOf(gate.col, gate.row, gate.level) + 0.05);
     var x = center.x - camera.x, y = center.y - camera.y;
-    var cell = Iso.toScreen(portal.col + 1.5, portal.row + 0.5, 0).x - Iso.toScreen(portal.col + 0.5, portal.row + 0.5, 0).x;
+    var cell = Iso.toScreen(gate.col + 1.5, gate.row + 0.5, 0).x - Iso.toScreen(gate.col + 0.5, gate.row + 0.5, 0).x;
     var squash = 35 / 61;
     context.save();
-    if (!portal.open) {
+    if (!gate.open) {
       var glow = portalGlow();
       if (!glow.stage) { context.restore(); return; }
       var power = glow.power, radius = cell * PORTAL_RADIUS, pulse = 0.85 + 0.15 * Math.sin(now / (380 - power * 200));
@@ -2448,7 +2483,7 @@
       context.beginPath(); context.moveTo(x, y); context.lineTo(x, y - cell * 3);
       context.strokeStyle = 'rgba(200, 140, 255, ' + (0.3 + 0.2 * Math.sin(now / 200)) + ')'; context.lineWidth = cell * 0.6; context.stroke();
       // вспышка открытия: расходящийся белый свет
-      var flashAge = (now - portal.openedAt) / PORTAL_FLASH;
+      var flashAge = (now - gate.openedAt) / PORTAL_FLASH;
       if (flashAge < 1) {
         var flashRadius = cell * (2 + 9 * Math.sqrt(flashAge)), strength = Math.pow(1 - flashAge, 1.6);
         context.globalCompositeOperation = 'lighter';
@@ -3145,7 +3180,7 @@
   }
   function setPhaseLabel() {
     var label = document.getElementById('phase');
-    if (label) label.textContent = mission.roam ? 'ОСМОТР КАРТЫ' : phase === 'squad' ? 'ФАЗА ОТРЯДА' : phase === 'staff' ? 'ПЕРСОНАЛ БАЗЫ' : 'ХОД ПРИШЕЛЬЦЕВ';
+    if (label) label.textContent = mission.roam ? 'ОСМОТР КАРТЫ' : phase === 'squad' ? 'ФАЗА ОТРЯДА' : phase === 'staff' ? (staffQueue.length && staffQueue.every(function (unit) { return unit.police; }) ? 'ПОЛИЦИЯ' : 'ПЕРСОНАЛ БАЗЫ') : 'ХОД ПРИШЕЛЬЦЕВ';
   }
   // ---- переговоры пришельцев в их ход (Sound.alienTalk) ----
   // В начале хода один пришелец вызывает, один-два отвечают; когда пришелец начинает действовать — иногда короткая
@@ -3828,7 +3863,7 @@
     setPhaseLabel();
     staffQueue.forEach(function (unit) { unit.aiShots = 0; unit.aiMoves = 0; unit.aiReloaded = false; });
     staffWaitUntil = performance.now() + 300;
-    say('Персонал базы');
+    say(staffQueue.every(function (unit) { return unit.police; }) ? 'Полиция' : 'Персонал базы');
   }
   function updateStaffAI(now) {
     if (phase !== 'staff' || mission.over || now < staffWaitUntil || shots.length || shotView) return;
