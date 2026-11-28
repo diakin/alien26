@@ -2752,7 +2752,7 @@
   // в пределах дальности его оружия и при свободной линии огня от его ствола до корпуса (как при выборе цели:
   // стены, предметы и юниты на линии заслоняют). Считается частями, не больше FIRE_BUDGET мс за кадр; пока юниты
   // идут, показывается прежняя картина.
-  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12, FIRE_HATCH = 7;
+  var FIRE_BUDGET = 4, STANDING_TARGET = 1.12, FIRE_LINE = 1.2;
   var reachOverlay = { key: '', far: null, near: null, at: 0 };
   var fireOverlay = { key: '', cells: null, building: null, jobs: null, index: 0 };
   function debugOn(key) { return !!(window.Settings && Settings.values[key]); }
@@ -2828,25 +2828,10 @@
     }
     if (fireOverlay.index >= jobs.length) { fireOverlay.cells = fireOverlay.building; fireOverlay.jobs = null; }
   }
-  var hatchTile = null, hatchCache = null;
-  function hatchPattern() {
-    if (!hatchCache) {
-      hatchTile = document.createElement('canvas');
-      hatchTile.width = hatchTile.height = FIRE_HATCH;
-      var tileContext = hatchTile.getContext('2d');
-      tileContext.strokeStyle = 'rgb(255, 35, 20)'; tileContext.lineWidth = 1;
-      tileContext.beginPath();
-      [-FIRE_HATCH, 0, FIRE_HATCH].forEach(function (shift) { tileContext.moveTo(shift, FIRE_HATCH); tileContext.lineTo(shift + FIRE_HATCH, 0); });
-      tileContext.stroke();
-      hatchCache = context.createPattern(hatchTile, 'repeat');
-    }
-    return hatchCache;
-  }
   function cellOf(key) { var cell = Number(key), col = cell % GRID; return { col: col, row: (cell - col) / GRID }; }
   function drawDebugZones() {
     if (fireOverlay.cells && debugOn('debugFire')) {
-      // клетки под огнём — штриховка красными линиями: все клетки одним путём, заливка узором из наклонных линий;
-      // узор привязан к карте (сдвигается с камерой), шаг и толщина линий — в пикселях экрана при любом приближении
+      // клетки под огнём — красные границы клеток: все клетки одним путём, обводка толщиной FIRE_LINE пикселей экрана
       context.save();
       context.beginPath();
       Object.keys(fireOverlay.cells).forEach(function (key) {
@@ -2857,10 +2842,8 @@
         });
         context.closePath();
       });
-      var pattern = hatchPattern();
-      if (pattern.setTransform && window.DOMMatrix) pattern.setTransform(new DOMMatrix([1 / zoom, 0, 0, 1 / zoom, -camera.x % FIRE_HATCH, -camera.y % FIRE_HATCH]));
-      context.fillStyle = pattern;
-      context.fill();
+      context.strokeStyle = 'rgb(255, 40, 25)'; context.lineWidth = FIRE_LINE / zoom; context.lineJoin = 'round';
+      context.stroke();
       context.restore();
     }
     if (reachOverlay.far && debugOn('debugReach')) {
