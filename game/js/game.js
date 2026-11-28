@@ -331,7 +331,7 @@
       callsign: 'ПОЛИЦИЯ-' + number, rank: person.rank || 'сержант полиции', role: 'ПОЛИЦИЯ',
       subtitle: 'ПОЛИЦИЯ · ДЕЖУРНАЯ ЧАСТЬ', missions: 0,
       accuracy: 46, reactions: 44, strength: 28, bravery: 50, throwing: 35, armor: 10,
-      maxTimeUnits: 54, health: 34, maxHealth: 34, stamina: 56, maxStamina: 56, morale: 60, optics: '—',
+      maxTimeUnits: 54, health: 51, maxHealth: 51, stamina: 56, maxStamina: 56, morale: 60, optics: '—',
       loadout: [['pistol', 'rightHand', 17], ['pistolMag', 'belt'], ['pistolMag', 'belt']]
     };
   }
